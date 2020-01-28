@@ -1,0 +1,16 @@
+[package]
+name = "rye"
+version = "0.0.0"
+publish = false
+description = """
+Catch2 inspired testing framework for Rust
+"""
+authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ubnt-intrepid/joke-rs.git"
+readme = "README.md"
+
+[dependencies]
+scoped-tls = "1"
+slab = "0.4"
