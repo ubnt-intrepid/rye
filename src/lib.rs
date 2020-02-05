@@ -30,10 +30,10 @@ where
 #[doc(hidden)]
 pub mod _internal {
     use crate::section::Section;
-    pub use crate::{section::SectionId, tls::set as set_session};
+    pub use crate::{section::SectionId, tls::set as set_section};
 
     #[inline]
-    pub fn new_session(id: &'static SectionId) -> Option<Section> {
+    pub fn new_section(id: &'static SectionId) -> Option<Section> {
         crate::tls::with(|section| section.new_section(id))
     }
 }
@@ -48,8 +48,8 @@ macro_rules! section {
             line: line!(),
             column: column!(),
         };
-        if let Some(mut section) = $crate::_internal::new_session(&SECTION) {
-            let _guard = $crate::_internal::set_session(&mut section);
+        if let Some(mut section) = $crate::_internal::new_section(&SECTION) {
+            let _guard = $crate::_internal::set_section(&mut section);
             $body
         }
     }};
