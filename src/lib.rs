@@ -6,7 +6,13 @@ mod section;
 mod tls;
 
 use crate::section::Sections;
-use futures::future::Future;
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "futures")] {
+        mod futures;
+        pub use futures::test_case_async;
+    }
+}
 
 /// Run a test case.
 pub fn test_case<'a, F>(f: F)
@@ -19,23 +25,6 @@ where
         let _guard = crate::tls::set(&mut section);
         f();
     }
-}
-
-/// Run a test case asynchronously.
-pub async fn test_case_async<'a, F, Fut>(f: F)
-where
-    F: Fn() -> Fut + 'a,
-    Fut: Future<Output = ()> + 'a,
-{
-    crate::tls::with_tls(async move {
-        let sections = Sections::new();
-        while !sections.completed() {
-            let mut section = sections.root();
-            let _guard = crate::tls::set(&mut section);
-            f().await;
-        }
-    })
-    .await
 }
 
 #[doc(hidden)]
