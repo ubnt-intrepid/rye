@@ -10,8 +10,9 @@ where
     crate::tls::futures::with_tls(async move {
         let sections = Sections::new();
         while !sections.completed() {
-            let mut section = sections.root();
-            let _guard = crate::tls::set(&mut section);
+            let section = sections.root();
+            pin_mut!(section);
+            let _guard = crate::tls::set(section.as_mut());
             f().await;
         }
     })

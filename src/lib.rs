@@ -2,6 +2,17 @@
 Catch inspired testing framework for Rust.
 !*/
 
+// copied from pin-utils
+#[doc(hidden)]
+#[macro_export]
+macro_rules! pin_mut {
+    ($x:ident) => {
+        let mut $x = $x;
+        #[allow(unused_mut)]
+        let mut $x = unsafe { std::pin::Pin::new_unchecked(&mut $x) };
+    };
+}
+
 mod section;
 mod tls;
 
@@ -21,8 +32,9 @@ where
 {
     let sections = Sections::new();
     while !sections.completed() {
-        let mut section = sections.root();
-        let _guard = crate::tls::set(&mut section);
+        let section = sections.root();
+        pin_mut!(section);
+        let _guard = crate::tls::set(section.as_mut());
         f();
     }
 }
@@ -48,8 +60,9 @@ macro_rules! section {
             line: line!(),
             column: column!(),
         };
-        if let Some(mut section) = $crate::_internal::new_section(&SECTION) {
-            let _guard = $crate::_internal::set_section(&mut section);
+        if let Some(section) = $crate::_internal::new_section(&SECTION) {
+            $crate::pin_mut!(section);
+            let _guard = $crate::_internal::set_section(section.as_mut());
             $body
         }
     }};

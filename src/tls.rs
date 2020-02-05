@@ -1,5 +1,5 @@
 use crate::section::Section;
-use std::{cell::Cell, marker::PhantomData, ptr::NonNull};
+use std::{cell::Cell, marker::PhantomData, pin::Pin, ptr::NonNull};
 
 thread_local! {
     static CURRENT_SECTION: Cell<Option<NonNull<Section>>> = Cell::new(None);
@@ -17,11 +17,14 @@ impl Drop for SetOnDrop {
 
 pub struct Guard<'a> {
     _set_on_drop: SetOnDrop,
-    _marker: PhantomData<&'a mut Section>,
+    _marker: PhantomData<Pin<&'a mut Section>>,
 }
 
-pub fn set(section: &mut Section) -> Guard<'_> {
-    let old_section = CURRENT_SECTION.with(|tls| tls.replace(Some(NonNull::from(section))));
+pub fn set(section: Pin<&mut Section>) -> Guard<'_> {
+    let old_section = CURRENT_SECTION.with(|tls| unsafe {
+        let section = section.get_unchecked_mut();
+        tls.replace(Some(NonNull::from(section)))
+    });
     Guard {
         _set_on_drop: SetOnDrop(old_section),
         _marker: PhantomData,
@@ -30,12 +33,12 @@ pub fn set(section: &mut Section) -> Guard<'_> {
 
 pub(crate) fn with<F, R>(f: F) -> R
 where
-    F: FnOnce(&mut Section) -> R,
+    F: FnOnce(Pin<&mut Section>) -> R,
 {
     let section_ptr = CURRENT_SECTION.with(|tls| tls.replace(None));
     let _reset = SetOnDrop(section_ptr);
     let mut section_ptr = section_ptr.expect("current section is not set");
-    unsafe { f(section_ptr.as_mut()) }
+    unsafe { f(Pin::new_unchecked(section_ptr.as_mut())) }
 }
 
 #[cfg(feature = "futures")]
