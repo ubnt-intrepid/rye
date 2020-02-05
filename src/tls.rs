@@ -49,37 +49,42 @@ pub(crate) mod futures {
         task::{self, Poll},
     };
     use pin_project::pin_project;
-    use std::pin::Pin;
+    use std::{marker::PhantomPinned, pin::Pin};
 
     pub(crate) fn with_tls<Fut: Future>(fut: Fut) -> impl Future<Output = Fut::Output> {
-        #[pin_project]
-        #[must_use]
-        pub struct WithTls<Fut> {
-            #[pin]
-            fut: Fut,
-            cache: Option<NonNull<Section>>,
+        WithTls {
+            fut,
+            cache: None,
+            _marker: PhantomPinned,
         }
+    }
 
-        impl<Fut> Future for WithTls<Fut>
-        where
-            Fut: Future,
-        {
-            type Output = Fut::Output;
+    #[pin_project]
+    #[must_use]
+    struct WithTls<Fut> {
+        #[pin]
+        fut: Fut,
+        cache: Option<NonNull<Section>>,
+        _marker: PhantomPinned,
+    }
 
-            fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-                let me = self.project();
+    impl<Fut> Future for WithTls<Fut>
+    where
+        Fut: Future,
+    {
+        type Output = Fut::Output;
 
-                let prev_section = CURRENT_SECTION.with(|tls| tls.replace(me.cache.take()));
-                let _reset = SetOnDrop(prev_section);
+        fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+            let me = self.project();
 
-                let polled = me.fut.poll(cx);
-                if let Poll::Pending = polled {
-                    *me.cache = CURRENT_SECTION.with(|tls| tls.replace(None));
-                }
-                polled
+            let prev_section = CURRENT_SECTION.with(|tls| tls.replace(me.cache.take()));
+            let _reset = SetOnDrop(prev_section);
+
+            let polled = me.fut.poll(cx);
+            if let Poll::Pending = polled {
+                *me.cache = CURRENT_SECTION.with(|tls| tls.get());
             }
+            polled
         }
-
-        WithTls { fut, cache: None }
     }
 }
