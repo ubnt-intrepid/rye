@@ -12,5 +12,8 @@ repository = "https://github.com/ubnt-intrepid/joke-rs.git"
 readme = "README.md"
 
 [dependencies]
-scoped-tls = "1"
-slab = "0.4"
+futures = "0.3"
+pin-project = "0.4"
+
+[dev-dependencies]
+futures-test = "0.3"

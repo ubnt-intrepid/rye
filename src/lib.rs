@@ -2,10 +2,60 @@
 Catch inspired testing framework for Rust.
 !*/
 
+#[doc(hidden)]
+pub mod tls;
+
+use futures::future::Future;
 use std::cell::RefCell;
 use std::collections::hash_map::{Entry, HashMap};
 use std::fmt;
+use std::rc::Rc;
 
+pub fn test_case<'a, F>(f: F)
+where
+    F: Fn() + 'a,
+{
+    let sections = Sections::new();
+    while !sections.completed() {
+        let mut section = sections.root();
+        let _guard = crate::tls::set(&mut section);
+        f();
+    }
+}
+
+pub async fn test_case_async<'a, F, Fut>(f: F)
+where
+    F: Fn() -> Fut + 'a,
+    Fut: Future<Output = ()> + 'a,
+{
+    crate::tls::with_tls(async move {
+        let sections = Sections::new();
+        while !sections.completed() {
+            let mut section = sections.root();
+            let _guard = crate::tls::set(&mut section);
+            f().await;
+        }
+    })
+    .await
+}
+
+#[macro_export]
+macro_rules! section {
+    ($name:expr, $body:block) => {{
+        static SECTION: $crate::SectionId = $crate::SectionId::SubSection {
+            name: $name,
+            file: file!(),
+            line: line!(),
+            column: column!(),
+        };
+        if let Some(mut section) = $crate::tls::with(|section| section.new_section(SECTION)) {
+            let _guard = $crate::tls::set(&mut section);
+            $body
+        }
+    }};
+}
+
+#[doc(hidden)]
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum SectionId {
     Root,
@@ -31,26 +81,15 @@ impl fmt::Debug for SectionId {
     }
 }
 
-#[macro_export]
-macro_rules! section_id {
-    ($name:expr) => {
-        $crate::SectionId::SubSection {
-            name: $name,
-            file: file!(),
-            line: line!(),
-            column: column!(),
-        }
-    };
-}
-
 /// A container that holds all section data in a test case.
-pub struct Sections {
-    inner: RefCell<HashMap<SectionId, SectionData>>,
+#[derive(Clone)]
+struct Sections {
+    inner: Rc<RefCell<HashMap<SectionId, SectionData>>>,
 }
 
 #[allow(clippy::new_without_default)]
 impl Sections {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let mut inner = HashMap::new();
         inner.insert(
             SectionId::Root,
@@ -60,19 +99,19 @@ impl Sections {
             },
         );
         Self {
-            inner: RefCell::new(inner),
+            inner: Rc::new(RefCell::new(inner)),
         }
     }
 
-    pub fn root(&self) -> Section<'_> {
+    fn root(&self) -> Section {
         Section {
-            sections: self,
+            sections: self.clone(),
             id: SectionId::Root,
             encounted: false,
         }
     }
 
-    pub fn completed(&self) -> bool {
+    fn completed(&self) -> bool {
         let sections = self.inner.borrow();
         let root = &sections[&SectionId::Root];
         root.state == SectionState::Completed
@@ -91,14 +130,15 @@ enum SectionState {
     Completed,
 }
 
-pub struct Section<'a> {
-    sections: &'a Sections,
+#[doc(hidden)]
+pub struct Section {
+    sections: Sections,
     id: SectionId,
     encounted: bool,
 }
 
-impl<'a> Section<'a> {
-    pub fn new_section(&mut self, id: SectionId) -> Option<Section<'_>> {
+impl Section {
+    pub fn new_section(&mut self, id: SectionId) -> Option<Section> {
         let mut sections = self.sections.inner.borrow_mut();
         let insert_child;
         let is_target;
@@ -143,7 +183,7 @@ impl<'a> Section<'a> {
 
         if is_target {
             Some(Section {
-                sections: &*self.sections,
+                sections: self.sections.clone(),
                 id,
                 encounted: false,
             })
@@ -171,7 +211,7 @@ impl<'a> Section<'a> {
     }
 }
 
-impl Drop for Section<'_> {
+impl Drop for Section {
     fn drop(&mut self) {
         if let Err(()) = self.check_completed() {
             if std::thread::panicking() {

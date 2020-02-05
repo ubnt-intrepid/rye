@@ -1,49 +1,71 @@
 #![allow(clippy::len_zero)]
 
-use rye::{section_id, SectionId, Sections};
-
 #[test]
 fn sketch() {
-    let sections = Sections::new();
-
-    while !sections.completed() {
-        let mut section = sections.root();
-
+    rye::test_case(|| {
         println!("setup");
 
-        {
-            const SECTION: SectionId = section_id!("section1");
-            if let Some(mut section) = section.new_section(SECTION) {
-                println!("section1:setup");
+        rye::section!("section1", {
+            println!("section1:setup");
 
-                {
-                    static SECTION: SectionId = section_id!("section2");
-                    if let Some(_section) = section.new_section(SECTION) {
-                        println!("section2");
-                    }
-                }
+            rye::section!("section2", {
+                println!("section2");
+            });
 
-                {
-                    static SECTION: SectionId = section_id!("section3");
-                    if let Some(_section) = section.new_section(SECTION) {
-                        println!("section3");
-                    }
-                }
+            rye::section!("section3", {
+                println!("section3");
+            });
 
-                println!("section1:teardown");
-            }
-        }
+            println!("section1:teardown");
+        });
 
         println!("test");
 
-        {
-            static SECTION: SectionId = section_id!("section4");
-            if let Some(_section) = section.new_section(SECTION) {
-                println!("section4");
-            }
-        }
+        rye::section!("section4", {
+            println!("section4");
+        });
 
         println!("teardown");
         println!("----------");
-    }
+    });
+}
+
+#[test]
+fn sketch_async() {
+    use futures_test::future::FutureTestExt as _;
+
+    futures::executor::block_on(rye::test_case_async(|| async {
+        println!("setup");
+        async {}.pending_once().await;
+
+        rye::section!("section1", {
+            println!("section1:setup");
+            async {}.pending_once().await;
+
+            rye::section!("section2", {
+                async {}.pending_once().await;
+                println!("section2");
+            });
+
+            rye::section!("section3", {
+                async {}.pending_once().await;
+                println!("section3");
+            });
+
+            async {}.pending_once().await;
+            println!("section1:teardown");
+        });
+
+        println!("test");
+        async {}.pending_once().await;
+
+        rye::section!("section4", {
+            async {}.pending_once().await;
+            println!("section4");
+        });
+
+        async {}.pending_once().await;
+        println!("teardown");
+        println!("----------");
+    }));
 }
