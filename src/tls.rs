@@ -1,4 +1,4 @@
-use crate::Section;
+use crate::section::Section;
 use futures::{
     future::Future,
     task::{self, Poll},

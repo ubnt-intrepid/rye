@@ -17,3 +17,4 @@ pin-project = "0.4"
 
 [dev-dependencies]
 futures-test = "0.3"
+async-std = { version = "1", features = ["attributes"] }

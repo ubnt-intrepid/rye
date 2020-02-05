@@ -30,11 +30,11 @@ fn sketch() {
     });
 }
 
-#[test]
-fn sketch_async() {
+#[async_std::test]
+async fn sketch_async() {
     use futures_test::future::FutureTestExt as _;
 
-    futures::executor::block_on(rye::test_case_async(|| async {
+    rye::test_case_async(|| async {
         println!("setup");
         async {}.pending_once().await;
 
@@ -67,5 +67,6 @@ fn sketch_async() {
         async {}.pending_once().await;
         println!("teardown");
         println!("----------");
-    }));
+    })
+    .await;
 }
