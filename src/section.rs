@@ -1,10 +1,7 @@
-use pin_project::{pin_project, pinned_drop};
 use std::{
     cell::RefCell,
     collections::hash_map::{Entry, HashMap},
     fmt,
-    marker::PhantomPinned,
-    pin::Pin,
     rc::Rc,
 };
 
@@ -45,27 +42,23 @@ enum SectionState {
     Completed,
 }
 
-#[pin_project(PinnedDrop)]
 pub struct Section {
     sections: Sections,
     id: &'static SectionId,
     encounted: bool,
-    _marker: PhantomPinned,
 }
 
 impl Section {
-    pub(crate) fn new_section(self: Pin<&mut Self>, id: &'static SectionId) -> Option<Section> {
-        let me = self.project();
-
-        let mut sections = me.sections.inner.borrow_mut();
+    pub(crate) fn new_section(&mut self, id: &'static SectionId) -> Option<Section> {
+        let mut sections = self.sections.inner.borrow_mut();
         let insert_child;
         let is_target;
         match sections.entry(id) {
             Entry::Occupied(entry) => {
                 let data = entry.into_mut();
                 match data.state {
-                    SectionState::Found if !*me.encounted => {
-                        *me.encounted = true;
+                    SectionState::Found if !self.encounted => {
+                        self.encounted = true;
                         insert_child = false;
                         is_target = true;
                     }
@@ -76,7 +69,7 @@ impl Section {
                 }
             }
             Entry::Vacant(entry) => {
-                if *me.encounted {
+                if self.encounted {
                     entry.insert(SectionData {
                         state: SectionState::Found,
                         children: vec![],
@@ -84,7 +77,7 @@ impl Section {
                     insert_child = true;
                     is_target = false;
                 } else {
-                    *me.encounted = true;
+                    self.encounted = true;
                     entry.insert(SectionData {
                         state: SectionState::Found,
                         children: vec![],
@@ -96,22 +89,21 @@ impl Section {
             }
         }
         if insert_child {
-            sections.get_mut(&*me.id).unwrap().children.push(id);
+            sections.get_mut(&self.id).unwrap().children.push(id);
         }
 
         if is_target {
             Some(Section {
-                sections: me.sections.clone(),
+                sections: self.sections.clone(),
                 id,
                 encounted: false,
-                _marker: PhantomPinned,
             })
         } else {
             None
         }
     }
 
-    fn check_completed(self: Pin<&mut Self>) -> Result<(), ()> {
+    fn check_completed(&mut self) -> Result<(), ()> {
         let mut sections = self.sections.inner.try_borrow_mut().map_err(drop)?;
 
         let mut completed = true;
@@ -130,9 +122,8 @@ impl Section {
     }
 }
 
-#[pinned_drop]
-impl PinnedDrop for Section {
-    fn drop(self: Pin<&mut Self>) {
+impl Drop for Section {
+    fn drop(&mut self) {
         if let Err(()) = self.check_completed() {
             if std::thread::panicking() {
                 panic!("unexpected error during checking section completeness.");
@@ -169,7 +160,6 @@ impl Sections {
             sections: self.clone(),
             id: &SectionId::Root,
             encounted: false,
-            _marker: PhantomPinned,
         }
     }
 

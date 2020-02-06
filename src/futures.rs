@@ -11,8 +11,7 @@ where
         let sections = Sections::new();
         while !sections.completed() {
             let section = sections.root();
-            pin_mut!(section);
-            let _guard = crate::tls::set(section.as_mut());
+            let _guard = crate::tls::set(section);
             f().await;
         }
     })
