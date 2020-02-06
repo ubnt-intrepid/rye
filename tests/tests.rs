@@ -1,5 +1,20 @@
 use rye::TestCase;
 
+macro_rules! section {
+    ($name:expr, $body:block) => {{
+        static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
+            name: $name,
+            file: file!(),
+            line: line!(),
+            column: column!(),
+        };
+        if let Some(section) = rye::_internal::new_section(&SECTION) {
+            let _guard = rye::_internal::Guard::set(Some(Box::new(section)));
+            $body
+        }
+    }};
+}
+
 #[test]
 fn no_section() {
     let mut history = vec![];
@@ -20,7 +35,7 @@ fn one_section() {
         test_case.run(|| {
             history.push("setup");
 
-            rye::section!("section1", {
+            section!("section1", {
                 history.push("section1");
             });
 
@@ -38,11 +53,11 @@ fn multi_section() {
         test_case.run(|| {
             history.push("setup");
 
-            rye::section!("section1", {
+            section!("section1", {
                 history.push("section1");
             });
 
-            rye::section!("section2", {
+            section!("section2", {
                 history.push("section2");
             });
 
@@ -68,14 +83,14 @@ fn nested_section() {
         test_case.run(|| {
             history.push("setup");
 
-            rye::section!("section1", {
+            section!("section1", {
                 history.push("section1:setup");
 
-                rye::section!("section2", {
+                section!("section2", {
                     history.push("section2");
                 });
 
-                rye::section!("section3", {
+                section!("section3", {
                     history.push("section3");
                 });
 
@@ -84,7 +99,7 @@ fn nested_section() {
 
             history.push("test");
 
-            rye::section!("section4", {
+            section!("section4", {
                 history.push("section4");
             });
 
@@ -129,16 +144,16 @@ fn smoke_async() {
             history.push("setup");
             async {}.pending_once().await;
 
-            rye::section!("section1", {
+            section!("section1", {
                 history.push("section1:setup");
                 async {}.pending_once().await;
 
-                rye::section!("section2", {
+                section!("section2", {
                     async {}.pending_once().await;
                     history.push("section2");
                 });
 
-                rye::section!("section3", {
+                section!("section3", {
                     async {}.pending_once().await;
                     history.push("section3");
                 });
@@ -150,7 +165,7 @@ fn smoke_async() {
             history.push("test");
             async {}.pending_once().await;
 
-            rye::section!("section4", {
+            section!("section4", {
                 async {}.pending_once().await;
                 history.push("section4");
             });
