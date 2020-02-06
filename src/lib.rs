@@ -25,16 +25,7 @@ pub mod _internal {
 /// Declare a section in the test case.
 #[macro_export]
 macro_rules! section {
-    ($name:expr, $body:block) => {{
-        static SECTION: $crate::_internal::SectionId = $crate::_internal::SectionId::SubSection {
-            name: $name,
-            file: file!(),
-            line: line!(),
-            column: column!(),
-        };
-        if let Some(section) = $crate::_internal::new_section(&SECTION) {
-            let _guard = $crate::_internal::Guard::set(Some(Box::new(section)));
-            $body
-        }
-    }};
+    ($($t:tt)*) => {
+        compile_error!("section!() cannot be used outside of #[test_case]")
+    };
 }
