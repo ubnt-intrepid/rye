@@ -5,7 +5,7 @@ Catch inspired testing framework for Rust.
 mod section;
 mod tls;
 
-use crate::section::Sections;
+use crate::{section::Sections, tls::Guard};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "futures")] {
@@ -22,7 +22,7 @@ where
     let sections = Sections::new();
     while !sections.completed() {
         let section = sections.root();
-        let _guard = crate::tls::set(section);
+        let _guard = Guard::set(Some(Box::new(section)));
         f();
     }
 }
@@ -30,7 +30,7 @@ where
 #[doc(hidden)]
 pub mod _internal {
     use crate::section::Section;
-    pub use crate::{section::SectionId, tls::set as set_section};
+    pub use crate::{section::SectionId, tls::Guard};
 
     #[inline]
     pub fn new_section(id: &'static SectionId) -> Option<Section> {
@@ -49,7 +49,7 @@ macro_rules! section {
             column: column!(),
         };
         if let Some(section) = $crate::_internal::new_section(&SECTION) {
-            let _guard = $crate::_internal::set_section(section);
+            let _guard = $crate::_internal::Guard::set(Some(Box::new(section)));
             $body
         }
     }};

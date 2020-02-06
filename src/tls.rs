@@ -1,30 +1,36 @@
 use crate::section::Section;
-use std::{cell::Cell, marker::PhantomData, pin::Pin};
+use std::{cell::Cell, marker::PhantomData};
 
 thread_local! {
     static CURRENT_SECTION: Cell<Option<Box<Section>>> = Cell::new(None);
 }
 
-struct SetOnDrop(Option<Box<Section>>);
+pub struct Guard<'a> {
+    old_section: Option<Box<Section>>,
+    _marker: PhantomData<fn(&'a ()) -> &'a ()>,
+}
 
-impl Drop for SetOnDrop {
+impl Drop for Guard<'_> {
     fn drop(&mut self) {
         CURRENT_SECTION.with(|tls| {
-            tls.set(self.0.take());
+            tls.set(self.old_section.take());
         });
     }
 }
 
-pub struct Guard<'a> {
-    _set_on_drop: SetOnDrop,
-    _marker: PhantomData<Pin<&'a mut Section>>,
-}
+impl<'a> Guard<'a> {
+    #[inline(never)]
+    pub fn set(section: Option<Box<Section>>) -> Self {
+        let old_section = CURRENT_SECTION.with(|tls| tls.replace(section));
+        Self {
+            old_section,
+            _marker: PhantomData,
+        }
+    }
 
-pub fn set<'a>(section: Section) -> Guard<'a> {
-    let old_section = CURRENT_SECTION.with(|tls| tls.replace(Some(Box::new(section))));
-    Guard {
-        _set_on_drop: SetOnDrop(old_section),
-        _marker: PhantomData,
+    #[inline]
+    pub(crate) fn section_mut(&mut self) -> Option<&mut Section> {
+        self.old_section.as_deref_mut()
     }
 }
 
@@ -32,51 +38,12 @@ pub(crate) fn with<F, R>(f: F) -> R
 where
     F: FnOnce(&mut Section) -> R,
 {
-    let section_ptr = CURRENT_SECTION.with(|tls| tls.replace(None));
-    let mut reset = SetOnDrop(section_ptr);
-    let section_ptr = reset.0.as_deref_mut().expect("current section is not set");
-    f(section_ptr)
+    let mut guard = Guard::set(None);
+    let section = guard.section_mut().expect("current section is not set");
+    f(section)
 }
 
 #[cfg(feature = "futures")]
-pub(crate) mod futures {
-    use super::*;
-    use futures_core::{
-        future::Future,
-        task::{self, Poll},
-    };
-    use pin_project::pin_project;
-    use std::pin::Pin;
-
-    pub(crate) fn with_tls<Fut: Future>(fut: Fut) -> impl Future<Output = Fut::Output> {
-        WithTls { fut, cache: None }
-    }
-
-    #[pin_project]
-    #[must_use]
-    struct WithTls<Fut> {
-        #[pin]
-        fut: Fut,
-        cache: Option<Box<Section>>,
-    }
-
-    impl<Fut> Future for WithTls<Fut>
-    where
-        Fut: Future,
-    {
-        type Output = Fut::Output;
-
-        fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-            let me = self.project();
-
-            let prev_section = CURRENT_SECTION.with(|tls| tls.replace(me.cache.take()));
-            let _reset = SetOnDrop(prev_section);
-
-            let polled = me.fut.poll(cx);
-            if let Poll::Pending = polled {
-                *me.cache = CURRENT_SECTION.with(|tls| tls.take());
-            }
-            polled
-        }
-    }
+pub(crate) fn take() -> Option<Box<Section>> {
+    CURRENT_SECTION.with(|tls| tls.take())
 }
