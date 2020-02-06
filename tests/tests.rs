@@ -1,47 +1,56 @@
-use std::cell::RefCell;
+use rye::TestCase;
 
 #[test]
 fn no_section() {
-    let history = RefCell::new(vec![]);
-    rye::TestCase::new().run(|| {
-        history.borrow_mut().push("test");
-    });
-    assert_eq!(*history.borrow(), vec!["test"]);
+    let mut history = vec![];
+    let mut test_case = TestCase::new();
+    while !test_case.completed() {
+        test_case.run(|| {
+            history.push("test");
+        });
+    }
+    assert_eq!(history, vec!["test"]);
 }
 
 #[test]
 fn one_section() {
-    let history = RefCell::new(vec![]);
-    rye::TestCase::new().run(|| {
-        history.borrow_mut().push("setup");
+    let mut history = vec![];
+    let mut test_case = TestCase::new();
+    while !test_case.completed() {
+        test_case.run(|| {
+            history.push("setup");
 
-        rye::section!("section1", {
-            history.borrow_mut().push("section1");
+            rye::section!("section1", {
+                history.push("section1");
+            });
+
+            history.push("teardown");
         });
-
-        history.borrow_mut().push("teardown");
-    });
-    assert_eq!(*history.borrow(), vec!["setup", "section1", "teardown"]);
+    }
+    assert_eq!(history, vec!["setup", "section1", "teardown"]);
 }
 
 #[test]
 fn multi_section() {
-    let history = RefCell::new(vec![]);
-    rye::TestCase::new().run(|| {
-        history.borrow_mut().push("setup");
+    let mut history = vec![];
+    let mut test_case = TestCase::new();
+    while !test_case.completed() {
+        test_case.run(|| {
+            history.push("setup");
 
-        rye::section!("section1", {
-            history.borrow_mut().push("section1");
+            rye::section!("section1", {
+                history.push("section1");
+            });
+
+            rye::section!("section2", {
+                history.push("section2");
+            });
+
+            history.push("teardown");
         });
-
-        rye::section!("section2", {
-            history.borrow_mut().push("section2");
-        });
-
-        history.borrow_mut().push("teardown");
-    });
+    }
     assert_eq!(
-        *history.borrow(),
+        history,
         vec![
             // phase 1
             "setup", "section1", "teardown", //
@@ -53,34 +62,37 @@ fn multi_section() {
 
 #[test]
 fn nested_section() {
-    let history = RefCell::new(vec![]);
-    rye::TestCase::new().run(|| {
-        history.borrow_mut().push("setup");
+    let mut history = vec![];
+    let mut test_case = TestCase::new();
+    while !test_case.completed() {
+        test_case.run(|| {
+            history.push("setup");
 
-        rye::section!("section1", {
-            history.borrow_mut().push("section1:setup");
+            rye::section!("section1", {
+                history.push("section1:setup");
 
-            rye::section!("section2", {
-                history.borrow_mut().push("section2");
+                rye::section!("section2", {
+                    history.push("section2");
+                });
+
+                rye::section!("section3", {
+                    history.push("section3");
+                });
+
+                history.push("section1:teardown");
             });
 
-            rye::section!("section3", {
-                history.borrow_mut().push("section3");
+            history.push("test");
+
+            rye::section!("section4", {
+                history.push("section4");
             });
 
-            history.borrow_mut().push("section1:teardown");
+            history.push("teardown");
         });
-
-        history.borrow_mut().push("test");
-
-        rye::section!("section4", {
-            history.borrow_mut().push("section4");
-        });
-
-        history.borrow_mut().push("teardown");
-    });
+    }
     assert_eq!(
-        *history.borrow(),
+        history,
         vec![
             // phase 1
             "setup",
@@ -110,38 +122,66 @@ fn nested_section() {
 fn smoke_async() {
     use futures_test::future::FutureTestExt as _;
 
-    futures_executor::block_on(rye::TestCase::new().run_async(|| async {
-        println!("setup");
-        async {}.pending_once().await;
-
-        rye::section!("section1", {
-            println!("section1:setup");
+    let mut history = vec![];
+    let mut test_case = TestCase::new();
+    while !test_case.completed() {
+        futures_executor::block_on(test_case.run_async(async {
+            history.push("setup");
             async {}.pending_once().await;
 
-            rye::section!("section2", {
+            rye::section!("section1", {
+                history.push("section1:setup");
                 async {}.pending_once().await;
-                println!("section2");
+
+                rye::section!("section2", {
+                    async {}.pending_once().await;
+                    history.push("section2");
+                });
+
+                rye::section!("section3", {
+                    async {}.pending_once().await;
+                    history.push("section3");
+                });
+
+                async {}.pending_once().await;
+                history.push("section1:teardown");
             });
 
-            rye::section!("section3", {
+            history.push("test");
+            async {}.pending_once().await;
+
+            rye::section!("section4", {
                 async {}.pending_once().await;
-                println!("section3");
+                history.push("section4");
             });
 
             async {}.pending_once().await;
-            println!("section1:teardown");
-        });
+            history.push("teardown");
+        }));
+    }
 
-        println!("test");
-        async {}.pending_once().await;
-
-        rye::section!("section4", {
-            async {}.pending_once().await;
-            println!("section4");
-        });
-
-        async {}.pending_once().await;
-        println!("teardown");
-        println!("----------");
-    }));
+    assert_eq!(
+        history,
+        vec![
+            // phase 1
+            "setup",
+            "section1:setup",
+            "section2",
+            "section1:teardown",
+            "test",
+            "teardown",
+            // phase 2
+            "setup",
+            "section1:setup",
+            "section3",
+            "section1:teardown",
+            "test",
+            "teardown",
+            // phase 3
+            "setup",
+            "test",
+            "section4",
+            "teardown",
+        ]
+    );
 }

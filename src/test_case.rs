@@ -21,16 +21,22 @@ impl TestCase {
         }
     }
 
+    pub fn completed(&self) -> bool {
+        self.sections.completed()
+    }
+
     /// Run the test case.
-    pub fn run<'a, F>(&mut self, f: F)
+    pub fn run<F>(&mut self, f: F)
     where
-        F: Fn() + 'a,
+        F: FnOnce(),
     {
-        while !self.sections.completed() {
-            let section = self.sections.root();
-            let _guard = Guard::set(Some(Box::new(section)));
-            f();
+        if self.completed() {
+            return;
         }
+
+        let section = self.sections.root();
+        let _guard = Guard::set(Some(Box::new(section)));
+        f();
     }
 }
 
@@ -48,17 +54,18 @@ mod futures {
 
     impl TestCase {
         /// Run the test case asynchronously.
-        pub async fn run_async<'a, F, Fut>(&mut self, f: F)
+        pub async fn run_async<Fut>(&mut self, fut: Fut)
         where
-            F: Fn() -> Fut + 'a,
-            Fut: Future<Output = ()> + 'a,
+            Fut: Future<Output = ()>,
         {
+            if self.completed() {
+                return;
+            }
+
             with_tls(async move {
-                while !self.sections.completed() {
-                    let section = self.sections.root();
-                    let _guard = Guard::set(Some(Box::new(section)));
-                    f().await;
-                }
+                let section = self.sections.root();
+                let _guard = Guard::set(Some(Box::new(section)));
+                fut.await;
             })
             .await
         }
