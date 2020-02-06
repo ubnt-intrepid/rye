@@ -3,7 +3,7 @@ use std::cell::RefCell;
 #[test]
 fn no_section() {
     let history = RefCell::new(vec![]);
-    rye::test_case(|| {
+    rye::TestCase::new().run(|| {
         history.borrow_mut().push("test");
     });
     assert_eq!(*history.borrow(), vec!["test"]);
@@ -12,7 +12,7 @@ fn no_section() {
 #[test]
 fn one_section() {
     let history = RefCell::new(vec![]);
-    rye::test_case(|| {
+    rye::TestCase::new().run(|| {
         history.borrow_mut().push("setup");
 
         rye::section!("section1", {
@@ -27,7 +27,7 @@ fn one_section() {
 #[test]
 fn multi_section() {
     let history = RefCell::new(vec![]);
-    rye::test_case(|| {
+    rye::TestCase::new().run(|| {
         history.borrow_mut().push("setup");
 
         rye::section!("section1", {
@@ -54,7 +54,7 @@ fn multi_section() {
 #[test]
 fn nested_section() {
     let history = RefCell::new(vec![]);
-    rye::test_case(|| {
+    rye::TestCase::new().run(|| {
         history.borrow_mut().push("setup");
 
         rye::section!("section1", {
@@ -110,7 +110,7 @@ fn nested_section() {
 fn smoke_async() {
     use futures_test::future::FutureTestExt as _;
 
-    futures_executor::block_on(rye::test_case_async(|| async {
+    futures_executor::block_on(rye::TestCase::new().run_async(|| async {
         println!("setup");
         async {}.pending_once().await;
 

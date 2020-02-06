@@ -134,7 +134,7 @@ impl Drop for Section {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Sections {
     inner: Rc<RefCell<HashMap<&'static SectionId, SectionData>>>,
 }

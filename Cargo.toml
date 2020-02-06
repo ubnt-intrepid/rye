@@ -23,3 +23,4 @@ futures-test = "0.3"
 [features]
 default = [ "futures" ]
 futures = [ "futures-core", "pin-project" ]
+nightly = []

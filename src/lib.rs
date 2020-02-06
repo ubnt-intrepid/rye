@@ -2,30 +2,13 @@
 Catch inspired testing framework for Rust.
 !*/
 
+#![cfg_attr(feature = "nightly", feature(doc_cfg))]
+
 mod section;
+mod test_case;
 mod tls;
 
-use crate::{section::Sections, tls::Guard};
-
-cfg_if::cfg_if! {
-    if #[cfg(feature = "futures")] {
-        mod futures;
-        pub use futures::test_case_async;
-    }
-}
-
-/// Run a test case.
-pub fn test_case<'a, F>(f: F)
-where
-    F: Fn() + 'a,
-{
-    let sections = Sections::new();
-    while !sections.completed() {
-        let section = sections.root();
-        let _guard = Guard::set(Some(Box::new(section)));
-        f();
-    }
-}
+pub use crate::test_case::TestCase;
 
 #[doc(hidden)]
 pub mod _internal {
