@@ -15,6 +15,7 @@ readme = "README.md"
 cfg-if = "0.1"
 futures-core = { version = "0.3", optional = true }
 pin-project = { version = "0.4", optional = true }
+rye-macros = { path = "macros" }
 
 [dev-dependencies]
 futures-executor = "0.3"
@@ -24,3 +25,9 @@ futures-test = "0.3"
 default = [ "futures" ]
 futures = [ "futures-core", "pin-project" ]
 nightly = []
+
+[workspace]
+members = [
+  ".",
+  "macros",
+]

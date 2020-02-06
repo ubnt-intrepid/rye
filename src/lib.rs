@@ -9,6 +9,7 @@ mod test_case;
 mod tls;
 
 pub use crate::test_case::TestCase;
+pub use rye_macros::test_case;
 
 #[doc(hidden)]
 pub mod _internal {

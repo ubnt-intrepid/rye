@@ -122,6 +122,15 @@ dependencies = [
  "futures-executor",
  "futures-test",
  "pin-project",
+ "rye-macros",
+]
+
+[[package]]
+name = "rye-macros"
+version = "0.0.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
