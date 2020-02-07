@@ -3,13 +3,12 @@
 </h1>
 <div align="center">
   <strong>
-    Catch2 inspired testing framework for Rust.
+    A Rust unit testing library inspired by Catch2.
   </strong>
 </div>
 
 <br />
 
-<!--
 <div align="center">
   <a href="https://crates.io/crates/rye">
     <img src="https://img.shields.io/crates/v/rye.svg?style=flat-square"
@@ -26,36 +25,22 @@
          alt="docs.rs" />
   </a>
 </div>
--->
 
 <br />
 
-<!--
-
 ## Installation
 
-First, add `rye` as a development dependency of your package.
-If you are the user of [`cargo-edit`](https://github.com/killercup/cargo-edit):
-
-```shell-session
-$ cargo add --dev rye
-```
-
-The test binaries must explicitly set the `harness` key to make the default test harness provided by `rustc` disabled:
+Add `rye` to `dev-dependency` section in your `Cargo.toml` as follows:
 
 ```toml
-[[test]]
-name = "mytest"
-path = "tests/mytest.rs"
-harness = false
+[dev-dependencies]
+rye = { git = "https://github.com/ubnt-intrepid/rye.git" }
 ```
 
 ## Resources
 
-* [Examples](./examples)
 * [API documentation (docs.rs)](https://docs.rs/rye)
 * [API documentation (master)](https://ubnt-intrepid.github.io/rye/rye/index.html)
--->
 
 ## License
 

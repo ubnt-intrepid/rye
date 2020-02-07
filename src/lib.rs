@@ -1,13 +1,9 @@
 /*!
-Catch inspired testing framework for Rust.
+A Rust unit testing library inspired by Catch2.
 !*/
-
-#![cfg_attr(feature = "nightly", feature(doc_cfg))]
 
 mod section;
 mod test_case;
-
-pub use rye_macros::test_case;
 
 #[doc(hidden)]
 pub mod _internal {
@@ -16,6 +12,9 @@ pub mod _internal {
         test_case::TestCase,
     };
 }
+
+/// Generate a test case.
+pub use rye_macros::test_case;
 
 /// Declare a section in the test case.
 #[macro_export]

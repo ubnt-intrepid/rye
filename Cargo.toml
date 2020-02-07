@@ -3,7 +3,7 @@ name = "rye"
 version = "0.0.0"
 publish = false
 description = """
-Catch2 inspired testing framework for Rust
+A Rust unit testing library inspired by Catch2.
 """
 authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
 edition = "2018"
