@@ -18,10 +18,14 @@ pin-project = { version = "0.4", optional = true }
 rye-macros = { path = "macros" }
 
 [dev-dependencies]
-cargo-husky = { version = "1.5", features = [ "precommit-hook", "run-cargo-fmt" ] }
 futures-executor = "0.3"
 futures-test = "0.3"
 trybuild = "1"
+
+[dev-dependencies.cargo-husky]
+version = "1.5"
+features = [ "user-hooks" ]
+default-features = false
 
 [features]
 default = [ "futures" ]

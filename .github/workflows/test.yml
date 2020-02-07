@@ -7,6 +7,7 @@ on:
   pull_request:
 
 env:
+  CARGO_HUSKY_DONT_INSTALL_HOOKS: true
   CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: full
 
@@ -68,6 +69,12 @@ jobs:
       with:
         command: test
         args: --workspace
+
+    - name: Run ignored tests
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --workspace -- --ignored
 
     - name: Install cargo-tarpaulin
       run: |
