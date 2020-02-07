@@ -1,6 +1,5 @@
 extern crate proc_macro;
 
-mod args;
 mod expand;
 mod generate;
 mod imp;

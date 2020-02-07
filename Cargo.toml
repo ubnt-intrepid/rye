@@ -12,9 +12,6 @@ repository = "https://github.com/ubnt-intrepid/joke-rs.git"
 readme = "README.md"
 
 [dependencies]
-cfg-if = "0.1"
-futures-core = { version = "0.3", optional = true }
-pin-project = { version = "0.4", optional = true }
 rye-macros = { path = "macros" }
 
 [dev-dependencies]
@@ -26,11 +23,6 @@ trybuild = "1"
 version = "1.5"
 features = [ "user-hooks" ]
 default-features = false
-
-[features]
-default = [ "futures" ]
-futures = [ "futures-core", "pin-project" ]
-nightly = []
 
 [workspace]
 members = [

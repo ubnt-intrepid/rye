@@ -1,4 +1,4 @@
-fn case_async() {
+async fn case_async() {
     async fn {{inner}}(__section: rye::_internal::Section) {
         #[allow(unused_mut, unused_variables)]
         let mut {{section}} = __section;
@@ -27,11 +27,9 @@ fn case_async() {
         }
     }
 
-    block_on(async {
-        #[allow(unused_mut)]
-        let mut test_case = rye::_internal::TestCase::new();
-        while !test_case.completed() {
-            {{inner}}(test_case.root_section()).await;
-        }
-    });
+    #[allow(unused_mut)]
+    let mut test_case = rye::_internal::TestCase::new();
+    while !test_case.completed() {
+        {{inner}}(test_case.root_section()).await;
+    }
 }

@@ -139,7 +139,6 @@ fn nested_section() {
     );
 }
 
-#[cfg(feature = "futures")]
 #[test]
 fn smoke_async() {
     use futures_test::future::FutureTestExt as _;
