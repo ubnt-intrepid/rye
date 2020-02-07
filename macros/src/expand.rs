@@ -54,6 +54,7 @@ impl ExpandBlock<'_> {
                 column: column!(),
             };
             if let Some(__section) = #section.new_section(&SECTION) {
+                #[allow(unused_mut, unused_variables)]
                 let mut #section = __section;
                 #block
             }

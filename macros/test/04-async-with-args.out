@@ -16,6 +16,7 @@ fn case_async() {
                     column: column!(),
                 };
                 if let Some(__section) = {{section}}.new_section(&SECTION) {
+                    #[allow(unused_mut, unused_variables)]
                     let mut {{section}} = __section;
                     {
                         vec.resize(10, 0);
@@ -30,7 +31,6 @@ fn case_async() {
     path::to::custom_block_on(async {
         #[allow(unused_mut)]
         let mut test_case = rye::_internal::TestCase::new();
-
         while !test_case.completed() {
             {{inner}}(test_case.root_section()).await;
         }

@@ -16,6 +16,7 @@ fn case_sync() {
                     column: column!(),
                 };
                 if let Some(__section) = {{section}}.new_section(&SECTION) {
+                    #[allow(unused_mut, unused_variables)]
                     let mut {{section}} = __section;
                     {
                         vec.resize(10, 0);
@@ -30,6 +31,7 @@ fn case_sync() {
                                 column: column!(),
                             };
                             if let Some(__section) = {{section}}.new_section(&SECTION) {
+                                #[allow(unused_mut, unused_variables)]
                                 let mut {{section}} = __section;
                                 {
                                     vec.resize(0, 0);
