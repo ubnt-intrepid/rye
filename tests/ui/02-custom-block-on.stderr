@@ -1,0 +1,70 @@
+error: future cannot be sent between threads safely
+  --> $DIR/02-custom-block-on.rs:10:29
+   |
+3  | fn custom_block_on<F>(fut: F) -> F::Output
+   |    ---------------
+4  | where
+5  |     F: std::future::Future + Send + 'static,
+   |                              ---- required by this bound in `custom_block_on`
+...
+10 | #[rye::test_case(block_on = "custom_block_on")]
+   |                             ^^^^^^^^^^^^^^^^^ future returned by `nested` is not `Send`
+   |
+   = help: within `impl std::future::Future`, the trait `std::marker::Send` is not implemented for `std::rc::Rc<std::cell::RefCell<std::collections::HashMap<&'static rye::section::SectionId, rye::section::SectionData>>>`
+note: future is not `Send` as this value is used across an await
+  --> $DIR/02-custom-block-on.rs:10:1
+   |
+10 | #[rye::test_case(block_on = "custom_block_on")]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-
+   | |                                             |
+   | |                                             `#[rye::test_case(block_on = "custom_block_on")]` is later dropped here
+   | await occurs here, with `#[rye::test_case(block_on = "custom_block_on")]` maybe used later
+   | has type `rye::test_case::TestCase`
+
+error: future cannot be sent between threads safely
+  --> $DIR/02-custom-block-on.rs:10:29
+   |
+3  | fn custom_block_on<F>(fut: F) -> F::Output
+   |    ---------------
+4  | where
+5  |     F: std::future::Future + Send + 'static,
+   |                              ---- required by this bound in `custom_block_on`
+...
+10 | #[rye::test_case(block_on = "custom_block_on")]
+   |                             ^^^^^^^^^^^^^^^^^ future returned by `nested` is not `Send`
+   |
+   = help: within `rye::test_case::TestCase`, the trait `std::marker::Sync` is not implemented for `std::rc::Rc<std::cell::RefCell<std::collections::HashMap<&'static rye::section::SectionId, rye::section::SectionData>>>`
+note: future is not `Send` as this value is used across an await
+  --> $DIR/02-custom-block-on.rs:10:1
+   |
+10 | #[rye::test_case(block_on = "custom_block_on")]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-
+   | |                                             |
+   | |                                             `#[rye::test_case(block_on = "custom_block_on")]` is later dropped here
+   | await occurs here, with `#[rye::test_case(block_on = "custom_block_on")]` maybe used later
+   | has type `&rye::test_case::TestCase`
+
+error: future cannot be sent between threads safely
+  --> $DIR/02-custom-block-on.rs:10:29
+   |
+3  | fn custom_block_on<F>(fut: F) -> F::Output
+   |    ---------------
+4  | where
+5  |     F: std::future::Future + Send + 'static,
+   |                              ---- required by this bound in `custom_block_on`
+...
+10 | #[rye::test_case(block_on = "custom_block_on")]
+   |                             ^^^^^^^^^^^^^^^^^ future returned by `nested` is not `Send`
+   |
+   = help: within `impl std::future::Future`, the trait `std::marker::Send` is not implemented for `std::rc::Rc<()>`
+note: future is not `Send` as this value is used across an await
+  --> $DIR/02-custom-block-on.rs:23:9
+   |
+15 |     let rc = std::rc::Rc::new(());
+   |         -- has type `std::rc::Rc<()>`
+...
+23 |         async {}.pending_once().await;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ await occurs here, with `rc` maybe used later
+...
+37 | }
+   | - `rc` is later dropped here

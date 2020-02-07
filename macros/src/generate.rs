@@ -11,15 +11,13 @@ pub(crate) fn generate(
 ) -> TokenStream {
     let section = &current_section_ident;
 
+    let attrs = &item.attrs;
     let vis = &item.vis;
     let asyncness = &item.sig.asyncness;
     let fn_token = &item.sig.fn_token;
     let ident = &item.sig.ident;
     let output = &item.sig.output;
     let block = &*item.block;
-
-    let test_attr: syn::Attribute = syn::parse_quote!(#[test]);
-    let attrs = Some(&test_attr).into_iter().chain(&item.attrs);
 
     let body = if let Some(async_token) = asyncness {
         let block_on: syn::Path = match args

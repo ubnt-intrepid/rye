@@ -21,6 +21,7 @@ rye-macros = { path = "macros" }
 cargo-husky = { version = "1.5", features = [ "precommit-hook", "run-cargo-fmt" ] }
 futures-executor = "0.3"
 futures-test = "0.3"
+trybuild = "1"
 
 [features]
 default = [ "futures" ]
