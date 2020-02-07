@@ -6,20 +6,15 @@ Catch inspired testing framework for Rust.
 
 mod section;
 mod test_case;
-mod tls;
 
-pub use crate::test_case::TestCase;
 pub use rye_macros::test_case;
 
 #[doc(hidden)]
 pub mod _internal {
-    use crate::section::Section;
-    pub use crate::{section::SectionId, tls::Guard};
-
-    #[inline]
-    pub fn new_section(id: &'static SectionId) -> Option<Section> {
-        crate::tls::with(|section| section.new_section(id))
-    }
+    pub use crate::{
+        section::{Section, SectionId},
+        test_case::TestCase,
+    };
 }
 
 /// Declare a section in the test case.

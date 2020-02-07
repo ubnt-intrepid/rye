@@ -1,15 +1,26 @@
 use crate::args::Args;
-use proc_macro2::TokenStream;
-use syn::{parse::Result, ItemFn};
+use proc_macro2::{Span, TokenStream};
+use syn::{parse::Result, Ident, ItemFn};
+
+const CURRENT_SECTION_IDENT_NAME: &str = "__rye_current_section__";
+const INNER_FN_IDENT_NAME: &str = "__rye_inner_fn__";
 
 pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> Result<TokenStream> {
     let args: Args = syn::parse2(args)?;
 
     let mut item: ItemFn = syn::parse2(item)?;
 
-    crate::expand::expand(&mut *item.block)?;
+    let current_section_ident = Ident::new(CURRENT_SECTION_IDENT_NAME, Span::call_site());
+    let inner_fn_ident = Ident::new(INNER_FN_IDENT_NAME, item.sig.ident.span());
 
-    Ok(crate::generate::generate(args, item))
+    crate::expand::expand(&mut *item.block, &current_section_ident)?;
+
+    Ok(crate::generate::generate(
+        args,
+        item,
+        current_section_ident,
+        inner_fn_ident,
+    ))
 }
 
 #[cfg(test)]
@@ -33,43 +44,49 @@ mod tests {
                 });
             }
         };
+
+        let section = Ident::new(CURRENT_SECTION_IDENT_NAME, Span::call_site());
+        let inner = Ident::new(INNER_FN_IDENT_NAME, Span::call_site());
         let expected = quote! {
             #[test]
             fn case_sync() {
-                fn __inner__() {
-                    let mut vec = vec![0usize; 5];
-                    assert_eq!(vec.len(), 5);
-                    assert!(vec.capacity() >= 5);
-
+                fn #inner(__section: rye::_internal::Section) {
+                    #[allow(unused_mut, unused_variables)]
+                    let mut #section = __section;
                     {
-                        static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
-                            name: "resizing bigger changes size and capacity",
-                            file: file!(),
-                            line: line!(),
-                            column: column!(),
-                        };
+                        let mut vec = vec![0usize; 5];
+                        assert_eq!(vec.len(), 5);
+                        assert!(vec.capacity() >= 5);
 
-                        if let Some(section) = rye::_internal::new_section(&SECTION) {
-                            let _guard = rye::_internal::Guard::set(Some(Box::new(section)));
-
-                            {
-                                vec.resize(10, 0);
-                                assert_eq!(vec.len(), 10);
-                                assert!(vec.capacity() >= 5);
+                        {
+                            static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
+                                name: "resizing bigger changes size and capacity",
+                                file: file!(),
+                                line: line!(),
+                                column: column!(),
+                            };
+                            if let Some(__section) = #section.new_section(&SECTION) {
+                                let mut #section = __section;
+                                {
+                                    vec.resize(10, 0);
+                                    assert_eq!(vec.len(), 10);
+                                    assert!(vec.capacity() >= 5);
+                                }
                             }
                         }
                     }
                 }
 
-                let mut test_case = rye::TestCase::new();
+                #[allow(unused_mut)]
+                let mut test_case = rye::_internal::TestCase::new();
                 while !test_case.completed() {
-                    test_case.run(__inner__);
+                    #inner(test_case.root_section());
                 }
             }
         };
 
         let output = test_case(args, item).unwrap();
-        assert_eq!(output.to_string(), expected.to_string());
+        assert_eq!(expected.to_string(), output.to_string());
     }
 
     #[test]
@@ -94,45 +111,48 @@ mod tests {
                 });
             }
         };
+
+        let section = Ident::new(CURRENT_SECTION_IDENT_NAME, Span::call_site());
+        let inner = Ident::new(INNER_FN_IDENT_NAME, Span::call_site());
         let expected = quote! {
             #[test]
             fn case_sync() {
-                fn __inner__() {
-                    let mut vec = vec![0usize; 5];
-                    assert_eq!(vec.len(), 5);
-                    assert!(vec.capacity() >= 5);
-
+                fn #inner(__section: rye::_internal::Section) {
+                    #[allow(unused_mut, unused_variables)]
+                    let mut #section = __section;
                     {
-                        static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
-                            name: "resizing bigger changes size and capacity",
-                            file: file!(),
-                            line: line!(),
-                            column: column!(),
-                        };
+                        let mut vec = vec![0usize; 5];
+                        assert_eq!(vec.len(), 5);
+                        assert!(vec.capacity() >= 5);
 
-                        if let Some(section) = rye::_internal::new_section(&SECTION) {
-                            let _guard = rye::_internal::Guard::set(Some(Box::new(section)));
-
-                            {
-                                vec.resize(10, 0);
-                                assert_eq!(vec.len(), 10);
-                                assert!(vec.capacity() >= 10);
-
+                        {
+                            static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
+                                name: "resizing bigger changes size and capacity" ,
+                                file: file!(),
+                                line: line!(),
+                                column: column!(),
+                            };
+                            if let Some(__section) = #section.new_section(&SECTION) {
+                                let mut #section = __section;
                                 {
-                                    static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
-                                        name: "shrinking smaller does not changes capacity",
-                                        file: file!(),
-                                        line: line!(),
-                                        column: column!(),
-                                    };
+                                    vec.resize(10, 0);
+                                    assert_eq!(vec.len(), 10);
+                                    assert!(vec.capacity() >= 10);
 
-                                    if let Some(section) = rye::_internal::new_section(&SECTION) {
-                                        let _guard = rye::_internal::Guard::set(Some(Box::new(section)));
-
-                                        {
-                                            vec.resize(0, 0);
-                                            assert_eq!(vec.len(), 0);
-                                            assert!(vec.capacity() >= 10);
+                                    {
+                                        static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
+                                            name: "shrinking smaller does not changes capacity" ,
+                                            file: file!(),
+                                            line: line!(),
+                                            column: column!(),
+                                        };
+                                        if let Some(__section) = #section.new_section(&SECTION) {
+                                            let mut #section = __section;
+                                            {
+                                                vec.resize(0, 0);
+                                                assert_eq!(vec.len(), 0);
+                                                assert!(vec.capacity() >= 10);
+                                            }
                                         }
                                     }
                                 }
@@ -141,15 +161,16 @@ mod tests {
                     }
                 }
 
-                let mut test_case = rye::TestCase::new();
+                #[allow(unused_mut)]
+                let mut test_case = rye::_internal::TestCase::new();
                 while !test_case.completed() {
-                    test_case.run(__inner__);
+                    #inner(test_case.root_section());
                 }
             }
         };
 
         let output = test_case(args, item).unwrap();
-        assert_eq!(output.to_string(), expected.to_string());
+        assert_eq!(expected.to_string(), output.to_string());
     }
 
     #[test]
@@ -168,45 +189,51 @@ mod tests {
                 });
             }
         };
+
+        let section = Ident::new(CURRENT_SECTION_IDENT_NAME, Span::call_site());
+        let inner = Ident::new(INNER_FN_IDENT_NAME, Span::call_site());
         let expected = quote! {
             #[test]
             fn case_async() {
-                async fn __inner__() {
-                    let mut vec = vec![0usize; 5];
-                    assert_eq!(vec.len(), 5);
-                    assert!(vec.capacity() >= 5);
-
+                async fn #inner(__section: rye::_internal::Section) {
+                    #[allow(unused_mut, unused_variables)]
+                    let mut #section = __section;
                     {
-                        static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
-                            name: "resizing bigger changes size and capacity",
-                            file: file!(),
-                            line: line!(),
-                            column: column!(),
-                        };
+                        let mut vec = vec![0usize; 5];
+                        assert_eq!(vec.len(), 5);
+                        assert!(vec.capacity() >= 5);
 
-                        if let Some(section) = rye::_internal::new_section(&SECTION) {
-                            let _guard = rye::_internal::Guard::set(Some(Box::new(section)));
-
-                            {
-                                vec.resize(10, 0);
-                                assert_eq!(vec.len(), 10);
-                                assert!(vec.capacity() >= 5);
+                        {
+                            static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
+                                name: "resizing bigger changes size and capacity",
+                                file: file!(),
+                                line: line!(),
+                                column: column!(),
+                            };
+                            if let Some(__section) = #section.new_section(&SECTION) {
+                                let mut #section = __section;
+                                {
+                                    vec.resize(10, 0);
+                                    assert_eq!(vec.len(), 10);
+                                    assert!(vec.capacity() >= 5);
+                                }
                             }
                         }
                     }
                 }
 
                 block_on(async {
-                    let mut test_case = rye::TestCase::new();
+                    #[allow(unused_mut)]
+                    let mut test_case = rye::_internal::TestCase::new();
                     while !test_case.completed() {
-                        test_case.run_async(__inner__()).await;
+                        #inner(test_case.root_section()).await;
                     }
                 });
             }
         };
 
         let output = test_case(args, item).unwrap();
-        assert_eq!(output.to_string(), expected.to_string());
+        assert_eq!(expected.to_string(), output.to_string());
     }
 
     #[test]
@@ -225,44 +252,51 @@ mod tests {
                 });
             }
         };
+
+        let section = Ident::new(CURRENT_SECTION_IDENT_NAME, Span::call_site());
+        let inner = Ident::new(INNER_FN_IDENT_NAME, Span::call_site());
         let expected = quote! {
             #[test]
             fn case_async() {
-                async fn __inner__() {
-                    let mut vec = vec![0usize; 5];
-                    assert_eq!(vec.len(), 5);
-                    assert!(vec.capacity() >= 5);
-
+                async fn #inner(__section: rye::_internal::Section) {
+                    #[allow(unused_mut, unused_variables)]
+                    let mut #section = __section;
                     {
-                        static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
-                            name: "resizing bigger changes size and capacity",
-                            file: file!(),
-                            line: line!(),
-                            column: column!(),
-                        };
+                        let mut vec = vec![0usize; 5];
+                        assert_eq!(vec.len(), 5);
+                        assert!(vec.capacity() >= 5);
 
-                        if let Some(section) = rye::_internal::new_section(&SECTION) {
-                            let _guard = rye::_internal::Guard::set(Some(Box::new(section)));
-
-                            {
-                                vec.resize(10, 0);
-                                assert_eq!(vec.len(), 10);
-                                assert!(vec.capacity() >= 5);
+                        {
+                            static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
+                                name: "resizing bigger changes size and capacity",
+                                file: file!(),
+                                line: line!(),
+                                column: column!(),
+                            };
+                            if let Some(__section) = #section.new_section(&SECTION) {
+                                let mut #section = __section;
+                                {
+                                    vec.resize(10, 0);
+                                    assert_eq!(vec.len(), 10);
+                                    assert!(vec.capacity() >= 5);
+                                }
                             }
                         }
                     }
                 }
 
                 path::to::custom_block_on(async {
-                    let mut test_case = rye::TestCase::new();
+                    #[allow(unused_mut)]
+                    let mut test_case = rye::_internal::TestCase::new();
+
                     while !test_case.completed() {
-                        test_case.run_async(__inner__()).await;
+                        #inner(test_case.root_section()).await;
                     }
                 });
             }
         };
 
         let output = test_case(args, item).unwrap();
-        assert_eq!(output.to_string(), expected.to_string());
+        assert_eq!(expected.to_string(), output.to_string());
     }
 }

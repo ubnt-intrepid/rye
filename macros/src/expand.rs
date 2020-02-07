@@ -5,7 +5,7 @@ use std::{
 use syn::{
     parse::{Error, Parse, ParseStream, Result},
     visit_mut::{self, VisitMut},
-    Block, Expr, Macro, Stmt, Token,
+    Block, Expr, Ident, Macro, Stmt, Token,
 };
 
 struct SectionBody {
@@ -24,17 +24,20 @@ impl Parse for SectionBody {
     }
 }
 
-struct ExpandBlock {
+struct ExpandBlock<'a> {
     last_error: Option<Error>,
+    current_section_ident: &'a Ident,
 }
 
-impl ExpandBlock {
+impl ExpandBlock<'_> {
     fn throw_err(&mut self, err: Error) -> ! {
         self.last_error.replace(err);
         panic!("explicit panic");
     }
 
     fn expand_section_macro(&mut self, mac: &Macro) -> Stmt {
+        let section = &*self.current_section_ident;
+
         let body: SectionBody = match mac.parse_body() {
             Ok(body) => body,
             Err(err) => self.throw_err(err),
@@ -50,8 +53,8 @@ impl ExpandBlock {
                 line: line!(),
                 column: column!(),
             };
-            if let Some(section) = rye::_internal::new_section(&SECTION) {
-                let _guard = rye::_internal::Guard::set(Some(Box::new(section)));
+            if let Some(__section) = #section.new_section(&SECTION) {
+                let mut #section = __section;
                 #block
             }
         }}
@@ -68,7 +71,7 @@ impl ExpandBlock {
     }
 }
 
-impl VisitMut for ExpandBlock {
+impl VisitMut for ExpandBlock<'_> {
     fn visit_stmt_mut(&mut self, item: &mut Stmt) {
         match item {
             Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _) => {
@@ -84,6 +87,10 @@ impl VisitMut for ExpandBlock {
 }
 
 #[inline]
-pub(crate) fn expand(block: &mut Block) -> Result<()> {
-    ExpandBlock { last_error: None }.expand(block)
+pub(crate) fn expand(block: &mut Block, current_section_ident: &Ident) -> Result<()> {
+    ExpandBlock {
+        last_error: None,
+        current_section_ident,
+    }
+    .expand(block)
 }
