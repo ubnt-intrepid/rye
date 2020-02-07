@@ -1,0 +1,52 @@
+#[test]
+fn case_sync() {
+    fn {{inner}}(__section: rye::_internal::Section) {
+        #[allow(unused_mut, unused_variables)]
+        let mut {{section}} = __section;
+        {
+            let mut vec = vec![0usize; 5];
+            assert_eq!(vec.len(), 5);
+            assert!(vec.capacity() >= 5);
+
+            {
+                static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
+                    name: "resizing bigger changes size and capacity" ,
+                    file: file!(),
+                    line: line!(),
+                    column: column!(),
+                };
+                if let Some(__section) = {{section}}.new_section(&SECTION) {
+                    let mut {{section}} = __section;
+                    {
+                        vec.resize(10, 0);
+                        assert_eq!(vec.len(), 10);
+                        assert!(vec.capacity() >= 10);
+
+                        {
+                            static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
+                                name: "shrinking smaller does not changes capacity" ,
+                                file: file!(),
+                                line: line!(),
+                                column: column!(),
+                            };
+                            if let Some(__section) = {{section}}.new_section(&SECTION) {
+                                let mut {{section}} = __section;
+                                {
+                                    vec.resize(0, 0);
+                                    assert_eq!(vec.len(), 0);
+                                    assert!(vec.capacity() >= 10);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[allow(unused_mut)]
+    let mut test_case = rye::_internal::TestCase::new();
+    while !test_case.completed() {
+        {{inner}}(test_case.root_section());
+    }
+}
