@@ -21,11 +21,13 @@ pub mod _internal {
     where
         F: Fn(),
     {
-        let test_case = TestCase::new("root");
-        while !test_case.completed() {
-            let mut section = test_case.root_section();
-            section.scope(&f);
-        }
+        let mut test_case = TestCase::new("root");
+        test_case.scope(|| {
+            while !TestCase::with(|test_case| test_case.completed()) {
+                let mut section = Section::root();
+                section.scope(&f);
+            }
+        })
     }
 
     #[cfg(feature = "futures")]

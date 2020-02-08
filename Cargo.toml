@@ -13,13 +13,13 @@ readme = "README.md"
 
 [dependencies]
 rye-macros = { path = "macros" }
+scoped-tls = "1"
 futures-core = { version = "0.3", optional = true }
 pin-project = { version = "0.4", optional = true }
 
 [dev-dependencies]
 futures-executor = "0.3"
 futures-test = "0.3"
-scoped-tls = "1"
 trybuild = "1"
 
 [features]

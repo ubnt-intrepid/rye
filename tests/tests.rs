@@ -215,8 +215,13 @@ fn smoke_async() {
         append_history("teardown");
     }
 
+    fn assert_bounds<T: Send>(t: T) -> T {
+        t
+    }
+    let test_case = assert_bounds(test_case());
+
     let mut history = RefCell::new(vec![]);
-    futures_executor::block_on(HISTORY.set_async(&history, test_case()));
+    futures_executor::block_on(HISTORY.set_async(&history, test_case));
 
     assert_eq!(
         *history.get_mut(),

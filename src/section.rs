@@ -42,12 +42,18 @@ pub(crate) enum SectionState {
 }
 
 pub struct Section {
-    pub(crate) test_case: TestCase,
     pub(crate) id: SectionId,
     pub(crate) encounted: bool,
 }
 
 impl Section {
+    pub(crate) fn root() -> Self {
+        Self {
+            id: SectionId::root(),
+            encounted: false,
+        }
+    }
+
     pub(crate) fn with<F, R>(f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
@@ -69,88 +75,83 @@ impl Section {
     }
 
     pub(crate) fn new_section(&mut self, id: SectionId, name: &'static str) -> Option<Section> {
-        let mut sections = self.test_case.sections.borrow_mut();
-        let insert_child;
-        let is_target;
-        match sections.entry(id) {
-            Entry::Occupied(entry) => {
-                let data = entry.into_mut();
-                match data.state {
-                    SectionState::Found if !self.encounted => {
+        TestCase::with(|test_case| {
+            let sections = &mut test_case.sections;
+            let insert_child;
+            let is_target;
+            match sections.entry(id) {
+                Entry::Occupied(entry) => {
+                    let data = entry.into_mut();
+                    match data.state {
+                        SectionState::Found if !self.encounted => {
+                            self.encounted = true;
+                            insert_child = false;
+                            is_target = true;
+                        }
+                        _ => {
+                            insert_child = false;
+                            is_target = false;
+                        }
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    if self.encounted {
+                        entry.insert(SectionData {
+                            name,
+                            state: SectionState::Found,
+                            children: vec![],
+                        });
+                        insert_child = true;
+                        is_target = false;
+                    } else {
                         self.encounted = true;
-                        insert_child = false;
+                        entry.insert(SectionData {
+                            name,
+                            state: SectionState::Found,
+                            children: vec![],
+                        });
+
+                        insert_child = true;
                         is_target = true;
                     }
-                    _ => {
-                        insert_child = false;
-                        is_target = false;
-                    }
                 }
             }
-            Entry::Vacant(entry) => {
-                if self.encounted {
-                    entry.insert(SectionData {
-                        name,
-                        state: SectionState::Found,
-                        children: vec![],
-                    });
-                    insert_child = true;
-                    is_target = false;
-                } else {
-                    self.encounted = true;
-                    entry.insert(SectionData {
-                        name,
-                        state: SectionState::Found,
-                        children: vec![],
-                    });
-
-                    insert_child = true;
-                    is_target = true;
-                }
+            if insert_child {
+                sections.get_mut(&self.id).unwrap().children.push(id);
             }
-        }
-        if insert_child {
-            sections.get_mut(&self.id).unwrap().children.push(id);
-        }
 
-        if is_target {
-            Some(Section {
-                test_case: self.test_case.clone(),
-                id,
-                encounted: false,
-            })
-        } else {
-            None
-        }
+            if is_target {
+                Some(Section {
+                    id,
+                    encounted: false,
+                })
+            } else {
+                None
+            }
+        })
     }
 
-    fn check_completed(&mut self) -> Result<(), ()> {
-        let mut sections = self.test_case.sections.try_borrow_mut().map_err(drop)?;
+    fn check_completed(&mut self) {
+        TestCase::with(|test_case| {
+            let sections = &mut test_case.sections;
 
-        let mut completed = true;
-        let data = sections.get(&self.id).ok_or(())?;
-        for child in &data.children {
-            let child = sections.get(child).ok_or(())?;
-            completed &= child.state == SectionState::Completed;
-        }
+            let mut completed = true;
+            let data = sections.get(&self.id).unwrap();
+            for child in &data.children {
+                let child = sections.get(child).unwrap();
+                completed &= child.state == SectionState::Completed;
+            }
 
-        if completed {
-            let data = sections.get_mut(&self.id).unwrap();
-            data.state = SectionState::Completed;
-        }
-
-        Ok(())
+            if completed {
+                let data = sections.get_mut(&self.id).unwrap();
+                data.state = SectionState::Completed;
+            }
+        })
     }
 }
 
 impl Drop for Section {
     fn drop(&mut self) {
-        if let Err(()) = self.check_completed() {
-            if std::thread::panicking() {
-                panic!("unexpected error during checking section completeness.");
-            } else {
-                eprintln!("warning: unexpected error during checking section completeness.");
-            }
-        }
+        self.check_completed();
     }
 }
