@@ -3,8 +3,8 @@ use syn::{parse::Result, ItemFn};
 
 pub(crate) fn test_case(_args: TokenStream, item: TokenStream) -> Result<TokenStream> {
     let mut item: ItemFn = syn::parse2(item)?;
-    crate::expand::expand(&mut item);
-    Ok(crate::generate::generate(item))
+    let sections = crate::expand::expand(&mut item);
+    Ok(crate::generate::generate(item, sections))
 }
 
 #[cfg(test)]

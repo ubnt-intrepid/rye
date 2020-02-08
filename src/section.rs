@@ -1,157 +1,48 @@
-use crate::test_case::TestCase;
-use std::{cell::Cell, collections::hash_map::Entry, ptr::NonNull};
+use phf::Set;
 
-thread_local! {
-    static SECTION: Cell<Option<NonNull<Section>>> = Cell::new(None);
-}
-
-struct SetOnDrop(Option<NonNull<Section>>);
-
-impl Drop for SetOnDrop {
-    fn drop(&mut self) {
-        SECTION.with(|tls| tls.set(self.0.take()));
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct SectionId(Option<u64>);
-
-impl SectionId {
-    #[inline]
-    pub(crate) const fn root() -> Self {
-        Self(None)
-    }
-
-    #[inline]
-    pub const fn new(id: u64) -> Self {
-        Self(Some(id))
-    }
-}
+type SectionId = u64;
 
 #[derive(Debug)]
-pub(crate) struct SectionData {
-    pub(crate) name: &'static str,
-    pub(crate) state: SectionState,
-    pub(crate) children: Vec<SectionId>,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub(crate) enum SectionState {
-    Found,
-    Completed,
-}
-
 pub struct Section {
-    pub(crate) id: SectionId,
-    pub(crate) encounted: bool,
+    id: Option<SectionId>,
+    #[allow(dead_code)]
+    name: &'static str,
+    is_leaf: bool,
+    ancestors: Set<SectionId>,
 }
 
 impl Section {
-    pub(crate) fn root() -> Self {
+    pub(crate) const ROOT: Self = Self {
+        id: None,
+        name: "root",
+        is_leaf: true,
+        ancestors: phf::phf_set!(),
+    };
+
+    #[doc(hidden)] // private API.
+    pub const fn new(
+        id: SectionId,
+        name: &'static str,
+        is_leaf: bool,
+        ancestors: Set<SectionId>,
+    ) -> Self {
         Self {
-            id: SectionId::root(),
-            encounted: false,
+            id: Some(id),
+            name,
+            is_leaf,
+            ancestors,
         }
     }
 
-    pub(crate) fn with<F, R>(f: F) -> R
-    where
-        F: FnOnce(&mut Self) -> R,
-    {
-        let section_ptr = SECTION.with(|tls| tls.take());
-        let _reset = SetOnDrop(section_ptr);
-        let mut section_ptr = section_ptr.expect("section is not set on the current thread");
-        unsafe { f(section_ptr.as_mut()) }
-    }
-
     #[doc(hidden)] // private API.
-    pub fn scope<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        let prev = SECTION.with(|tls| tls.replace(Some(NonNull::from(self))));
-        let _reset = SetOnDrop(prev);
-        f()
+    #[inline]
+    pub fn is_leaf(&self) -> bool {
+        self.is_leaf
     }
 
-    pub(crate) fn new_section(&mut self, id: SectionId, name: &'static str) -> Option<Section> {
-        TestCase::with(|test_case| {
-            let sections = &mut test_case.sections;
-            let insert_child;
-            let is_target;
-            match sections.entry(id) {
-                Entry::Occupied(entry) => {
-                    let data = entry.into_mut();
-                    match data.state {
-                        SectionState::Found if !self.encounted => {
-                            self.encounted = true;
-                            insert_child = false;
-                            is_target = true;
-                        }
-                        _ => {
-                            insert_child = false;
-                            is_target = false;
-                        }
-                    }
-                }
-                Entry::Vacant(entry) => {
-                    if self.encounted {
-                        entry.insert(SectionData {
-                            name,
-                            state: SectionState::Found,
-                            children: vec![],
-                        });
-                        insert_child = true;
-                        is_target = false;
-                    } else {
-                        self.encounted = true;
-                        entry.insert(SectionData {
-                            name,
-                            state: SectionState::Found,
-                            children: vec![],
-                        });
-
-                        insert_child = true;
-                        is_target = true;
-                    }
-                }
-            }
-            if insert_child {
-                sections.get_mut(&self.id).unwrap().children.push(id);
-            }
-
-            if is_target {
-                Some(Section {
-                    id,
-                    encounted: false,
-                })
-            } else {
-                None
-            }
-        })
-    }
-
-    fn check_completed(&mut self) {
-        TestCase::with(|test_case| {
-            let sections = &mut test_case.sections;
-
-            let mut completed = true;
-            let data = sections.get(&self.id).unwrap();
-            for child in &data.children {
-                let child = sections.get(child).unwrap();
-                completed &= child.state == SectionState::Completed;
-            }
-
-            if completed {
-                let data = sections.get_mut(&self.id).unwrap();
-                data.state = SectionState::Completed;
-            }
-        })
-    }
-}
-
-impl Drop for Section {
-    fn drop(&mut self) {
-        self.check_completed();
+    #[inline]
+    pub fn is_target(&self, id: SectionId) -> bool {
+        self.id
+            .map_or(false, |t| t == id || self.ancestors.contains(&id))
     }
 }

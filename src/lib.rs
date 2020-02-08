@@ -2,36 +2,48 @@
 A Rust unit testing library inspired by Catch2.
 !*/
 
-mod futures;
 mod section;
-mod test_case;
 
 #[doc(hidden)]
 pub mod _internal {
     pub use crate::section::Section;
-
-    use crate::{section::SectionId, test_case::TestCase};
-
-    pub fn new_section(id: u64, name: &'static str) -> Option<Section> {
-        Section::with(|section| section.new_section(SectionId::new(id), name))
-    }
+    pub use phf::phf_set;
 
     #[inline]
-    pub fn run<F>(f: F)
+    pub fn run<'a, F>(f: F, sections: &'a [Section])
     where
-        F: Fn(),
+        F: Fn(&'a Section),
     {
-        let mut test_case = TestCase::new("root");
-        test_case.scope(|| {
-            while !TestCase::with(|test_case| test_case.completed()) {
-                let mut section = Section::root();
-                section.scope(&f);
+        if sections.is_empty() {
+            f(&Section::ROOT);
+            return;
+        }
+
+        for section in sections {
+            if section.is_leaf() {
+                f(section);
             }
-        })
+        }
     }
 
     #[cfg(feature = "futures")]
-    pub use crate::futures::run_async;
+    #[inline]
+    pub async fn run_async<'a, F, Fut>(f: F, sections: &'a [Section])
+    where
+        F: Fn(&'a Section) -> Fut,
+        Fut: futures_core::Future + 'a,
+    {
+        if sections.is_empty() {
+            f(&Section::ROOT).await;
+            return;
+        }
+
+        for section in sections {
+            if section.is_leaf() {
+                f(section).await;
+            }
+        }
+    }
 }
 
 /// Generate a test case.

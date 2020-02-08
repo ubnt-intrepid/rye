@@ -13,6 +13,7 @@ readme = "README.md"
 
 [dependencies]
 rye-macros = { path = "macros" }
+phf = { version = "0.8", features = [ "macros" ] }
 scoped-tls = "1"
 futures-core = { version = "0.3", optional = true }
 pin-project = { version = "0.4", optional = true }

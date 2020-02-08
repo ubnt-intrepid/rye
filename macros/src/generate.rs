@@ -1,8 +1,9 @@
+use crate::section::Section;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Ident, ItemFn};
+use syn::{punctuated::Punctuated, Ident, ItemFn, Token};
 
-pub(crate) fn generate(item: ItemFn) -> TokenStream {
+pub(crate) fn generate(item: ItemFn, sections: Vec<Section>) -> TokenStream {
     let attrs = &item.attrs;
     let vis = &item.vis;
     let asyncness = &item.sig.asyncness;
@@ -15,18 +16,23 @@ pub(crate) fn generate(item: ItemFn) -> TokenStream {
 
     let scoped = if asyncness.is_some() {
         quote! {
-            rye::_internal::run_async(#inner_fn_ident).await;
+            rye::_internal::run_async(#inner_fn_ident, SECTIONS).await;
         }
     } else {
         quote! {
-            rye::_internal::run(#inner_fn_ident);
+            rye::_internal::run(#inner_fn_ident, SECTIONS);
         }
     };
+
+    let sections: Punctuated<_, Token![,]> = sections.into_iter().collect();
 
     quote! {
         #(#attrs)*
         #vis #asyncness #fn_token #ident () {
-            #asyncness #fn_token #inner_fn_ident() #output #block
+            #asyncness #fn_token #inner_fn_ident(__section: &rye::_internal::Section) #output #block
+            static SECTIONS: &[rye::_internal::Section] = &[
+                #sections
+            ];
             #scoped
         }
     }
