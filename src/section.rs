@@ -1,5 +1,5 @@
 use crate::test_case::TestCase;
-use std::{cell::Cell, collections::hash_map::Entry, fmt, ptr::NonNull};
+use std::{cell::Cell, collections::hash_map::Entry, ptr::NonNull};
 
 thread_local! {
     static SECTION: Cell<Option<NonNull<Section>>> = Cell::new(None);
@@ -13,35 +13,26 @@ impl Drop for SetOnDrop {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub enum SectionId {
-    Root,
-    SubSection {
-        name: &'static str,
-        file: &'static str,
-        line: u32,
-        column: u32,
-    },
-}
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SectionId(Option<u64>);
 
-impl fmt::Debug for SectionId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Root => f.write_str("<root>"),
-            Self::SubSection {
-                name,
-                file,
-                line,
-                column,
-            } => write!(f, "[{}:{}:{}:{}]", name, file, line, column),
-        }
+impl SectionId {
+    #[inline]
+    pub(crate) const fn root() -> Self {
+        Self(None)
+    }
+
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Some(id))
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct SectionData {
+    pub(crate) name: &'static str,
     pub(crate) state: SectionState,
-    pub(crate) children: Vec<&'static SectionId>,
+    pub(crate) children: Vec<SectionId>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -52,7 +43,7 @@ pub(crate) enum SectionState {
 
 pub struct Section {
     pub(crate) test_case: TestCase,
-    pub(crate) id: &'static SectionId,
+    pub(crate) id: SectionId,
     pub(crate) encounted: bool,
 }
 
@@ -77,7 +68,7 @@ impl Section {
         f()
     }
 
-    pub(crate) fn new_section(&mut self, id: &'static SectionId) -> Option<Section> {
+    pub(crate) fn new_section(&mut self, id: SectionId, name: &'static str) -> Option<Section> {
         let mut sections = self.test_case.sections.borrow_mut();
         let insert_child;
         let is_target;
@@ -99,6 +90,7 @@ impl Section {
             Entry::Vacant(entry) => {
                 if self.encounted {
                     entry.insert(SectionData {
+                        name,
                         state: SectionState::Found,
                         children: vec![],
                     });
@@ -107,6 +99,7 @@ impl Section {
                 } else {
                     self.encounted = true;
                     entry.insert(SectionData {
+                        name,
                         state: SectionState::Found,
                         children: vec![],
                     });

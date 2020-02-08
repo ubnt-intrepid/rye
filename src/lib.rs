@@ -8,11 +8,12 @@ mod test_case;
 
 #[doc(hidden)]
 pub mod _internal {
-    pub use crate::section::{Section, SectionId};
-    use crate::test_case::TestCase;
+    pub use crate::section::Section;
 
-    pub fn new_section(id: &'static SectionId) -> Option<Section> {
-        Section::with(|section| section.new_section(id))
+    use crate::{section::SectionId, test_case::TestCase};
+
+    pub fn new_section(id: u64, name: &'static str) -> Option<Section> {
+        Section::with(|section| section.new_section(SectionId::new(id), name))
     }
 
     #[inline]
@@ -20,7 +21,7 @@ pub mod _internal {
     where
         F: Fn(),
     {
-        let test_case = TestCase::new();
+        let test_case = TestCase::new("root");
         while !test_case.completed() {
             let mut section = test_case.root_section();
             section.scope(&f);

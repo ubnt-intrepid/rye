@@ -23,6 +23,7 @@ impl Parse for SectionBody {
 
 struct ExpandBlock {
     is_async: bool,
+    next_section_id: u64,
 }
 
 impl ExpandBlock {
@@ -38,6 +39,9 @@ impl ExpandBlock {
         let name = &body.name;
         let block = &body.block;
 
+        let section_id = self.next_section_id;
+        self.next_section_id += 1;
+
         let scoped = if self.is_async {
             quote::quote! {
                 __section.scope_async(async #block).await;
@@ -48,17 +52,11 @@ impl ExpandBlock {
             }
         };
 
-        syn::parse_quote! {{
-            static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
-                name: #name,
-                file: file!(),
-                line: line!(),
-                column: column!(),
-            };
-            if let Some(mut __section) = rye::_internal::new_section(&SECTION) {
+        syn::parse_quote! {
+            if let Some(mut __section) = rye::_internal::new_section(#section_id, #name) {
                 #scoped
             }
-        }}
+        }
     }
 }
 
@@ -80,5 +78,9 @@ impl VisitMut for ExpandBlock {
 #[inline]
 pub(crate) fn expand(item: &mut ItemFn) {
     let is_async = item.sig.asyncness.is_some();
-    ExpandBlock { is_async }.visit_block_mut(&mut *item.block);
+    ExpandBlock {
+        is_async,
+        next_section_id: 0,
+    }
+    .visit_block_mut(&mut *item.block);
 }

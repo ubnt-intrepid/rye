@@ -14,7 +14,7 @@ where
     F: Fn() -> Fut,
     Fut: Future,
 {
-    let test_case = TestCase::new();
+    let test_case = TestCase::new("root");
     while !test_case.completed() {
         let mut section = test_case.root_section();
         section.scope_async(f()).await;

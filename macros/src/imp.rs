@@ -45,4 +45,9 @@ mod tests {
     fn test_async_nested() {
         test_expanded("04-async-nested");
     }
+
+    #[test]
+    fn multi_sections_in_scope() {
+        test_expanded("05-multi-sections-in-scope");
+    }
 }
