@@ -1,9 +1,6 @@
-use std::{
-    mem,
-    panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
-};
+use std::mem;
 use syn::{
-    parse::{Error, Parse, ParseStream, Result},
+    parse::{Parse, ParseStream, Result},
     visit_mut::{self, VisitMut},
     Block, Expr, ItemFn, Macro, Stmt, Token,
 };
@@ -25,20 +22,17 @@ impl Parse for SectionBody {
 }
 
 struct ExpandBlock {
-    last_error: Option<Error>,
     is_async: bool,
 }
 
 impl ExpandBlock {
-    fn throw_err(&mut self, err: Error) -> ! {
-        self.last_error.replace(err);
-        panic!("explicit panic");
-    }
-
     fn expand_section_macro(&mut self, mac: &Macro) -> Stmt {
         let body: SectionBody = match mac.parse_body() {
             Ok(body) => body,
-            Err(err) => self.throw_err(err),
+            Err(err) => {
+                let err = err.to_compile_error();
+                return syn::parse_quote!(#err);
+            }
         };
 
         let name = &body.name;
@@ -66,16 +60,6 @@ impl ExpandBlock {
             }
         }}
     }
-
-    fn expand(&mut self, block: &mut syn::Block) -> Result<()> {
-        if let Err(payload) = catch_unwind(AssertUnwindSafe(|| self.visit_block_mut(block))) {
-            if let Some(err) = self.last_error.take() {
-                return Err(err);
-            }
-            resume_unwind(payload);
-        }
-        Ok(())
-    }
 }
 
 impl VisitMut for ExpandBlock {
@@ -94,11 +78,7 @@ impl VisitMut for ExpandBlock {
 }
 
 #[inline]
-pub(crate) fn expand(item: &mut ItemFn) -> Result<()> {
+pub(crate) fn expand(item: &mut ItemFn) {
     let is_async = item.sig.asyncness.is_some();
-    ExpandBlock {
-        last_error: None,
-        is_async,
-    }
-    .expand(&mut *item.block)
+    ExpandBlock { is_async }.visit_block_mut(&mut *item.block);
 }
