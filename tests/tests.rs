@@ -1,76 +1,66 @@
-macro_rules! section {
-    ($section:ident, $name:expr, $body:block) => {{
-        static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
-            name: $name,
-            file: file!(),
-            line: line!(),
-            column: column!(),
-        };
-        if let Some($section) = $section.new_section(&SECTION) {
-            #[allow(unused_mut, unused_variables)]
-            let mut $section = $section;
-            $body
-        }
-    }};
+use scoped_tls::scoped_thread_local;
+use std::cell::RefCell;
+
+scoped_thread_local!(static HISTORY: RefCell<Vec<&'static str>>);
+
+fn append_history(v: &'static str) {
+    HISTORY.with(|history| history.borrow_mut().push(v));
 }
 
 #[test]
 fn no_section() {
-    let mut history = vec![];
-    let test_case = rye::_internal::TestCase::new();
-    while !test_case.completed() {
-        #[allow(unused_mut, unused_variables)]
-        let mut section = test_case.root_section();
-        {
-            history.push("test");
-        }
+    #[rye::test_case]
+    fn test_case() {
+        append_history("test");
     }
-    assert_eq!(history, vec!["test"]);
+
+    let mut history = RefCell::new(vec![]);
+    HISTORY.set(&history, test_case);
+
+    assert_eq!(*history.get_mut(), vec!["test"]);
 }
 
 #[test]
 fn one_section() {
-    let mut history = vec![];
-    let test_case = rye::_internal::TestCase::new();
-    while !test_case.completed() {
-        #[allow(unused_mut, unused_variables)]
-        let mut section = test_case.root_section();
-        {
-            history.push("setup");
+    #[rye::test_case]
+    fn test_case() {
+        append_history("setup");
 
-            section!(section, "section1", {
-                history.push("section1");
-            });
+        section!("section1", {
+            append_history("section1");
+        });
 
-            history.push("teardown");
-        }
+        append_history("teardown");
     }
-    assert_eq!(history, vec!["setup", "section1", "teardown"]);
+
+    let mut history = RefCell::new(vec![]);
+    HISTORY.set(&history, test_case);
+
+    assert_eq!(*history.get_mut(), vec!["setup", "section1", "teardown"]);
 }
 
 #[test]
 fn multi_section() {
-    let mut history = vec![];
-    let test_case = rye::_internal::TestCase::new();
-    while !test_case.completed() {
-        #[allow(unused_mut, unused_variables)]
-        let mut section = test_case.root_section();
-        {
-            history.push("setup");
+    #[rye::test_case]
+    fn test_case() {
+        HISTORY.with(|history| history.borrow_mut().push("setup"));
 
-            section!(section, "section1", {
-                history.push("section1");
-            });
+        section!("section1", {
+            append_history("section1");
+        });
 
-            section!(section, "section2", {
-                history.push("section2");
-            });
+        section!("section2", {
+            append_history("section2");
+        });
 
-            history.push("teardown");
-        }
+        append_history("teardown");
     }
+
+    let mut history = RefCell::new(vec![]);
+    HISTORY.set(&history, test_case);
+
     assert_eq!(
-        history,
+        *history.get_mut(),
         vec![
             // phase 1
             "setup", "section1", "teardown", //
@@ -82,39 +72,38 @@ fn multi_section() {
 
 #[test]
 fn nested_section() {
-    let mut history = vec![];
-    let test_case = rye::_internal::TestCase::new();
-    while !test_case.completed() {
-        #[allow(unused_mut, unused_variables)]
-        let mut section = test_case.root_section();
-        {
-            history.push("setup");
+    #[rye::test_case]
+    fn test_case() {
+        append_history("setup");
 
-            section!(section, "section1", {
-                history.push("section1:setup");
+        section!("section1", {
+            append_history("section1:setup");
 
-                section!(section, "section2", {
-                    history.push("section2");
-                });
-
-                section!(section, "section3", {
-                    history.push("section3");
-                });
-
-                history.push("section1:teardown");
+            section!("section2", {
+                append_history("section2");
             });
 
-            history.push("test");
-
-            section!(section, "section4", {
-                history.push("section4");
+            section!("section3", {
+                append_history("section3");
             });
 
-            history.push("teardown");
-        }
+            append_history("section1:teardown");
+        });
+
+        append_history("test");
+
+        section!("section4", {
+            append_history("section4");
+        });
+
+        append_history("teardown");
     }
+
+    let mut history = RefCell::new(vec![]);
+    HISTORY.set(&history, test_case);
+
     assert_eq!(
-        history,
+        *history.get_mut(),
         vec![
             // phase 1
             "setup",
@@ -139,72 +128,118 @@ fn nested_section() {
     );
 }
 
+#[cfg(feature = "futures")]
 #[test]
 fn smoke_async() {
-    use futures_test::future::FutureTestExt as _;
-    futures_executor::block_on(async {
-        let mut history = vec![];
-        let test_case = rye::_internal::TestCase::new();
-        while !test_case.completed() {
-            let mut section = test_case.root_section();
-            {
-                history.push("setup");
-                async {}.pending_once().await;
+    use futures_core::{
+        future::Future,
+        task::{self, Poll},
+    };
+    use scoped_tls::ScopedKey;
+    use std::pin::Pin;
 
-                section!(section, "section1", {
-                    history.push("section1:setup");
-                    async {}.pending_once().await;
+    trait LocalKeyAsyncExt<T> {
+        fn set_async<'a, Fut>(&'static self, t: &'a T, fut: Fut) -> SetAsync<'a, T, Fut>
+        where
+            T: 'static,
+            Fut: Future;
+    }
 
-                    section!(section, "section2", {
-                        async {}.pending_once().await;
-                        history.push("section2");
-                    });
-
-                    section!(section, "section3", {
-                        async {}.pending_once().await;
-                        history.push("section3");
-                    });
-
-                    async {}.pending_once().await;
-                    history.push("section1:teardown");
-                });
-
-                history.push("test");
-                async {}.pending_once().await;
-
-                section!(section, "section4", {
-                    async {}.pending_once().await;
-                    history.push("section4");
-                });
-
-                async {}.pending_once().await;
-                history.push("teardown");
-            }
+    impl<T> LocalKeyAsyncExt<T> for ScopedKey<T> {
+        fn set_async<'a, Fut>(&'static self, t: &'a T, fut: Fut) -> SetAsync<'a, T, Fut>
+        where
+            T: 'static,
+            Fut: Future,
+        {
+            SetAsync { key: self, t, fut }
         }
+    }
 
-        assert_eq!(
-            history,
-            vec![
-                // phase 1
-                "setup",
-                "section1:setup",
-                "section2",
-                "section1:teardown",
-                "test",
-                "teardown",
-                // phase 2
-                "setup",
-                "section1:setup",
-                "section3",
-                "section1:teardown",
-                "test",
-                "teardown",
-                // phase 3
-                "setup",
-                "test",
-                "section4",
-                "teardown",
-            ]
-        );
-    });
+    #[pin_project::pin_project]
+    struct SetAsync<'a, T: 'static, Fut> {
+        key: &'static ScopedKey<T>,
+        t: &'a T,
+        #[pin]
+        fut: Fut,
+    }
+
+    impl<T, Fut> Future for SetAsync<'_, T, Fut>
+    where
+        Fut: Future,
+    {
+        type Output = Fut::Output;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+            let me = self.project();
+            let key = me.key;
+            let t = *me.t;
+            let fut = me.fut;
+            key.set(t, || fut.poll(cx))
+        }
+    }
+
+    #[rye::test_case]
+    async fn test_case() {
+        use futures_test::future::FutureTestExt as _;
+
+        append_history("setup");
+        async {}.pending_once().await;
+
+        section!("section1", {
+            append_history("section1:setup");
+            async {}.pending_once().await;
+
+            section!("section2", {
+                async {}.pending_once().await;
+                append_history("section2");
+            });
+
+            section!("section3", {
+                async {}.pending_once().await;
+                append_history("section3");
+            });
+
+            async {}.pending_once().await;
+            append_history("section1:teardown");
+        });
+
+        append_history("test");
+        async {}.pending_once().await;
+
+        section!("section4", {
+            async {}.pending_once().await;
+            append_history("section4");
+        });
+
+        async {}.pending_once().await;
+        append_history("teardown");
+    }
+
+    let mut history = RefCell::new(vec![]);
+    futures_executor::block_on(HISTORY.set_async(&history, test_case()));
+
+    assert_eq!(
+        *history.get_mut(),
+        vec![
+            // phase 1
+            "setup",
+            "section1:setup",
+            "section2",
+            "section1:teardown",
+            "test",
+            "teardown",
+            // phase 2
+            "setup",
+            "section1:setup",
+            "section3",
+            "section1:teardown",
+            "test",
+            "teardown",
+            // phase 3
+            "setup",
+            "test",
+            "section4",
+            "teardown",
+        ]
+    );
 }

@@ -49,7 +49,7 @@ pub struct Section {
 }
 
 impl Section {
-    pub fn new_section(&mut self, id: &'static SectionId) -> Option<Section> {
+    pub(crate) fn new_section(&mut self, id: &'static SectionId) -> Option<Section> {
         let mut sections = self.sections.inner.borrow_mut();
         let insert_child;
         let is_target;
