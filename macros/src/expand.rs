@@ -5,7 +5,7 @@ use std::{
 use syn::{
     parse::{Error, Parse, ParseStream, Result},
     visit_mut::{self, VisitMut},
-    Block, Expr, Ident, Macro, Stmt, Token,
+    Block, Expr, ItemFn, Macro, Stmt, Token,
 };
 
 struct SectionBody {
@@ -24,20 +24,18 @@ impl Parse for SectionBody {
     }
 }
 
-struct ExpandBlock<'a> {
+struct ExpandBlock {
     last_error: Option<Error>,
-    current_section_ident: &'a Ident,
+    is_async: bool,
 }
 
-impl ExpandBlock<'_> {
+impl ExpandBlock {
     fn throw_err(&mut self, err: Error) -> ! {
         self.last_error.replace(err);
         panic!("explicit panic");
     }
 
     fn expand_section_macro(&mut self, mac: &Macro) -> Stmt {
-        let section = &*self.current_section_ident;
-
         let body: SectionBody = match mac.parse_body() {
             Ok(body) => body,
             Err(err) => self.throw_err(err),
@@ -46,6 +44,16 @@ impl ExpandBlock<'_> {
         let name = &body.name;
         let block = &body.block;
 
+        let body = if self.is_async {
+            quote::quote! {
+                rye::_internal::with_section_async(&mut __section, async #block).await;
+            }
+        } else {
+            quote::quote! {
+                rye::_internal::with_section(&mut __section, || #block);
+            }
+        };
+
         syn::parse_quote! {{
             static SECTION: rye::_internal::SectionId = rye::_internal::SectionId::SubSection {
                 name: #name,
@@ -53,10 +61,8 @@ impl ExpandBlock<'_> {
                 line: line!(),
                 column: column!(),
             };
-            if let Some(__section) = #section.new_section(&SECTION) {
-                #[allow(unused_mut, unused_variables)]
-                let mut #section = __section;
-                #block
+            if let Some(mut __section) = rye::_internal::new_section(&SECTION) {
+                #body
             }
         }}
     }
@@ -72,7 +78,7 @@ impl ExpandBlock<'_> {
     }
 }
 
-impl VisitMut for ExpandBlock<'_> {
+impl VisitMut for ExpandBlock {
     fn visit_stmt_mut(&mut self, item: &mut Stmt) {
         match item {
             Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _) => {
@@ -88,10 +94,11 @@ impl VisitMut for ExpandBlock<'_> {
 }
 
 #[inline]
-pub(crate) fn expand(block: &mut Block, current_section_ident: &Ident) -> Result<()> {
+pub(crate) fn expand(item: &mut ItemFn) -> Result<()> {
+    let is_async = item.sig.asyncness.is_some();
     ExpandBlock {
         last_error: None,
-        current_section_ident,
+        is_async,
     }
-    .expand(block)
+    .expand(&mut *item.block)
 }

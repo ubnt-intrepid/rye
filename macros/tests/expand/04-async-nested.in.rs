@@ -1,4 +1,4 @@
-fn case_sync() {
+async fn case_async_nested() {
     let mut vec = vec![0usize; 5];
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);

@@ -1,14 +1,8 @@
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::quote;
 use syn::{Ident, ItemFn};
 
-pub(crate) fn generate(
-    item: ItemFn,
-    current_section_ident: Ident,
-    inner_fn_ident: Ident,
-) -> TokenStream {
-    let section = &current_section_ident;
-
+pub(crate) fn generate(item: ItemFn) -> TokenStream {
     let attrs = &item.attrs;
     let vis = &item.vis;
     let asyncness = &item.sig.asyncness;
@@ -17,23 +11,28 @@ pub(crate) fn generate(
     let output = &item.sig.output;
     let block = &*item.block;
 
-    let await_token = asyncness.as_ref().map(|async_token| {
-        use syn::spanned::Spanned;
-        quote_spanned!(async_token.span() => .await)
-    });
+    let inner_fn_ident = Ident::new("__inner__", ident.span());
+
+    let body = if asyncness.is_some() {
+        quote! {
+            rye::_internal::with_section_async(&mut section, #inner_fn_ident()).await;
+        }
+    } else {
+        quote! {
+            rye::_internal::with_section(&mut section, #inner_fn_ident);
+        }
+    };
 
     quote! {
         #(#attrs)*
         #vis #asyncness #fn_token #ident () {
-            #asyncness #fn_token #inner_fn_ident(__section: rye::_internal::Section) #output {
-                #[allow(unused_mut, unused_variables)]
-                let mut #section = __section;
-                #block
-            }
+            #asyncness #fn_token #inner_fn_ident() #output #block
+
             #[allow(unused_mut)]
             let mut test_case = rye::_internal::TestCase::new();
             while !test_case.completed() {
-                #inner_fn_ident(test_case.root_section()) #await_token;
+                let mut section = test_case.root_section();
+                #body
             }
         }
     }
