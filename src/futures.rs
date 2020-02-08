@@ -1,6 +1,6 @@
 #![cfg(feature = "futures")]
 
-use crate::section::Section;
+use crate::{section::Section, test_case::TestCase};
 use futures_core::{
     future::Future,
     task::{self, Poll},
@@ -8,8 +8,22 @@ use futures_core::{
 use pin_project::pin_project;
 use std::pin::Pin;
 
+#[inline]
+pub async fn run_async<F, Fut>(f: F)
+where
+    F: Fn() -> Fut,
+    Fut: Future,
+{
+    let test_case = TestCase::new();
+    while !test_case.completed() {
+        let mut section = test_case.root_section();
+        section.scope_async(f()).await;
+    }
+}
+
 impl Section {
-    pub async fn set_async<Fut>(&mut self, fut: Fut) -> Fut::Output
+    #[doc(hidden)] // private API.
+    pub async fn scope_async<Fut>(&mut self, fut: Fut) -> Fut::Output
     where
         Fut: Future,
     {
@@ -34,6 +48,6 @@ where
         let me = self.project();
         let fut = me.fut;
         let section = me.section;
-        section.set(|| fut.poll(cx))
+        section.scope(|| fut.poll(cx))
     }
 }

@@ -46,11 +46,11 @@ impl ExpandBlock {
 
         let scoped = if self.is_async {
             quote::quote! {
-                __section.set_async(async #block).await;
+                __section.scope_async(async #block).await;
             }
         } else {
             quote::quote! {
-                __section.set(|| #block);
+                __section.scope(|| #block);
             }
         };
 

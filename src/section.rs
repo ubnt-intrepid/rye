@@ -68,7 +68,7 @@ impl Section {
     }
 
     #[doc(hidden)] // private API.
-    pub fn set<F, R>(&mut self, f: F) -> R
+    pub fn scope<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce() -> R,
     {

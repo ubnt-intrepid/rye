@@ -22,7 +22,7 @@ fn nested() {
     });
 }
 
-#[rye::test_case(block_on = "futures_executor::block_on")]
+#[rye::test_case]
 async fn case_async() {
     let mut vec = vec![0usize; 5];
 

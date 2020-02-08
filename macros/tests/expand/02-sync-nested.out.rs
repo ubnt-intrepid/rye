@@ -12,7 +12,7 @@ fn case_sync_nested() {
                 column: column!(),
             };
             if let Some(mut __section) = rye::_internal::new_section(&SECTION) {
-                __section.set(|| {
+                __section.scope(|| {
                     vec.resize(10, 0);
                     assert_eq!(vec.len(), 10);
                     assert!(vec.capacity() >= 10);
@@ -26,7 +26,7 @@ fn case_sync_nested() {
                                 column: column!(),
                             };
                         if let Some(mut __section) = rye::_internal::new_section(&SECTION) {
-                            __section.set(|| {
+                            __section.scope(|| {
                                 vec.resize(0, 0);
                                 assert_eq!(vec.len(), 0);
                                 assert!(vec.capacity() >= 10);
@@ -37,11 +37,5 @@ fn case_sync_nested() {
             }
         }
     }
-
-    #[allow(unused_mut)]
-    let mut test_case = rye::_internal::TestCase::new();
-    while !test_case.completed() {
-        let mut section = test_case.root_section();
-        section.set(__inner__);
-    }
+    rye::_internal::run(__inner__);
 }

@@ -15,11 +15,11 @@ pub(crate) fn generate(item: ItemFn) -> TokenStream {
 
     let scoped = if asyncness.is_some() {
         quote! {
-            section.set_async(#inner_fn_ident()).await;
+            rye::_internal::run_async(#inner_fn_ident).await;
         }
     } else {
         quote! {
-            section.set(#inner_fn_ident);
+            rye::_internal::run(#inner_fn_ident);
         }
     };
 
@@ -27,13 +27,7 @@ pub(crate) fn generate(item: ItemFn) -> TokenStream {
         #(#attrs)*
         #vis #asyncness #fn_token #ident () {
             #asyncness #fn_token #inner_fn_ident() #output #block
-
-            #[allow(unused_mut)]
-            let mut test_case = rye::_internal::TestCase::new();
-            while !test_case.completed() {
-                let mut section = test_case.root_section();
-                #scoped
-            }
+            #scoped
         }
     }
 }
