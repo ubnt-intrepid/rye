@@ -12,7 +12,7 @@ async fn case_async() {
                 column: column!(),
             };
             if let Some(mut __section) = rye::_internal::new_section(&SECTION) {
-                rye::_internal::with_section_async(&mut __section, async {
+                __section.set_async(async {
                     vec.resize(10, 0);
                     assert_eq!(vec.len(), 10);
                     assert!(vec.capacity() >= 5);
@@ -26,6 +26,6 @@ async fn case_async() {
     let mut test_case = rye::_internal::TestCase::new();
     while !test_case.completed() {
         let mut section = test_case.root_section();
-        rye::_internal::with_section_async(&mut section, __inner__()).await;
+        section.set_async(__inner__()).await;
     }
 }

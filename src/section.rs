@@ -1,9 +1,17 @@
-use std::{
-    cell::RefCell,
-    collections::hash_map::{Entry, HashMap},
-    fmt,
-    rc::Rc,
-};
+use crate::test_case::TestCase;
+use std::{cell::Cell, collections::hash_map::Entry, fmt, ptr::NonNull};
+
+thread_local! {
+    static SECTION: Cell<Option<NonNull<Section>>> = Cell::new(None);
+}
+
+struct SetOnDrop(Option<NonNull<Section>>);
+
+impl Drop for SetOnDrop {
+    fn drop(&mut self) {
+        SECTION.with(|tls| tls.set(self.0.take()));
+    }
+}
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum SectionId {
@@ -31,26 +39,46 @@ impl fmt::Debug for SectionId {
 }
 
 #[derive(Debug)]
-struct SectionData {
-    state: SectionState,
-    children: Vec<&'static SectionId>,
+pub(crate) struct SectionData {
+    pub(crate) state: SectionState,
+    pub(crate) children: Vec<&'static SectionId>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum SectionState {
+pub(crate) enum SectionState {
     Found,
     Completed,
 }
 
 pub struct Section {
-    sections: Sections,
-    id: &'static SectionId,
-    encounted: bool,
+    pub(crate) test_case: TestCase,
+    pub(crate) id: &'static SectionId,
+    pub(crate) encounted: bool,
 }
 
 impl Section {
+    pub(crate) fn with<F, R>(f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let section_ptr = SECTION.with(|tls| tls.take());
+        let _reset = SetOnDrop(section_ptr);
+        let mut section_ptr = section_ptr.expect("section is not set on the current thread");
+        unsafe { f(section_ptr.as_mut()) }
+    }
+
+    #[doc(hidden)] // private API.
+    pub fn set<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let prev = SECTION.with(|tls| tls.replace(Some(NonNull::from(self))));
+        let _reset = SetOnDrop(prev);
+        f()
+    }
+
     pub(crate) fn new_section(&mut self, id: &'static SectionId) -> Option<Section> {
-        let mut sections = self.sections.inner.borrow_mut();
+        let mut sections = self.test_case.sections.borrow_mut();
         let insert_child;
         let is_target;
         match sections.entry(id) {
@@ -94,7 +122,7 @@ impl Section {
 
         if is_target {
             Some(Section {
-                sections: self.sections.clone(),
+                test_case: self.test_case.clone(),
                 id,
                 encounted: false,
             })
@@ -104,7 +132,7 @@ impl Section {
     }
 
     fn check_completed(&mut self) -> Result<(), ()> {
-        let mut sections = self.sections.inner.try_borrow_mut().map_err(drop)?;
+        let mut sections = self.test_case.sections.try_borrow_mut().map_err(drop)?;
 
         let mut completed = true;
         let data = sections.get(&self.id).ok_or(())?;
@@ -131,41 +159,5 @@ impl Drop for Section {
                 eprintln!("warning: unexpected error during checking section completeness.");
             }
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct Sections {
-    inner: Rc<RefCell<HashMap<&'static SectionId, SectionData>>>,
-}
-
-#[allow(clippy::new_without_default)]
-impl Sections {
-    pub(crate) fn new() -> Self {
-        let mut inner = HashMap::new();
-        inner.insert(
-            &SectionId::Root,
-            SectionData {
-                state: SectionState::Found,
-                children: vec![],
-            },
-        );
-        Self {
-            inner: Rc::new(RefCell::new(inner)),
-        }
-    }
-
-    pub(crate) fn root(&self) -> Section {
-        Section {
-            sections: self.clone(),
-            id: &SectionId::Root,
-            encounted: false,
-        }
-    }
-
-    pub(crate) fn completed(&self) -> bool {
-        let sections = self.inner.borrow();
-        let root = &sections[&SectionId::Root];
-        root.state == SectionState::Completed
     }
 }

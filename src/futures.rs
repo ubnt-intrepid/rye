@@ -8,11 +8,13 @@ use futures_core::{
 use pin_project::pin_project;
 use std::pin::Pin;
 
-pub async fn with_section_async<Fut>(section: &mut Section, fut: Fut) -> Fut::Output
-where
-    Fut: Future,
-{
-    WithSectionAsync { fut, section }.await
+impl Section {
+    pub async fn set_async<Fut>(&mut self, fut: Fut) -> Fut::Output
+    where
+        Fut: Future,
+    {
+        WithSectionAsync { fut, section: self }.await
+    }
 }
 
 #[pin_project]
@@ -32,6 +34,6 @@ where
         let me = self.project();
         let fut = me.fut;
         let section = me.section;
-        crate::tls::set(section, || fut.poll(cx))
+        section.set(|| fut.poll(cx))
     }
 }

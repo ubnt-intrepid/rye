@@ -44,13 +44,13 @@ impl ExpandBlock {
         let name = &body.name;
         let block = &body.block;
 
-        let body = if self.is_async {
+        let scoped = if self.is_async {
             quote::quote! {
-                rye::_internal::with_section_async(&mut __section, async #block).await;
+                __section.set_async(async #block).await;
             }
         } else {
             quote::quote! {
-                rye::_internal::with_section(&mut __section, || #block);
+                __section.set(|| #block);
             }
         };
 
@@ -62,7 +62,7 @@ impl ExpandBlock {
                 column: column!(),
             };
             if let Some(mut __section) = rye::_internal::new_section(&SECTION) {
-                #body
+                #scoped
             }
         }}
     }
