@@ -50,4 +50,14 @@ mod tests {
     fn multi_sections_in_scope() {
         test_expanded("05-multi-sections-in-scope");
     }
+
+    #[test]
+    fn ignore_inner_items() {
+        test_expanded("06-ignore-inner-items");
+    }
+
+    #[test]
+    fn no_sections() {
+        test_expanded("07-no-sections");
+    }
 }

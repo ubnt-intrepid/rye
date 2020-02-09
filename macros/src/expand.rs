@@ -4,7 +4,7 @@ use std::mem;
 use syn::{
     parse::{Parse, ParseStream, Result},
     visit_mut::{self, VisitMut},
-    Block, Expr, ExprForLoop, ExprLoop, ExprWhile, ItemFn, Macro, Stmt, Token,
+    Block, Expr, ExprForLoop, ExprLoop, ExprWhile, Item, ItemFn, Macro, Stmt, Token,
 };
 
 struct SectionBody {
@@ -118,6 +118,10 @@ impl VisitMut for ExpandBlock {
         let prev = std::mem::replace(&mut self.in_loop, true);
         visit_mut::visit_expr_while_mut(self, node);
         self.in_loop = prev;
+    }
+
+    fn visit_item_mut(&mut self, _node: &mut Item) {
+        // ignore inner items.
     }
 }
 
