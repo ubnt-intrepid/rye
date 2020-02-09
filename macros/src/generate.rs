@@ -14,13 +14,13 @@ pub(crate) fn generate(item: ItemFn, sections: Vec<Section>) -> TokenStream {
 
     let inner_fn_ident = Ident::new("__inner__", ident.span());
 
-    let scoped = if asyncness.is_some() {
+    let run_test = if asyncness.is_some() {
         quote! {
-            rye::_internal::run_async(#inner_fn_ident, SECTIONS).await;
+            TEST_CASE.run_async(#inner_fn_ident).await;
         }
     } else {
         quote! {
-            rye::_internal::run(#inner_fn_ident, SECTIONS);
+            TEST_CASE.run(#inner_fn_ident);
         }
     };
 
@@ -30,10 +30,10 @@ pub(crate) fn generate(item: ItemFn, sections: Vec<Section>) -> TokenStream {
         #(#attrs)*
         #vis #asyncness #fn_token #ident () {
             #asyncness #fn_token #inner_fn_ident() #output #block
-            static SECTIONS: &[rye::_internal::Section] = &[
-                #sections
-            ];
-            #scoped
+            static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
+                sections: &[ #sections ],
+            };
+            #run_test
         }
     }
 }

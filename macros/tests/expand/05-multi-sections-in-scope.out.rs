@@ -20,13 +20,15 @@ fn multi_section_in_scope() {
             assert!(false);
         }
     }
-    static SECTIONS: &[rye::_internal::Section] = &[
-        rye::_internal::Section::new(0u64, "section1", true, rye::_internal::phf_set!())
-      , rye::_internal::Section::new(1u64, "section2", false, rye::_internal::phf_set!())
-      , rye::_internal::Section::new(2u64, "section2-1", false, rye::_internal::phf_set!(1u64))
-      , rye::_internal::Section::new(3u64, "section2-1-2", true, rye::_internal::phf_set!(1u64, 2u64))
-      , rye::_internal::Section::new(4u64, "section2-2", true, rye::_internal::phf_set!(1u64))
-      , rye::_internal::Section::new(5u64, "section3", true, rye::_internal::phf_set!())
-    ];
-    rye::_internal::run(__inner__, SECTIONS);
+    static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
+        sections: &[
+            rye::_internal::Section::new(0u64, "section1", true, rye::_internal::phf_set!())
+          , rye::_internal::Section::new(1u64, "section2", false, rye::_internal::phf_set!())
+          , rye::_internal::Section::new(2u64, "section2-1", false, rye::_internal::phf_set!(1u64))
+          , rye::_internal::Section::new(3u64, "section2-1-2", true, rye::_internal::phf_set!(1u64, 2u64))
+          , rye::_internal::Section::new(4u64, "section2-2", true, rye::_internal::phf_set!(1u64))
+          , rye::_internal::Section::new(5u64, "section3", true, rye::_internal::phf_set!())
+        ],
+    };
+    TEST_CASE.run(__inner__);
 }

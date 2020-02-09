@@ -16,9 +16,11 @@ fn case_sync_nested() {
             }
         }
     }
-    static SECTIONS: &[rye::_internal::Section] = &[
-        rye::_internal::Section::new(0u64, "resizing bigger changes size and capacity", false, rye::_internal::phf_set!())
-      , rye::_internal::Section::new(1u64, "shrinking smaller does not changes capacity", true, rye::_internal::phf_set!(0u64))
-    ];
-    rye::_internal::run(__inner__, SECTIONS);
+    static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
+        sections: &[
+            rye::_internal::Section::new(0u64, "resizing bigger changes size and capacity", false, rye::_internal::phf_set!())
+          , rye::_internal::Section::new(1u64, "shrinking smaller does not changes capacity", true, rye::_internal::phf_set!(0u64))
+        ],
+    };
+    TEST_CASE.run(__inner__);
 }
