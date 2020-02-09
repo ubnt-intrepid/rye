@@ -65,7 +65,7 @@ impl ExpandBlock {
 
         (
             syn::parse_quote! {
-                if __section.is_target(#section_id) #block
+                if rye::_internal::is_target(#section_id) #block
             },
             Some(section_id),
         )

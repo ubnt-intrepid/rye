@@ -1,15 +1,15 @@
 async fn case_async_nested() {
-    async fn __inner__(__section: &rye::_internal::Section) {
+    async fn __inner__() {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
         assert!(vec.capacity() >= 5);
 
-        if __section.is_target(0u64) {
+        if rye::_internal::is_target(0u64) {
             vec.resize(10, 0);
             assert_eq!(vec.len(), 10);
             assert!(vec.capacity() >= 10);
 
-            if __section.is_target(1u64) {
+            if rye::_internal::is_target(1u64) {
                 vec.resize(0, 0);
                 assert_eq!(vec.len(), 0);
                 assert!(vec.capacity() >= 10);

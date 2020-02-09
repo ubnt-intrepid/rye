@@ -1,6 +1,6 @@
 use phf::Set;
 
-type SectionId = u64;
+pub(crate) type SectionId = u64;
 
 #[derive(Debug)]
 pub struct Section {

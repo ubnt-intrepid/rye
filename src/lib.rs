@@ -2,6 +2,7 @@
 A Rust unit testing library inspired by Catch2.
 !*/
 
+mod context;
 mod section;
 
 #[doc(hidden)]
@@ -9,38 +10,45 @@ pub mod _internal {
     pub use crate::section::Section;
     pub use phf::phf_set;
 
+    use crate::{context::TestContext, section::SectionId};
+
     #[inline]
-    pub fn run<'a, F>(f: F, sections: &'a [Section])
+    pub fn is_target(id: SectionId) -> bool {
+        TestContext::with(|ctx| ctx.section().is_target(id))
+    }
+
+    #[inline]
+    pub fn run<F>(f: F, sections: &[Section])
     where
-        F: Fn(&'a Section),
+        F: Fn(),
     {
         if sections.is_empty() {
-            f(&Section::ROOT);
+            TestContext::new(&Section::ROOT).scope(&f);
             return;
         }
 
         for section in sections {
             if section.is_leaf() {
-                f(section);
+                TestContext::new(section).scope(&f);
             }
         }
     }
 
     #[cfg(feature = "futures")]
     #[inline]
-    pub async fn run_async<'a, F, Fut>(f: F, sections: &'a [Section])
+    pub async fn run_async<F, Fut>(f: F, sections: &[Section])
     where
-        F: Fn(&'a Section) -> Fut,
-        Fut: futures_core::Future + 'a,
+        F: Fn() -> Fut,
+        Fut: futures_core::Future<Output = ()>,
     {
         if sections.is_empty() {
-            f(&Section::ROOT).await;
+            TestContext::new(&Section::ROOT).scope_async(f()).await;
             return;
         }
 
         for section in sections {
             if section.is_leaf() {
-                f(section).await;
+                TestContext::new(section).scope_async(f()).await;
             }
         }
     }

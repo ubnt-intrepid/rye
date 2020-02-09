@@ -29,7 +29,7 @@ pub(crate) fn generate(item: ItemFn, sections: Vec<Section>) -> TokenStream {
     quote! {
         #(#attrs)*
         #vis #asyncness #fn_token #ident () {
-            #asyncness #fn_token #inner_fn_ident(__section: &rye::_internal::Section) #output #block
+            #asyncness #fn_token #inner_fn_ident() #output #block
             static SECTIONS: &[rye::_internal::Section] = &[
                 #sections
             ];
