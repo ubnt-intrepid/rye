@@ -1,0 +1,23 @@
+error: section cannot be described in a loop
+ --> $DIR/03-section-in-loop.rs:6:9
+  |
+6 | /         section!("section", {
+7 | |             assert!(true);
+8 | |         });
+  | |__________^
+
+error: section cannot be described in a loop
+  --> $DIR/03-section-in-loop.rs:15:9
+   |
+15 | /         section!("section", {
+16 | |             assert!(true);
+17 | |         });
+   | |__________^
+
+error: section cannot be described in a loop
+  --> $DIR/03-section-in-loop.rs:24:9
+   |
+24 | /         section!("section", {
+25 | |             assert!(true);
+26 | |         });
+   | |__________^
