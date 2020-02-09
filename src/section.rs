@@ -4,7 +4,7 @@ pub(crate) type SectionId = u64;
 
 #[derive(Debug)]
 pub struct Section {
-    id: Option<SectionId>,
+    id: SectionId,
     #[allow(dead_code)]
     name: &'static str,
     is_leaf: bool,
@@ -12,13 +12,6 @@ pub struct Section {
 }
 
 impl Section {
-    pub(crate) const ROOT: Self = Self {
-        id: None,
-        name: "root",
-        is_leaf: true,
-        ancestors: phf::phf_set!(),
-    };
-
     #[doc(hidden)] // private API.
     pub const fn new(
         id: SectionId,
@@ -27,7 +20,7 @@ impl Section {
         ancestors: Set<SectionId>,
     ) -> Self {
         Self {
-            id: Some(id),
+            id,
             name,
             is_leaf,
             ancestors,
@@ -42,7 +35,6 @@ impl Section {
 
     #[inline]
     pub fn is_target(&self, id: SectionId) -> bool {
-        self.id
-            .map_or(false, |t| t == id || self.ancestors.contains(&id))
+        self.id == id || self.ancestors.contains(&id)
     }
 }

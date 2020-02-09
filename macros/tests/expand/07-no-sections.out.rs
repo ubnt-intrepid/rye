@@ -6,7 +6,9 @@ fn no_sections() {
     }
 
     static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
-        sections: &[],
+        sections: &[
+            rye::_internal::Section::new(0u64, "no_sections", true, rye::_internal::phf_set!())
+        ],
     };
     TEST_CASE.run(__inner__);
 }

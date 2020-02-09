@@ -8,31 +8,7 @@ pub struct TestCase {
 
 impl TestCase {
     fn running_sections(&self) -> impl Iterator<Item = &Section> + '_ {
-        enum Either<A, B> {
-            A(A),
-            B(B),
-        }
-
-        impl<A, B, T> Iterator for Either<A, B>
-        where
-            A: Iterator<Item = T>,
-            B: Iterator<Item = T>,
-        {
-            type Item = T;
-            #[inline]
-            fn next(&mut self) -> Option<Self::Item> {
-                match self {
-                    Self::A(a) => a.next(),
-                    Self::B(b) => b.next(),
-                }
-            }
-        }
-
-        if self.sections.is_empty() {
-            Either::A(Some(&Section::ROOT).into_iter())
-        } else {
-            Either::B(self.sections.iter().filter(|section| section.is_leaf()))
-        }
+        self.sections.iter().filter(|section| section.is_leaf())
     }
 
     #[inline]
