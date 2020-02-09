@@ -1,0 +1,7 @@
+error: section cannot be described in a closure
+ --> $DIR/04-section-in-closure.rs:6:9
+  |
+6 | /         section!("section", {
+7 | |             assert!(true);
+8 | |         });
+  | |__________^

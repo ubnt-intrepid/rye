@@ -2,9 +2,10 @@ use crate::section::{Section, SectionId};
 use indexmap::IndexMap;
 use std::mem;
 use syn::{
-    parse::{Parse, ParseStream, Result},
+    parse::{Error, Parse, ParseStream, Result},
     visit_mut::{self, VisitMut},
-    Block, Expr, ExprForLoop, ExprLoop, ExprWhile, Item, ItemFn, Macro, Stmt, Token,
+    Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Item, ItemFn, Macro,
+    Stmt, Token,
 };
 
 struct SectionBody {
@@ -28,16 +29,31 @@ struct ExpandBlock {
     next_section_id: SectionId,
     current_section_id: Option<SectionId>,
     in_loop: bool,
+    in_closure: bool,
+    in_async_block: bool,
 }
 
 impl ExpandBlock {
     fn expand_section_macro(&mut self, mac: &Macro) -> Result<(Stmt, SectionId)> {
         if self.in_loop {
-            return Err(syn::parse::Error::new_spanned(
+            return Err(Error::new_spanned(
                 mac,
                 "section cannot be described in a loop",
             ));
         }
+        if self.in_closure {
+            return Err(Error::new_spanned(
+                mac,
+                "section cannot be described in a closure",
+            ));
+        }
+        if self.in_async_block {
+            return Err(Error::new_spanned(
+                mac,
+                "section cannot be described in an async block",
+            ));
+        }
+
         let body: SectionBody = mac.parse_body()?;
 
         let name = &body.name;
@@ -71,6 +87,36 @@ impl ExpandBlock {
             section_id,
         ))
     }
+
+    fn mark_in_loop<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let prev = mem::replace(&mut self.in_loop, true);
+        let res = f(self);
+        self.in_loop = prev;
+        res
+    }
+
+    fn mark_in_closure<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let prev = mem::replace(&mut self.in_closure, true);
+        let res = f(self);
+        self.in_closure = prev;
+        res
+    }
+
+    fn mark_in_async_block<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let prev = mem::replace(&mut self.in_async_block, true);
+        let res = f(self);
+        self.in_async_block = prev;
+        res
+    }
 }
 
 impl VisitMut for ExpandBlock {
@@ -103,21 +149,23 @@ impl VisitMut for ExpandBlock {
     }
 
     fn visit_expr_for_loop_mut(&mut self, node: &mut ExprForLoop) {
-        let prev = std::mem::replace(&mut self.in_loop, true);
-        visit_mut::visit_expr_for_loop_mut(self, node);
-        self.in_loop = prev;
+        self.mark_in_loop(|me| visit_mut::visit_expr_for_loop_mut(me, node));
     }
 
     fn visit_expr_loop_mut(&mut self, node: &mut ExprLoop) {
-        let prev = std::mem::replace(&mut self.in_loop, true);
-        visit_mut::visit_expr_loop_mut(self, node);
-        self.in_loop = prev;
+        self.mark_in_loop(|me| visit_mut::visit_expr_loop_mut(me, node));
     }
 
     fn visit_expr_while_mut(&mut self, node: &mut ExprWhile) {
-        let prev = std::mem::replace(&mut self.in_loop, true);
-        visit_mut::visit_expr_while_mut(self, node);
-        self.in_loop = prev;
+        self.mark_in_loop(|me| visit_mut::visit_expr_while_mut(me, node));
+    }
+
+    fn visit_expr_closure_mut(&mut self, node: &mut ExprClosure) {
+        self.mark_in_closure(|me| visit_mut::visit_expr_closure_mut(me, node));
+    }
+
+    fn visit_expr_async_mut(&mut self, node: &mut ExprAsync) {
+        self.mark_in_async_block(|me| visit_mut::visit_expr_async_mut(me, node));
     }
 
     fn visit_item_mut(&mut self, _node: &mut Item) {
@@ -132,6 +180,8 @@ pub(crate) fn expand(item: &mut ItemFn) -> Vec<Section> {
         next_section_id: 0,
         current_section_id: None,
         in_loop: false,
+        in_closure: false,
+        in_async_block: false,
     };
     expand.visit_block_mut(&mut *item.block);
     expand.sections.into_iter().map(|(_k, v)| v).collect()
