@@ -22,11 +22,3 @@ pub mod _internal {
 
 /// Generate a test case.
 pub use rye_macros::test_case;
-
-/// Declare a section in the test case.
-#[macro_export]
-macro_rules! section {
-    ($($t:tt)*) => {
-        compile_error!("section!() cannot be used outside of #[test_case]")
-    };
-}
