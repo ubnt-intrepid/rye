@@ -1,4 +1,4 @@
-fn multi_section_in_scope() {
+fn multi_section_in_scope(suite: &mut rye::TestSuite<'_>) {
     fn __inner__() {
         if rye::_internal::is_target(1u64) {
             assert!(1 + 1 == 2);
@@ -20,7 +20,9 @@ fn multi_section_in_scope() {
             assert!(false);
         }
     }
-    static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
+    static TEST_DESC: rye::_internal::TestDesc = rye::_internal::TestDesc {
+        name: "multi_section_in_scope",
+        module_path: module_path!(),
         sections: &[
             rye::_internal::Section::new(0u64, "multi_section_in_scope", false, rye::_internal::phf_set!())
           , rye::_internal::Section::new(1u64, "section1", true, rye::_internal::phf_set!(0u64))
@@ -31,5 +33,5 @@ fn multi_section_in_scope() {
           , rye::_internal::Section::new(6u64, "section3", true, rye::_internal::phf_set!(0u64))
         ],
     };
-    TEST_CASE.run(__inner__);
+    suite.register(&TEST_DESC, __inner__);
 }

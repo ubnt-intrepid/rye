@@ -1,5 +1,4 @@
 #[rye::test_case]
-#[test]
 fn case_sync() {
     let mut vec = vec![0usize; 5];
 
@@ -15,7 +14,6 @@ fn case_sync() {
 }
 
 #[rye::test_case]
-#[test]
 fn nested() {
     let mut vec = vec![0usize; 5];
 
@@ -37,10 +35,24 @@ fn nested() {
     });
 }
 
-#[test]
-fn case_async() {
+#[rye::test_case]
+async fn case_async() {
+    let mut vec = vec![0usize; 5];
+
+    assert_eq!(vec.len(), 5);
+    assert!(vec.capacity() >= 5);
+
+    section!("resizing bigger changes size and capacity", {
+        vec.resize(10, 0);
+
+        assert_eq!(vec.len(), 10);
+        assert!(vec.capacity() >= 5);
+    });
+}
+
+mod sub {
     #[rye::test_case]
-    async fn case_async() {
+    pub fn sub_test() {
         let mut vec = vec![0usize; 5];
 
         assert_eq!(vec.len(), 5);
@@ -53,6 +65,11 @@ fn case_async() {
             assert!(vec.capacity() >= 5);
         });
     }
+}
 
-    futures_executor::block_on(case_async());
+rye::test_main! {
+    case_sync,
+    nested,
+    case_async,
+    sub::sub_test,
 }

@@ -1,4 +1,10 @@
 use crate::section::Section;
+use futures::{
+    future::Future,
+    task::{self, Poll},
+};
+use pin_project::pin_project;
+use std::pin::Pin;
 use std::{cell::Cell, marker::PhantomData, mem, ptr::NonNull};
 
 thread_local! {
@@ -38,6 +44,13 @@ impl<'a> TestContext<'a> {
         f()
     }
 
+    pub(crate) async fn scope_async<Fut>(&mut self, fut: Fut) -> Fut::Output
+    where
+        Fut: Future,
+    {
+        ScopeAsync { fut, ctx: self }.await
+    }
+
     fn try_with<F, R>(f: F) -> Result<R, AccessError>
     where
         F: FnOnce(&mut TestContext<'_>) -> R,
@@ -65,42 +78,22 @@ pub(crate) struct AccessError {
     _p: (),
 }
 
-#[cfg(feature = "futures")]
-mod futures {
-    use super::*;
-    use futures_core::{
-        future::Future,
-        task::{self, Poll},
-    };
-    use pin_project::pin_project;
-    use std::pin::Pin;
+#[pin_project]
+struct ScopeAsync<'a, 'ctx, Fut> {
+    #[pin]
+    fut: Fut,
+    ctx: &'a mut TestContext<'ctx>,
+}
 
-    impl TestContext<'_> {
-        pub(crate) async fn scope_async<Fut>(&mut self, fut: Fut) -> Fut::Output
-        where
-            Fut: Future,
-        {
-            ScopeAsync { fut, ctx: self }.await
-        }
-    }
+impl<Fut> Future for ScopeAsync<'_, '_, Fut>
+where
+    Fut: Future,
+{
+    type Output = Fut::Output;
 
-    #[pin_project]
-    struct ScopeAsync<'a, 'ctx, Fut> {
-        #[pin]
-        fut: Fut,
-        ctx: &'a mut TestContext<'ctx>,
-    }
-
-    impl<Fut> Future for ScopeAsync<'_, '_, Fut>
-    where
-        Fut: Future,
-    {
-        type Output = Fut::Output;
-
-        fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-            let me = self.project();
-            let fut = me.fut;
-            me.ctx.scope(|| fut.poll(cx))
-        }
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        let me = self.project();
+        let fut = me.fut;
+        me.ctx.scope(|| fut.poll(cx))
     }
 }

@@ -1,4 +1,4 @@
-fn case_sync() {
+fn case_sync(suite: &mut rye::TestSuite<'_>) {
     fn __inner__() {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
@@ -10,11 +10,13 @@ fn case_sync() {
             assert!(vec.capacity() >= 5);
         }
     }
-    static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
+    static TEST_DESC: rye::_internal::TestDesc = rye::_internal::TestDesc {
+        name: "case_sync",
+        module_path: module_path!(),
         sections: &[
             rye::_internal::Section::new(0u64, "case_sync", false, rye::_internal::phf_set!())
           , rye::_internal::Section::new(1u64, "resizing bigger changes size and capacity", true, rye::_internal::phf_set!(0u64))
         ],
     };
-    TEST_CASE.run(__inner__);
+    suite.register(&TEST_DESC, __inner__);
 }

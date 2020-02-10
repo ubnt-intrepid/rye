@@ -1,4 +1,4 @@
-async fn case_async_nested() {
+fn case_async_nested(suite: &mut rye::TestSuite<'_>) {
     async fn __inner__() {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
@@ -16,12 +16,14 @@ async fn case_async_nested() {
             }
         }
     }
-    static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
+    static TEST_DESC: rye::_internal::TestDesc = rye::_internal::TestDesc {
+        name: "case_async_nested",
+        module_path: module_path!(),
         sections: &[
             rye::_internal::Section::new(0u64, "case_async_nested", false, rye::_internal::phf_set!())
           , rye::_internal::Section::new(1u64, "resizing bigger changes size and capacity", false, rye::_internal::phf_set!(0u64))
           , rye::_internal::Section::new(2u64, "shrinking smaller does not changes capacity", true, rye::_internal::phf_set!(0u64, 1u64))
         ],
     };
-    TEST_CASE.run_async(__inner__).await;
+    suite.register_async(&TEST_DESC, __inner__);
 }

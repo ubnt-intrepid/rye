@@ -14,26 +14,30 @@ pub(crate) fn generate(item: ItemFn, sections: Vec<Section>) -> TokenStream {
 
     let inner_fn_ident = Ident::new("__inner__", ident.span());
 
-    let run_test = if asyncness.is_some() {
+    let register = if asyncness.is_some() {
         quote! {
-            TEST_CASE.run_async(#inner_fn_ident).await;
+            suite.register_async(&TEST_DESC, #inner_fn_ident);
         }
     } else {
         quote! {
-            TEST_CASE.run(#inner_fn_ident);
+            suite.register(&TEST_DESC, #inner_fn_ident);
         }
     };
+
+    let test_name = ident.to_string();
 
     let sections: Punctuated<_, Token![,]> = sections.into_iter().collect();
 
     quote! {
         #(#attrs)*
-        #vis #asyncness #fn_token #ident () {
+        #vis #fn_token #ident (suite: &mut rye::TestSuite<'_>) {
             #asyncness #fn_token #inner_fn_ident() #output #block
-            static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
+            static TEST_DESC: rye::_internal::TestDesc = rye::_internal::TestDesc {
+                name: #test_name,
+                module_path: module_path!(),
                 sections: &[ #sections ],
             };
-            #run_test
+            #register
         }
     }
 }
