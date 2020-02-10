@@ -30,7 +30,7 @@
 
 ## Installation
 
-Add `rye` to `dev-dependency` section in your `Cargo.toml` as follows:
+Add `rye` to `dev-dependencies` section in your `Cargo.toml` as follows:
 
 ```toml
 [dev-dependencies]

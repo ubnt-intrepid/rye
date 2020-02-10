@@ -10,7 +10,6 @@ fn case_sync() {
             assert!(vec.capacity() >= 5);
         }
     }
-
     static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
         sections: &[
             rye::_internal::Section::new(0u64, "case_sync", false, rye::_internal::phf_set!())

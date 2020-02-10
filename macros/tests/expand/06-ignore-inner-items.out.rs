@@ -6,7 +6,6 @@ fn ignore_inner_items() {
             });
         }
     }
-    
     static TEST_CASE: rye::_internal::TestCase = rye::_internal::TestCase {
         sections: &[
             rye::_internal::Section::new(0u64, "ignore_inner_items", true, rye::_internal::phf_set!())
