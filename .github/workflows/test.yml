@@ -69,9 +69,3 @@ jobs:
       with:
         command: test
         args: --workspace
-
-    - name: Run ignored tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: --workspace -- --ignored
