@@ -1,11 +1,11 @@
-use crate::section::Section;
+use crate::{desc::TestDesc, section::SectionId};
 use futures::{
     future::Future,
     task::{self, Poll},
 };
 use pin_project::pin_project;
 use std::pin::Pin;
-use std::{cell::Cell, marker::PhantomData, mem, ptr::NonNull};
+use std::{cell::Cell, mem, ptr::NonNull};
 
 thread_local! {
     static TLS_CTX: Cell<Option<NonNull<TestContext<'static>>>> = Cell::new(None);
@@ -20,16 +20,13 @@ impl Drop for Guard {
 }
 
 pub(crate) struct TestContext<'a> {
-    section: &'a Section,
-    _marker: PhantomData<fn(&'a ()) -> &'a ()>,
+    desc: &'a TestDesc,
+    section: Option<SectionId>,
 }
 
 impl<'a> TestContext<'a> {
-    pub(crate) fn new(section: &'a Section) -> Self {
-        Self {
-            section,
-            _marker: PhantomData,
-        }
+    pub(crate) fn new(desc: &'a TestDesc, section: Option<SectionId>) -> Self {
+        Self { desc, section }
     }
 
     pub(crate) fn scope<F, R>(&mut self, f: F) -> R
@@ -68,8 +65,15 @@ impl<'a> TestContext<'a> {
         Self::try_with(f).expect("cannot acquire the test context")
     }
 
-    pub(crate) fn section(&self) -> &Section {
-        &*self.section
+    pub(crate) fn is_target_section(&self, id: SectionId) -> bool {
+        self.section.map_or(false, |section| {
+            let section = self
+                .desc
+                .sections
+                .get(&section)
+                .expect("invalid section id is set");
+            section.ancestors.contains(&id)
+        })
     }
 }
 

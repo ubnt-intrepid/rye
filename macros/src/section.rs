@@ -10,18 +10,25 @@ pub(crate) struct Section {
     pub(crate) children: Vec<SectionId>,
 }
 
-impl ToTokens for Section {
+impl Section {
+    pub(crate) fn map_entry(&self) -> SectionMapEntry<'_> {
+        SectionMapEntry { section: self }
+    }
+}
+
+pub(crate) struct SectionMapEntry<'a> {
+    section: &'a Section,
+}
+
+impl ToTokens for SectionMapEntry<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let id = &self.id;
-        let name = &self.name;
-        let is_leaf = self.children.is_empty();
-        let ancestors = &self.ancestors;
+        let id = &self.section.id;
+        let name = &self.section.name;
+        let ancestors = &self.section.ancestors;
         tokens.append_all(&[quote! {
-            rye::_internal::Section::new(
-                #id,
+            #id => rye::_internal::Section::new(
                 #name,
-                #is_leaf,
-                rye::_internal::phf_set!(#(#ancestors),*)
+                rye::_internal::hashset!(#(#ancestors),*)
             )
         }]);
     }

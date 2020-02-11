@@ -11,13 +11,13 @@ mod section;
 pub mod _internal {
     pub use crate::desc::TestDesc;
     pub use crate::section::Section;
-    pub use phf::phf_set;
+    pub use maplit::{hashmap, hashset};
 
     use crate::{context::TestContext, section::SectionId};
 
     #[inline]
     pub fn is_target(id: SectionId) -> bool {
-        TestContext::with(|ctx| ctx.section().is_target(id))
+        TestContext::with(|ctx| ctx.is_target_section(id))
     }
 }
 

@@ -1,26 +1,31 @@
-use crate::{context::TestContext, section::Section};
+use crate::{
+    context::TestContext,
+    section::{Section, SectionId},
+};
 use futures::future::Future;
+use std::collections::HashMap;
 
 /// Metadata for executing a test case.
 #[derive(Debug)]
 pub struct TestDesc {
     pub name: &'static str,
     pub module_path: &'static str,
-    pub sections: &'static [Section],
+    pub sections: HashMap<SectionId, Section>,
+    pub leaf_sections: &'static [SectionId],
 }
 
 impl TestDesc {
-    fn running_sections(&self) -> impl Iterator<Item = &Section> + '_ {
-        self.sections.iter().filter(|section| section.is_leaf())
-    }
-
     #[inline]
     pub fn run<F>(&self, f: F)
     where
         F: Fn(),
     {
-        for section in self.running_sections() {
-            TestContext::new(section).scope(&f);
+        if self.leaf_sections.is_empty() {
+            TestContext::new(self, None).scope(&f);
+        } else {
+            for &section in self.leaf_sections {
+                TestContext::new(self, Some(section)).scope(&f);
+            }
         }
     }
 
@@ -30,8 +35,12 @@ impl TestDesc {
         F: Fn() -> Fut,
         Fut: Future<Output = ()>,
     {
-        for section in self.running_sections() {
-            TestContext::new(section).scope_async(f()).await;
+        if self.leaf_sections.is_empty() {
+            TestContext::new(self, None).scope_async(f()).await;
+        } else {
+            for &section in self.leaf_sections {
+                TestContext::new(self, Some(section)).scope_async(f()).await;
+            }
         }
     }
 }

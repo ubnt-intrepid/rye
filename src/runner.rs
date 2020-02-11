@@ -11,7 +11,7 @@ pub struct TestSuite<'a> {
 
 impl TestSuite<'_> {
     #[doc(hidden)] // private API
-    pub fn register<F>(&mut self, desc: &'static TestDesc, test_fn: F)
+    pub fn register<F>(&mut self, desc: TestDesc, test_fn: F)
     where
         F: Fn() + Send + 'static,
     {
@@ -25,7 +25,7 @@ impl TestSuite<'_> {
     }
 
     #[doc(hidden)] // private API
-    pub fn register_async<F, Fut>(&mut self, desc: &'static TestDesc, test_fn: F)
+    pub fn register_async<F, Fut>(&mut self, desc: TestDesc, test_fn: F)
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = ()> + Send + 'static,
@@ -42,7 +42,7 @@ impl TestSuite<'_> {
 
 pub struct TestData {
     #[allow(dead_code)]
-    desc: &'static TestDesc,
+    desc: TestDesc,
     test_fn: TestFn,
 }
 

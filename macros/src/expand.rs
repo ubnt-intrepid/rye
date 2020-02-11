@@ -27,7 +27,7 @@ impl Parse for SectionBody {
 struct ExpandBlock {
     sections: IndexMap<SectionId, Section>,
     next_section_id: SectionId,
-    parent: SectionId,
+    parent: Option<SectionId>,
     in_loop: bool,
     in_closure: bool,
     in_async_block: bool,
@@ -60,12 +60,14 @@ impl ExpandBlock {
         let block = &body.block;
 
         let section_id = self.next_section_id;
-        let ancestors = {
-            let parent = &mut self.sections[&self.parent];
+        let ancestors = if let Some(parent) = self.parent {
+            let parent = &mut self.sections[&parent];
             parent.children.push(section_id);
             let mut ancestors = parent.ancestors.clone();
             ancestors.push(parent.id);
             ancestors
+        } else {
+            vec![]
         };
         self.sections.insert(
             section_id,
@@ -138,7 +140,7 @@ impl VisitMut for ExpandBlock {
             _ => None,
         };
         if let Some(section_id) = section_id {
-            let prev = mem::replace(&mut self.parent, section_id);
+            let prev = self.parent.replace(section_id);
             visit_mut::visit_stmt_mut(self, item);
             self.parent = prev;
         } else {
@@ -173,25 +175,10 @@ impl VisitMut for ExpandBlock {
 
 #[inline]
 pub(crate) fn expand(item: &mut ItemFn) -> Vec<Section> {
-    let mut sections = IndexMap::new();
-    sections.insert(
-        0,
-        Section {
-            id: 0,
-            name: {
-                let name = &item.sig.ident;
-                let name_str = name.to_string();
-                let name_expr = quote::quote_spanned!(name.span() => #name_str);
-                syn::parse_quote!(#name_expr)
-            },
-            ancestors: vec![],
-            children: vec![],
-        },
-    );
     let mut expand = ExpandBlock {
-        sections,
-        next_section_id: 1, // id=0 is used by the root section.
-        parent: 0,
+        sections: IndexMap::new(),
+        next_section_id: 0,
+        parent: None,
         in_loop: false,
         in_closure: false,
         in_async_block: false,
