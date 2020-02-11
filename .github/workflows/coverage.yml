@@ -1,4 +1,4 @@
-name: Workflow
+name: Coverage
 
 on:
   push:
@@ -9,31 +9,21 @@ on:
 env:
   CARGO_HUSKY_DONT_INSTALL_HOOKS: true
   CARGO_TERM_VERBOSE: true
+  CARGO_INCREMENTAL: '0'
   RUST_BACKTRACE: full
+  RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads'
 
 jobs:
-  Test:
-    strategy:
-      matrix:
-        conf:
-          - { toolchain: stable  , os: ubuntu-18.04   , components: "rustfmt, clippy" }
-          - { toolchain: beta    , os: ubuntu-18.04   }
-          - { toolchain: nightly , os: ubuntu-18.04   }
-          - { toolchain: 1.40.0  , os: ubuntu-18.04   } # minimum supported toolchain
-          - { toolchain: stable  , os: macos-latest   }
-          - { toolchain: stable  , os: windows-latest }
-
-    runs-on: ${{ matrix.conf.os }}
+  Coverage:
+    runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v1
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: ${{ matrix.conf.toolchain }}
-        components: ${{ matrix.conf.components }}
+        toolchain: nightly
         override: true
-
     - name: Cache cargo registry
       uses: actions/cache@v1
       with:
@@ -50,28 +40,31 @@ jobs:
     #     path: target
     #     key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Run format check
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: --all -- --check
-      if: contains(matrix.conf.components, 'rustfmt')
-
-    - name: Run clippy
-      uses: actions-rs/cargo@v1
-      with:
-        command: clippy
-        args: --workspace --all-targets
-      if: contains(matrix.conf.components, 'clippy')
-
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
         command: test
         args: --workspace
 
-    - name: Run ignored tests
+    - name: Run tests (ignored)
       uses: actions-rs/cargo@v1
       with:
         command: test
         args: --workspace -- --ignored
+
+    - name: Install grcov
+      run: |
+        curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+        mkdir -pv $HOME/.cargo/bin
+        mv -v ./grcov $HOME/.cargo/bin
+        echo ::add-path::$HOME/.cargo/bin
+
+    - name: Collect coverage
+      uses: actions-rs/grcov@v0.1
+      id: coverage
+
+    - name: Send report to Codecov
+      uses: codecov/codecov-action@v1.0.3
+      if: success()
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
