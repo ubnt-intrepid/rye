@@ -17,4 +17,3 @@ if cargo clippy --version >/dev/null; then
 fi
 
 (set -x; cargo test --workspace)
-(set -x; cargo test -- --ignored)

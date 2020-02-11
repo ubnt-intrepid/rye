@@ -46,12 +46,6 @@ jobs:
         command: test
         args: --workspace
 
-    - name: Run tests (ignored)
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: --workspace -- --ignored
-
     - name: Install grcov
       run: |
         curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
@@ -67,4 +61,5 @@ jobs:
       uses: codecov/codecov-action@v1.0.3
       if: success()
       with:
+        file: ./lcov.info
         token: ${{ secrets.CODECOV_TOKEN }}
