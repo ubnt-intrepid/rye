@@ -71,9 +71,10 @@ pub(crate) fn test_case(_args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     quote! {
-        #(#attrs)*
         #vis #fn_token #ident (suite: &mut rye::TestSuite<'_>) {
+            #(#attrs)*
             #asyncness #fn_token #inner_fn_ident() #output #block
+
             let desc = rye::_internal::TestDesc {
                 name: #test_name,
                 module_path: module_path!(),
@@ -291,8 +292,8 @@ mod tests {
 
     fn test_expanded(name: &str) {
         let args = TokenStream::new();
-        let item = read_file(format!("tests/expand/{}.in.rs", name));
-        let expected = read_file(format!("tests/expand/{}.out.rs", name));
+        let item = read_file(format!("tests/test_case/{}.in.rs", name));
+        let expected = read_file(format!("tests/test_case/{}.out.rs", name));
         let output = test_case(args, item);
         assert_eq!(expected.to_string(), output.to_string());
     }
@@ -330,5 +331,10 @@ mod tests {
     #[test]
     fn no_sections() {
         test_expanded("07-no-sections");
+    }
+
+    #[test]
+    fn attributes() {
+        test_expanded("08-attributes");
     }
 }

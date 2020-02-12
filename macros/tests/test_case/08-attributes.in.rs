@@ -1,4 +1,5 @@
 #[ignored]
+#[allow(unused_variables)]
 fn ignored() {
     let mut vec = vec![0usize; 5];
     assert_eq!(vec.len(), 5);
