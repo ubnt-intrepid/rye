@@ -1,12 +1,99 @@
-use crate::section::{Section, SectionId};
 use indexmap::IndexMap;
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
     parse::{Error, Parse, ParseStream, Result},
     visit_mut::{self, VisitMut},
-    Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Item, ItemFn, Macro,
-    Stmt, Token,
+    Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Ident, Item, ItemFn,
+    Macro, Stmt, Token,
 };
+
+pub(crate) fn test_case(_args: TokenStream, item: TokenStream) -> TokenStream {
+    let mut item: ItemFn = match syn::parse2(item) {
+        Ok(item) => item,
+        Err(err) => return err.to_compile_error(),
+    };
+
+    let sections: Vec<_> = {
+        let mut expand = ExpandBlock {
+            sections: IndexMap::new(),
+            next_section_id: 0,
+            parent: None,
+            in_loop: false,
+            in_closure: false,
+            in_async_block: false,
+        };
+        expand.visit_block_mut(&mut *item.block);
+        expand.sections.into_iter().map(|(_k, v)| v).collect()
+    };
+    let sections = &sections;
+
+    let vis = &item.vis;
+    let asyncness = &item.sig.asyncness;
+    let fn_token = &item.sig.fn_token;
+    let ident = &item.sig.ident;
+    let output = &item.sig.output;
+    let block = &*item.block;
+
+    let inner_fn_ident = Ident::new("__inner__", ident.span());
+
+    let register = if asyncness.is_some() {
+        quote! {
+            suite.register_async(desc, #inner_fn_ident);
+        }
+    } else {
+        quote! {
+            suite.register(desc, #inner_fn_ident);
+        }
+    };
+
+    let test_name = ident.to_string();
+
+    let section_map_entries = sections.iter().map(|section| SectionMapEntry { section });
+
+    let leaf_section_ids = sections.iter().filter_map(|section| {
+        if section.children.is_empty() {
+            Some(section.id)
+        } else {
+            None
+        }
+    });
+
+    let mut ignored = false;
+    let mut attrs = vec![];
+    for attr in item.attrs.drain(..) {
+        if attr.path.is_ident("ignored") {
+            ignored = true;
+            continue;
+        }
+        attrs.push(attr);
+    }
+
+    quote! {
+        #(#attrs)*
+        #vis #fn_token #ident (suite: &mut rye::TestSuite<'_>) {
+            #asyncness #fn_token #inner_fn_ident() #output #block
+            let desc = rye::_internal::TestDesc {
+                name: #test_name,
+                module_path: module_path!(),
+                ignored: #ignored,
+                sections: rye::_internal::hashmap! { #(#section_map_entries,)* },
+                leaf_sections: &[ #(#leaf_section_ids),* ],
+            };
+            #register
+        }
+    }
+}
+
+type SectionId = u64;
+
+struct Section {
+    id: SectionId,
+    name: syn::Expr,
+    ancestors: Vec<SectionId>,
+    children: Vec<SectionId>,
+}
 
 struct SectionBody {
     name: Expr,
@@ -173,16 +260,75 @@ impl VisitMut for ExpandBlock {
     }
 }
 
-#[inline]
-pub(crate) fn expand(item: &mut ItemFn) -> Vec<Section> {
-    let mut expand = ExpandBlock {
-        sections: IndexMap::new(),
-        next_section_id: 0,
-        parent: None,
-        in_loop: false,
-        in_closure: false,
-        in_async_block: false,
-    };
-    expand.visit_block_mut(&mut *item.block);
-    expand.sections.into_iter().map(|(_k, v)| v).collect()
+struct SectionMapEntry<'a> {
+    section: &'a Section,
+}
+
+impl ToTokens for SectionMapEntry<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let id = &self.section.id;
+        let name = &self.section.name;
+        let ancestors = &self.section.ancestors;
+        tokens.append_all(&[quote! {
+            #id => rye::_internal::Section::new(
+                #name,
+                rye::_internal::hashset!(#(#ancestors),*)
+            )
+        }]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    fn read_file<P: AsRef<Path>>(path: P) -> TokenStream {
+        let content = std::fs::read_to_string(path).unwrap();
+        let item: syn::ItemFn = syn::parse_str(&content).unwrap();
+        quote::quote!(#item)
+    }
+
+    fn test_expanded(name: &str) {
+        let args = TokenStream::new();
+        let item = read_file(format!("tests/expand/{}.in.rs", name));
+        let expected = read_file(format!("tests/expand/{}.out.rs", name));
+        let output = test_case(args, item);
+        assert_eq!(expected.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn test_sync() {
+        test_expanded("01-sync");
+    }
+
+    #[test]
+    fn test_sync_nested() {
+        test_expanded("02-sync-nested");
+    }
+
+    #[test]
+    fn test_async() {
+        test_expanded("03-async");
+    }
+
+    #[test]
+    fn test_async_nested() {
+        test_expanded("04-async-nested");
+    }
+
+    #[test]
+    fn multi_sections_in_scope() {
+        test_expanded("05-multi-sections-in-scope");
+    }
+
+    #[test]
+    fn ignore_inner_items() {
+        test_expanded("06-ignore-inner-items");
+    }
+
+    #[test]
+    fn no_sections() {
+        test_expanded("07-no-sections");
+    }
 }
