@@ -1,11 +1,77 @@
-use crate::{desc::TestDesc, section::SectionId};
 use futures::{
     future::Future,
     task::{self, Poll},
 };
 use pin_project::pin_project;
-use std::pin::Pin;
-use std::{cell::Cell, mem, ptr::NonNull};
+use std::{
+    cell::Cell,
+    collections::{HashMap, HashSet},
+    mem,
+    pin::Pin,
+    ptr::NonNull,
+};
+
+/// Description about a test case.
+#[derive(Debug)]
+pub struct TestDesc {
+    pub name: &'static str,
+    pub module_path: &'static str,
+    pub ignored: bool,
+    pub sections: HashMap<SectionId, Section>,
+    pub leaf_sections: &'static [SectionId],
+}
+
+impl TestDesc {
+    #[inline]
+    pub(crate) fn run<F>(&self, f: F)
+    where
+        F: Fn(),
+    {
+        if self.leaf_sections.is_empty() {
+            TestContext::new(self, None).scope(&f);
+        } else {
+            for &section in self.leaf_sections {
+                TestContext::new(self, Some(section)).scope(&f);
+            }
+        }
+    }
+
+    #[inline]
+    pub(crate) async fn run_async<F, Fut>(&self, f: F)
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output = ()>,
+    {
+        if self.leaf_sections.is_empty() {
+            TestContext::new(self, None).scope_async(f()).await;
+        } else {
+            for &section in self.leaf_sections {
+                TestContext::new(self, Some(section)).scope_async(f()).await;
+            }
+        }
+    }
+}
+
+pub(crate) type SectionId = u64;
+
+#[derive(Debug)]
+pub struct Section {
+    #[allow(dead_code)]
+    pub(crate) name: &'static str,
+    pub(crate) ancestors: HashSet<SectionId>,
+}
+
+impl Section {
+    #[doc(hidden)] // private API.
+    pub const fn new(name: &'static str, ancestors: HashSet<SectionId>) -> Self {
+        Self { name, ancestors }
+    }
+}
+
+pub(crate) struct TestContext<'a> {
+    desc: &'a TestDesc,
+    section: Option<SectionId>,
+}
 
 thread_local! {
     static TLS_CTX: Cell<Option<NonNull<TestContext<'static>>>> = Cell::new(None);
@@ -17,11 +83,6 @@ impl Drop for Guard {
     fn drop(&mut self) {
         TLS_CTX.with(|tls| tls.set(self.0.take()));
     }
-}
-
-pub(crate) struct TestContext<'a> {
-    desc: &'a TestDesc,
-    section: Option<SectionId>,
 }
 
 impl<'a> TestContext<'a> {

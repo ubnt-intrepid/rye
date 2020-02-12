@@ -1,4 +1,4 @@
-fn ignore_inner_items(suite: &mut rye::TestSuite<'_>) {
+fn ignore_inner_items(suite: &mut rye::_internal::TestSuite<'_>) {
     fn __inner__() {
         fn inner() {
             section!("section1", {

@@ -1,4 +1,4 @@
-fn ignored(suite: &mut rye::TestSuite<'_>) {
+fn ignored(suite: &mut rye::_internal::TestSuite<'_>) {
     #[allow(unused_variables)]
     fn __inner__() {
         let mut vec = vec![0usize; 5];

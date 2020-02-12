@@ -1,4 +1,4 @@
-fn no_sections(suite: &mut rye::TestSuite<'_>) {
+fn no_sections(suite: &mut rye::_internal::TestSuite<'_>) {
     fn __inner__() {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);

@@ -1,4 +1,4 @@
-fn multi_section_in_scope(suite: &mut rye::TestSuite<'_>) {
+fn multi_section_in_scope(suite: &mut rye::_internal::TestSuite<'_>) {
     fn __inner__() {
         if rye::_internal::is_target(0u64) {
             assert!(1 + 1 == 2);

@@ -1,22 +1,21 @@
 [package]
 name = "rye"
-version = "0.0.0"
-publish = false
+version = "0.0.1"
 description = """
-A Rust unit testing library inspired by Catch2.
+A custom unit testing framework inspired by Catch2.
 """
 authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/ubnt-intrepid/joke-rs.git"
+repository = "https://github.com/ubnt-intrepid/rye.git"
 readme = "README.md"
 
 [dependencies]
-rye-macros = { path = "macros" }
-expected = "0.0.1"
+rye-macros = { version = "=0.0.1", path = "./macros" }
+expected = { version = "0.0.1", features = [ "futures" ] }
 futures = { version = "0.3", features = [ "thread-pool" ] }
 maplit = "1"
-maybe-unwind = "0.1"
+maybe-unwind = { version = "0.1", features = [ "futures" ] }
 mimicaw = "0.1.3"
 pin-project = "0.4"
 

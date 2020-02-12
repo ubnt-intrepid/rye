@@ -1,19 +1,19 @@
 /*!
-A Rust unit testing library inspired by Catch2.
+A custom unit testing framework inspired by Catch2.
 !*/
 
-mod context;
-mod desc;
 mod runner;
-mod section;
+mod test_case;
 
 #[doc(hidden)]
 pub mod _internal {
-    pub use crate::desc::TestDesc;
-    pub use crate::section::Section;
+    pub use crate::{
+        runner::{run_tests, TestSuite},
+        test_case::{Section, TestDesc},
+    };
     pub use maplit::{hashmap, hashset};
 
-    use crate::{context::TestContext, section::SectionId};
+    use crate::test_case::{SectionId, TestContext};
 
     #[inline]
     pub fn is_target(id: SectionId) -> bool {
@@ -24,13 +24,11 @@ pub mod _internal {
 /// Generate a test case.
 pub use rye_macros::test_case;
 
-pub use crate::runner::{run_tests, DefaultRunner, TestData, TestSuite};
-
 #[macro_export]
 macro_rules! test_main {
     ($($test_case:path),*$(,)?) => {
         fn main() {
-            $crate::run_tests($crate::DefaultRunner::new(), &[$(&$test_case),*]);
+            $crate::_internal::run_tests(&[$(&$test_case),*]);
         }
     };
 }

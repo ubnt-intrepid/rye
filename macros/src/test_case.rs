@@ -71,7 +71,7 @@ pub(crate) fn test_case(_args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     quote! {
-        #vis #fn_token #ident (suite: &mut rye::TestSuite<'_>) {
+        #vis #fn_token #ident (suite: &mut rye::_internal::TestSuite<'_>) {
             #(#attrs)*
             #asyncness #fn_token #inner_fn_ident() #output #block
 

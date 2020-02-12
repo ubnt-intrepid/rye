@@ -1,4 +1,4 @@
-use crate::desc::TestDesc;
+use crate::test_case::TestDesc;
 use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{channel::oneshot, executor::ThreadPool, future::Future, task::SpawnExt as _};
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
@@ -48,8 +48,7 @@ impl TestSuite<'_> {
     }
 }
 
-pub struct TestData {
-    #[allow(dead_code)]
+struct TestData {
     desc: TestDesc,
     test_fn: TestFn,
 }
@@ -61,10 +60,7 @@ enum TestFn {
     ),
 }
 
-pub fn run_tests<T>(runner: T, tests: &[&dyn Fn(&mut TestSuite<'_>)])
-where
-    T: TestRunner<TestData>,
-{
+pub fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
     let args = mimicaw::Args::from_env().unwrap_or_else(|st| st.exit());
 
     static SET_HOOK: Once = Once::new();
@@ -79,12 +75,14 @@ where
         });
     }
 
+    let runner = DefaultRunner::new();
+
     let st = futures::executor::block_on(mimicaw::run_tests(&args, test_cases, runner));
     st.exit();
 }
 
 #[derive(Debug)]
-pub struct DefaultRunner {
+struct DefaultRunner {
     pool: ThreadPool,
 }
 

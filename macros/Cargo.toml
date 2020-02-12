@@ -1,9 +1,13 @@
 [package]
 name = "rye-macros"
-version = "0.0.0"
-publish = false
-authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+version = "0.0.1"
 edition = "2018"
+description = """
+Procedural macros for rye.
+"""
+authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ubnt-intrepid/rye.git"
 
 [lib]
 proc-macro = true

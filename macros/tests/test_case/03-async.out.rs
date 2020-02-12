@@ -1,4 +1,4 @@
-fn case_async(suite: &mut rye::TestSuite<'_>) {
+fn case_async(suite: &mut rye::_internal::TestSuite<'_>) {
     async fn __inner__() {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
