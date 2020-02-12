@@ -158,9 +158,9 @@ checksum = "7b0a34e53cf6cdcd0178aa573aed466b646eb3db769570841fda0c7ede375a27"
 
 [[package]]
 name = "futures-test"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "141d5c19e3c3c5e5e2428694454aa28ae875e18002bea039a67743a736bfb617"
+checksum = "a44185308a6ed8a0e575440f191019c7906858d507844fa43fd6804d4892ec13"
 dependencies = [
  "futures-core",
  "futures-executor",
@@ -442,9 +442,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.46"
+version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21b01d7f0288608a01dca632cf1df859df6fd6ffa885300fc275ce2ba6221953"
+checksum = "15913895b61e0be854afd32fd4163fcd2a3df34142cf2cb961b310ce694cbf90"
 dependencies = [
  "itoa",
  "ryu",
