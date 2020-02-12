@@ -3,8 +3,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, ItemFn};
 
-pub(crate) fn generate(item: ItemFn, sections: Vec<Section>) -> TokenStream {
-    let attrs = &item.attrs;
+pub(crate) fn generate(mut item: ItemFn, sections: Vec<Section>) -> TokenStream {
     let vis = &item.vis;
     let asyncness = &item.sig.asyncness;
     let fn_token = &item.sig.fn_token;
@@ -38,6 +37,16 @@ pub(crate) fn generate(item: ItemFn, sections: Vec<Section>) -> TokenStream {
         }
     });
 
+    let mut ignored = false;
+    let mut attrs = vec![];
+    for attr in item.attrs.drain(..) {
+        if attr.path.is_ident("ignored") {
+            ignored = true;
+            continue;
+        }
+        attrs.push(attr);
+    }
+
     quote! {
         #(#attrs)*
         #vis #fn_token #ident (suite: &mut rye::TestSuite<'_>) {
@@ -45,6 +54,7 @@ pub(crate) fn generate(item: ItemFn, sections: Vec<Section>) -> TokenStream {
             let desc = rye::_internal::TestDesc {
                 name: #test_name,
                 module_path: module_path!(),
+                ignored: #ignored,
                 sections: rye::_internal::hashmap! { #(#section_map_entries,)* },
                 leaf_sections: &[ #(#leaf_section_ids),* ],
             };

@@ -13,6 +13,7 @@ fn case_async(suite: &mut rye::TestSuite<'_>) {
     let desc = rye::_internal::TestDesc {
         name: "case_async",
         module_path: module_path!(),
+        ignored: false,
         sections: rye::_internal::hashmap! {
             0u64 => rye::_internal::Section::new("resizing bigger changes size and capacity", rye::_internal::hashset!()),
         },

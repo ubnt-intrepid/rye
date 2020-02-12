@@ -9,6 +9,7 @@ fn ignore_inner_items(suite: &mut rye::TestSuite<'_>) {
     let desc = rye::_internal::TestDesc {
         name: "ignore_inner_items",
         module_path: module_path!(),
+        ignored: false,
         sections: rye::_internal::hashmap! {},
         leaf_sections: &[],
     };

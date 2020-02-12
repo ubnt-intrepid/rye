@@ -23,6 +23,7 @@ fn multi_section_in_scope(suite: &mut rye::TestSuite<'_>) {
     let desc = rye::_internal::TestDesc {
         name: "multi_section_in_scope",
         module_path: module_path!(),
+        ignored: false,
         sections: rye::_internal::hashmap! {
             0u64 => rye::_internal::Section::new("section1", rye::_internal::hashset!()),
             1u64 => rye::_internal::Section::new("section2", rye::_internal::hashset!()),

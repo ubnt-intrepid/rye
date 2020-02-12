@@ -15,13 +15,17 @@ impl TestSuite<'_> {
     where
         F: Fn() + Send + 'static,
     {
-        self.test_cases.push(Test::test(
-            desc.name,
-            TestData {
-                desc,
-                test_fn: TestFn::Sync(Box::new(test_fn)),
-            },
-        ));
+        let ignored = desc.ignored;
+        self.test_cases.push(
+            Test::test(
+                desc.name,
+                TestData {
+                    desc,
+                    test_fn: TestFn::Sync(Box::new(test_fn)),
+                },
+            )
+            .ignore(ignored),
+        );
     }
 
     #[doc(hidden)] // private API
@@ -30,13 +34,17 @@ impl TestSuite<'_> {
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.test_cases.push(Test::test(
-            desc.name,
-            TestData {
-                desc,
-                test_fn: TestFn::Async(Box::new(move || Box::pin(test_fn()))),
-            },
-        ));
+        let ignored = desc.ignored;
+        self.test_cases.push(
+            Test::test(
+                desc.name,
+                TestData {
+                    desc,
+                    test_fn: TestFn::Async(Box::new(move || Box::pin(test_fn()))),
+                },
+            )
+            .ignore(ignored),
+        );
     }
 }
 

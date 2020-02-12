@@ -10,6 +10,7 @@ use std::collections::HashMap;
 pub struct TestDesc {
     pub name: &'static str,
     pub module_path: &'static str,
+    pub ignored: bool,
     pub sections: HashMap<SectionId, Section>,
     pub leaf_sections: &'static [SectionId],
 }
