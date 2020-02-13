@@ -3,7 +3,7 @@ use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{
     channel::oneshot,
     executor::ThreadPool,
-    future::Future,
+    future::{BoxFuture, Future},
     task::SpawnExt as _,
     task::{self, Poll},
 };
@@ -20,17 +20,14 @@ pub struct TestSuite<'a> {
 
 impl TestSuite<'_> {
     #[doc(hidden)] // private API
-    pub fn register<F>(&mut self, desc: TestDesc, test_fn: F)
-    where
-        F: Fn() + Send + 'static,
-    {
+    pub fn register(&mut self, desc: TestDesc, test_fn: fn()) {
         let ignored = desc.ignored;
         self.test_cases.push(
             Test::test(
                 desc.name,
                 TestData {
                     desc,
-                    test_fn: TestFn::Sync(Box::new(test_fn)),
+                    test_fn: TestFn::SyncTest(test_fn),
                 },
             )
             .ignore(ignored),
@@ -38,18 +35,14 @@ impl TestSuite<'_> {
     }
 
     #[doc(hidden)] // private API
-    pub fn register_async<F, Fut>(&mut self, desc: TestDesc, test_fn: F)
-    where
-        F: Fn() -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static,
-    {
+    pub fn register_async(&mut self, desc: TestDesc, test_fn: fn() -> BoxFuture<'static, ()>) {
         let ignored = desc.ignored;
         self.test_cases.push(
             Test::test(
                 desc.name,
                 TestData {
                     desc,
-                    test_fn: TestFn::Async(Box::new(move || Box::pin(test_fn()))),
+                    test_fn: TestFn::AsyncTest(test_fn),
                 },
             )
             .ignore(ignored),
@@ -88,17 +81,15 @@ struct TestData {
 }
 
 enum TestFn {
-    Sync(Box<dyn Fn() + Send + 'static>),
-    Async(
-        Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + Sync + 'static>,
-    ),
+    SyncTest(fn()),
+    AsyncTest(fn() -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>),
 }
 
 impl TestData {
     fn run(self, pool: &mut ThreadPool) -> Pin<Box<dyn Future<Output = Outcome> + Send + 'static>> {
         let Self { desc, test_fn } = self;
         match test_fn {
-            TestFn::Sync(f) => {
+            TestFn::SyncTest(f) => {
                 let (tx, rx) = oneshot::channel();
                 std::thread::spawn(move || {
                     let res = expected(|| {
@@ -124,7 +115,7 @@ impl TestData {
                     }
                 })
             }
-            TestFn::Async(f) => {
+            TestFn::AsyncTest(f) => {
                 let handle = pool
                     .spawn_with_handle(async move {
                         if desc.leaf_sections.is_empty() {
@@ -200,6 +191,26 @@ impl<'a> TestContext<'a> {
     where
         Fut: Future,
     {
+        #[pin_project]
+        struct ScopeAsync<'a, 'ctx, Fut> {
+            #[pin]
+            fut: Fut,
+            ctx: &'a mut TestContext<'ctx>,
+        }
+
+        impl<Fut> Future for ScopeAsync<'_, '_, Fut>
+        where
+            Fut: Future,
+        {
+            type Output = Fut::Output;
+
+            fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+                let me = self.project();
+                let fut = me.fut;
+                me.ctx.scope(|| fut.poll(cx))
+            }
+        }
+
         ScopeAsync { fut, ctx: self }.await
     }
 
@@ -235,24 +246,4 @@ impl<'a> TestContext<'a> {
 #[derive(Debug)]
 pub(crate) struct AccessError {
     _p: (),
-}
-
-#[pin_project]
-struct ScopeAsync<'a, 'ctx, Fut> {
-    #[pin]
-    fut: Fut,
-    ctx: &'a mut TestContext<'ctx>,
-}
-
-impl<Fut> Future for ScopeAsync<'_, '_, Fut>
-where
-    Fut: Future,
-{
-    type Output = Fut::Output;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        let me = self.project();
-        let fut = me.fut;
-        me.ctx.scope(|| fut.poll(cx))
-    }
 }

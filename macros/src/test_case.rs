@@ -40,7 +40,10 @@ pub(crate) fn test_case(_args: TokenStream, item: TokenStream) -> TokenStream {
 
     let register = if asyncness.is_some() {
         quote! {
-            suite.register_async(desc, #inner_fn_ident);
+            fn __async_inner__() -> rye::_internal::BoxFuture<'static, ()> {
+                Box::pin(#inner_fn_ident())
+            }
+            suite.register_async(desc, __async_inner__);
         }
     } else {
         quote! {

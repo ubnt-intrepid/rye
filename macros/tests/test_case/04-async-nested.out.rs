@@ -26,5 +26,8 @@ fn case_async_nested(suite: &mut rye::_internal::TestSuite<'_>) {
         },
         leaf_sections: &[ 1u64 ],
     };
-    suite.register_async(desc, __inner__);
+    fn __async_inner__() -> rye::_internal::BoxFuture<'static, ()> {
+        Box::pin(__inner__())
+    }
+    suite.register_async(desc, __async_inner__);
 }

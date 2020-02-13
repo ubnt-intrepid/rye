@@ -11,6 +11,7 @@ pub mod _internal {
         runner::{run_tests, TestSuite},
         test_case::{Section, TestDesc},
     };
+    pub use futures::future::BoxFuture;
     pub use maplit::{hashmap, hashset};
 
     use crate::{runner::TestContext, test_case::SectionId};
