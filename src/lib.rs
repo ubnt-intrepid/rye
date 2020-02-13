@@ -13,7 +13,7 @@ pub mod _internal {
     };
     pub use maplit::{hashmap, hashset};
 
-    use crate::test_case::{SectionId, TestContext};
+    use crate::{runner::TestContext, test_case::SectionId};
 
     #[inline]
     pub fn is_target(id: SectionId) -> bool {
