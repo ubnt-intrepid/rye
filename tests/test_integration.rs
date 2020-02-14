@@ -65,6 +65,23 @@ mod sub {
             assert!(vec.capacity() >= 5);
         });
     }
+
+    use rye as catcher_in_the_rye;
+
+    #[rye::test_case(rye_path = "catcher_in_the_rye")]
+    pub fn modified_rye_path() {
+        let mut vec = vec![0usize; 5];
+
+        assert_eq!(vec.len(), 5);
+        assert!(vec.capacity() >= 5);
+
+        section!("resizing bigger changes size and capacity", {
+            vec.resize(10, 0);
+
+            assert_eq!(vec.len(), 10);
+            assert!(vec.capacity() >= 5);
+        });
+    }
 }
 
 #[rye::test_case]
@@ -88,5 +105,6 @@ rye::test_main! {
     nested,
     case_async,
     sub::sub_test,
+    sub::modified_rye_path,
     ignored,
 }

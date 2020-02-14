@@ -4,19 +4,30 @@ use quote::{quote, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
     parse::{Error, Parse, ParseStream, Result},
+    punctuated::Punctuated,
     visit_mut::{self, VisitMut},
     Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Ident, Item, ItemFn,
     Macro, Stmt, Token,
 };
 
-pub(crate) fn test_case(_args: TokenStream, item: TokenStream) -> TokenStream {
-    let mut item: ItemFn = match syn::parse2(item) {
-        Ok(item) => item,
-        Err(err) => return err.to_compile_error(),
+macro_rules! parse {
+    ($input:ident as $t:ty) => {
+        match syn::parse2::<$t>($input) {
+            Ok(parsed) => parsed,
+            Err(err) => return err.to_compile_error(),
+        }
     };
+}
+
+pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse!(args as Args);
+    let mut item = parse!(item as ItemFn);
+
+    let rye_path = args.rye_path.unwrap_or_else(|| syn::parse_quote!(::rye));
 
     let sections: Vec<_> = {
         let mut expand = ExpandBlock {
+            rye_path: &rye_path,
             sections: IndexMap::new(),
             next_section_id: 0,
             parent: None,
@@ -40,7 +51,7 @@ pub(crate) fn test_case(_args: TokenStream, item: TokenStream) -> TokenStream {
 
     let register = if asyncness.is_some() {
         quote! {
-            fn __async_inner__() -> rye::_internal::BoxFuture<'static, ()> {
+            fn __async_inner__() -> #rye_path::_internal::BoxFuture<'static, ()> {
                 Box::pin(#inner_fn_ident())
             }
             suite.register_async(desc, __async_inner__);
@@ -53,7 +64,10 @@ pub(crate) fn test_case(_args: TokenStream, item: TokenStream) -> TokenStream {
 
     let test_name = ident.to_string();
 
-    let section_map_entries = sections.iter().map(|section| SectionMapEntry { section });
+    let section_map_entries = sections.iter().map(|section| SectionMapEntry {
+        section,
+        rye_path: &rye_path,
+    });
 
     let leaf_section_ids = sections.iter().filter_map(|section| {
         if section.children.is_empty() {
@@ -74,19 +88,48 @@ pub(crate) fn test_case(_args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     quote! {
-        #vis #fn_token #ident (suite: &mut rye::_internal::TestSuite<'_>) {
+        #vis #fn_token #ident (suite: &mut #rye_path::_internal::TestSuite<'_>) {
             #(#attrs)*
             #asyncness #fn_token #inner_fn_ident() #output #block
 
-            let desc = rye::_internal::TestDesc {
+            let desc = #rye_path::_internal::TestDesc {
                 name: #test_name,
                 module_path: module_path!(),
                 ignored: #ignored,
-                sections: rye::_internal::hashmap! { #(#section_map_entries,)* },
+                sections: #rye_path::_internal::hashmap! { #(#section_map_entries,)* },
                 leaf_sections: &[ #(#leaf_section_ids),* ],
             };
             #register
         }
+    }
+}
+
+struct Args {
+    rye_path: Option<syn::Path>,
+}
+
+impl Parse for Args {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut rye_path = None;
+
+        let params = Punctuated::<syn::MetaNameValue, Token![,]>::parse_terminated(input)?;
+        for param in params {
+            if param.path.is_ident("rye_path") {
+                match param.lit {
+                    syn::Lit::Str(ref lit) if rye_path.is_none() => {
+                        rye_path.replace(lit.parse()?);
+                    }
+                    syn::Lit::Str(..) => {
+                        return Err(Error::new_spanned(&param, "duplicated parameter"))
+                    }
+                    lit => return Err(Error::new_spanned(&lit, "required a string literal")),
+                }
+            } else {
+                return Err(Error::new_spanned(&param.path, "unknown parameter name"));
+            }
+        }
+
+        Ok(Self { rye_path })
     }
 }
 
@@ -115,7 +158,8 @@ impl Parse for SectionBody {
     }
 }
 
-struct ExpandBlock {
+struct ExpandBlock<'a> {
+    rye_path: &'a syn::Path,
     sections: IndexMap<SectionId, Section>,
     next_section_id: SectionId,
     parent: Option<SectionId>,
@@ -124,7 +168,7 @@ struct ExpandBlock {
     in_async_block: bool,
 }
 
-impl ExpandBlock {
+impl ExpandBlock<'_> {
     fn expand_section_macro(&mut self, mac: &Macro) -> Result<(Stmt, SectionId)> {
         if self.in_loop {
             return Err(Error::new_spanned(
@@ -171,9 +215,10 @@ impl ExpandBlock {
         );
         self.next_section_id += 1;
 
+        let rye_path = &*self.rye_path;
         Ok((
             syn::parse_quote! {
-                if rye::_internal::is_target(#section_id) #block
+                if #rye_path::_internal::is_target(#section_id) #block
             },
             section_id,
         ))
@@ -210,7 +255,7 @@ impl ExpandBlock {
     }
 }
 
-impl VisitMut for ExpandBlock {
+impl VisitMut for ExpandBlock<'_> {
     fn visit_stmt_mut(&mut self, item: &mut Stmt) {
         let section_id = match item {
             Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _) => {
@@ -266,6 +311,7 @@ impl VisitMut for ExpandBlock {
 
 struct SectionMapEntry<'a> {
     section: &'a Section,
+    rye_path: &'a syn::Path,
 }
 
 impl ToTokens for SectionMapEntry<'_> {
@@ -273,10 +319,11 @@ impl ToTokens for SectionMapEntry<'_> {
         let id = &self.section.id;
         let name = &self.section.name;
         let ancestors = &self.section.ancestors;
+        let rye_path = &*self.rye_path;
         tokens.append_all(&[quote! {
-            #id => rye::_internal::Section::new(
+            #id => #rye_path::_internal::Section::new(
                 #name,
-                rye::_internal::hashset!(#(#ancestors),*)
+                #rye_path::_internal::hashset!(#(#ancestors),*)
             )
         }]);
     }
