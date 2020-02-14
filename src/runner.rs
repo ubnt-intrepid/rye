@@ -3,7 +3,7 @@ use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{
     channel::oneshot,
     executor::ThreadPool,
-    future::{BoxFuture, Future},
+    future::{BoxFuture, Future, FutureExt as _},
     task::SpawnExt as _,
     task::{self, Poll},
 };
@@ -65,12 +65,14 @@ pub fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
         });
     }
 
-    let mut pool = ThreadPool::new().unwrap();
+    let mut runner = TestRunner {
+        pool: ThreadPool::new().unwrap(),
+    };
 
     let st = futures::executor::block_on(mimicaw::run_tests(
         &args,
         test_cases,
-        |_desc, data: TestData| data.run(&mut pool),
+        |_desc, data: TestData| runner.execute(data),
     ));
     st.exit();
 }
@@ -82,12 +84,16 @@ struct TestData {
 
 enum TestFn {
     SyncTest(fn()),
-    AsyncTest(fn() -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>),
+    AsyncTest(fn() -> BoxFuture<'static, ()>),
 }
 
-impl TestData {
-    fn run(self, pool: &mut ThreadPool) -> Pin<Box<dyn Future<Output = Outcome> + Send + 'static>> {
-        let Self { desc, test_fn } = self;
+struct TestRunner {
+    pool: ThreadPool,
+}
+
+impl TestRunner {
+    fn execute(&mut self, data: TestData) -> BoxFuture<'static, Outcome> {
+        let TestData { desc, test_fn } = data;
         match test_fn {
             TestFn::SyncTest(f) => {
                 let (tx, rx) = oneshot::channel();
@@ -103,21 +109,18 @@ impl TestData {
                             }
                         }))
                     });
-                    let _ = tx.send(res);
+                    let _ = tx.send(make_outcome(res));
                 });
 
-                Box::pin(async move {
-                    match rx.await {
-                        Ok(res) => make_outcome(res),
-                        Err(rx_err) => {
-                            Outcome::failed().error_message(format!("unknown error: {}", rx_err))
-                        }
-                    }
-                })
+                Box::pin(rx.map(|res| {
+                    res.unwrap_or_else(|rx_err| {
+                        Outcome::failed().error_message(format!("unknown error: {}", rx_err))
+                    })
+                }))
             }
             TestFn::AsyncTest(f) => {
-                let handle = pool
-                    .spawn_with_handle(async move {
+                let fut = async move {
+                    let res = AssertUnwindSafe(async move {
                         if desc.leaf_sections.is_empty() {
                             TestContext::new(&desc, None).scope_async(f()).await;
                         } else {
@@ -128,11 +131,12 @@ impl TestData {
                             }
                         }
                     })
-                    .unwrap();
-                Box::pin(async move {
-                    let res = AssertUnwindSafe(handle).maybe_unwind().expected().await;
+                    .maybe_unwind()
+                    .expected()
+                    .await;
                     make_outcome(res)
-                })
+                };
+                self.pool.spawn_with_handle(fut).unwrap().boxed()
             }
         }
     }
