@@ -72,7 +72,42 @@ pub fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
     let st = futures::executor::block_on(mimicaw::run_tests(
         &args,
         test_cases,
-        |_desc, data: TestData| runner.execute(data),
+        |_desc, data: TestData| {
+            let TestData { desc, test_fn } = data;
+            match test_fn {
+                TestFn::SyncTest(f) => runner.execute_blocking(move || {
+                    let res = expected(|| {
+                        maybe_unwind(AssertUnwindSafe(|| {
+                            if desc.leaf_sections.is_empty() {
+                                TestContext::new(&desc, None).scope(&f);
+                            } else {
+                                for &section in desc.leaf_sections {
+                                    TestContext::new(&desc, Some(section)).scope(&f);
+                                }
+                            }
+                        }))
+                    });
+                    make_outcome(res)
+                }),
+                TestFn::AsyncTest(f) => runner.execute(async move {
+                    let res = AssertUnwindSafe(async move {
+                        if desc.leaf_sections.is_empty() {
+                            TestContext::new(&desc, None).scope_async(f()).await;
+                        } else {
+                            for &section in desc.leaf_sections {
+                                TestContext::new(&desc, Some(section))
+                                    .scope_async(f())
+                                    .await;
+                            }
+                        }
+                    })
+                    .maybe_unwind()
+                    .expected()
+                    .await;
+                    make_outcome(res)
+                }),
+            }
+        },
     ));
     st.exit();
 }
@@ -92,53 +127,35 @@ struct TestRunner {
 }
 
 impl TestRunner {
-    fn execute(&mut self, data: TestData) -> BoxFuture<'static, Outcome> {
-        let TestData { desc, test_fn } = data;
-        match test_fn {
-            TestFn::SyncTest(f) => {
-                let (tx, rx) = oneshot::channel();
-                std::thread::spawn(move || {
-                    let res = expected(|| {
-                        maybe_unwind(AssertUnwindSafe(|| {
-                            if desc.leaf_sections.is_empty() {
-                                TestContext::new(&desc, None).scope(&f);
-                            } else {
-                                for &section in desc.leaf_sections {
-                                    TestContext::new(&desc, Some(section)).scope(&f);
-                                }
-                            }
-                        }))
-                    });
-                    let _ = tx.send(make_outcome(res));
-                });
+    fn execute<Fut>(&mut self, fut: Fut) -> BoxFuture<'static, Outcome>
+    where
+        Fut: Future<Output = Outcome> + Send + 'static,
+    {
+        let handle = self.pool.spawn_with_handle(fut);
+        Box::pin(async move {
+            match handle {
+                Ok(handle) => handle.await,
+                Err(spawn_err) => {
+                    Outcome::failed().error_message(format!("unknown error: {}", spawn_err))
+                }
+            }
+        })
+    }
 
-                Box::pin(rx.map(|res| {
-                    res.unwrap_or_else(|rx_err| {
-                        Outcome::failed().error_message(format!("unknown error: {}", rx_err))
-                    })
-                }))
-            }
-            TestFn::AsyncTest(f) => {
-                let fut = async move {
-                    let res = AssertUnwindSafe(async move {
-                        if desc.leaf_sections.is_empty() {
-                            TestContext::new(&desc, None).scope_async(f()).await;
-                        } else {
-                            for &section in desc.leaf_sections {
-                                TestContext::new(&desc, Some(section))
-                                    .scope_async(f())
-                                    .await;
-                            }
-                        }
-                    })
-                    .maybe_unwind()
-                    .expected()
-                    .await;
-                    make_outcome(res)
-                };
-                self.pool.spawn_with_handle(fut).unwrap().boxed()
-            }
-        }
+    fn execute_blocking<F>(&mut self, f: F) -> BoxFuture<'static, Outcome>
+    where
+        F: FnOnce() -> Outcome + Send + 'static,
+    {
+        let (tx, rx) = oneshot::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(f());
+        });
+
+        Box::pin(rx.map(|res| {
+            res.unwrap_or_else(|rx_err| {
+                Outcome::failed().error_message(format!("unknown error: {}", rx_err))
+            })
+        }))
     }
 }
 
