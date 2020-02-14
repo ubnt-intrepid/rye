@@ -1,4 +1,4 @@
-fn multi_section_in_scope(suite: &mut ::rye::_internal::TestSuite<'_>) {
+fn multi_section_in_scope(__suite: &mut ::rye::_internal::TestSuite<'_>) {
     fn __inner__() {
         if ::rye::_internal::is_target(0u64) {
             assert!(1 + 1 == 2);
@@ -20,19 +20,21 @@ fn multi_section_in_scope(suite: &mut ::rye::_internal::TestSuite<'_>) {
             assert!(false);
         }
     }
-    let desc = ::rye::_internal::TestDesc {
-        name: "multi_section_in_scope",
-        module_path: module_path!(),
-        ignored: false,
-        sections: ::rye::_internal::hashmap! {
-            0u64 => ::rye::_internal::Section::new("section1", ::rye::_internal::hashset!()),
-            1u64 => ::rye::_internal::Section::new("section2", ::rye::_internal::hashset!()),
-            2u64 => ::rye::_internal::Section::new("section2-1", ::rye::_internal::hashset!(1u64)),
-            3u64 => ::rye::_internal::Section::new("section2-1-2", ::rye::_internal::hashset!(1u64, 2u64)),
-            4u64 => ::rye::_internal::Section::new("section2-2", ::rye::_internal::hashset!(1u64)),
-            5u64 => ::rye::_internal::Section::new("section3", ::rye::_internal::hashset!()),
+    __suite.add_test_case(::rye::_internal::TestCase {
+        desc: ::rye::_internal::TestDesc {
+            name: "multi_section_in_scope",
+            module_path: ::rye::_internal::module_path!(),
+            ignored: false,
+            sections: ::rye::_internal::hashmap! {
+                0u64 => ::rye::_internal::Section { name: "section1"     , ancestors: ::rye::_internal::hashset!()           , },
+                1u64 => ::rye::_internal::Section { name: "section2"     , ancestors: ::rye::_internal::hashset!()           , },
+                2u64 => ::rye::_internal::Section { name: "section2-1"   , ancestors: ::rye::_internal::hashset!(1u64)       , },
+                3u64 => ::rye::_internal::Section { name: "section2-1-2" , ancestors: ::rye::_internal::hashset!(1u64, 2u64) , },
+                4u64 => ::rye::_internal::Section { name: "section2-2"   , ancestors: ::rye::_internal::hashset!(1u64)       , },
+                5u64 => ::rye::_internal::Section { name: "section3"     , ancestors: ::rye::_internal::hashset!()           , },
+            },
+            leaf_sections: &[ 0u64, 3u64, 4u64, 5u64 ],
         },
-        leaf_sections: &[ 0u64, 3u64, 4u64, 5u64 ],
-    };
-    suite.register(desc, __inner__);
+        test_fn: ::rye::_internal::TestFn::SyncTest(__inner__),
+    });
 }

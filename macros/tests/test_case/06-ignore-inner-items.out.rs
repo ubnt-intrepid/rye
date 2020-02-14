@@ -1,4 +1,4 @@
-fn ignore_inner_items(suite: &mut ::rye::_internal::TestSuite<'_>) {
+fn ignore_inner_items(__suite: &mut ::rye::_internal::TestSuite<'_>) {
     fn __inner__() {
         fn inner() {
             section!("section1", {
@@ -6,12 +6,14 @@ fn ignore_inner_items(suite: &mut ::rye::_internal::TestSuite<'_>) {
             });
         }
     }
-    let desc = ::rye::_internal::TestDesc {
-        name: "ignore_inner_items",
-        module_path: module_path!(),
-        ignored: false,
-        sections: ::rye::_internal::hashmap! {},
-        leaf_sections: &[],
-    };
-    suite.register(desc, __inner__);
+    __suite.add_test_case(::rye::_internal::TestCase {
+        desc: ::rye::_internal::TestDesc {
+            name: "ignore_inner_items",
+            module_path: ::rye::_internal::module_path!(),
+            ignored: false,
+            sections: ::rye::_internal::hashmap! {},
+            leaf_sections: &[],
+        },
+        test_fn: ::rye::_internal::TestFn::SyncTest(__inner__),
+    });
 }

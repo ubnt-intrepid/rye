@@ -1,4 +1,17 @@
+use futures::future::BoxFuture;
 use std::collections::{HashMap, HashSet};
+
+#[derive(Debug)]
+pub struct TestCase {
+    pub desc: TestDesc,
+    pub test_fn: TestFn,
+}
+
+#[derive(Debug)]
+pub enum TestFn {
+    SyncTest(fn()),
+    AsyncTest(fn() -> BoxFuture<'static, ()>),
+}
 
 /// Description about a test case.
 #[derive(Debug)]
@@ -14,14 +27,6 @@ pub(crate) type SectionId = u64;
 
 #[derive(Debug)]
 pub struct Section {
-    #[allow(dead_code)]
-    pub(crate) name: &'static str,
-    pub(crate) ancestors: HashSet<SectionId>,
-}
-
-impl Section {
-    #[doc(hidden)] // private API.
-    pub const fn new(name: &'static str, ancestors: HashSet<SectionId>) -> Self {
-        Self { name, ancestors }
-    }
+    pub name: &'static str,
+    pub ancestors: HashSet<SectionId>,
 }

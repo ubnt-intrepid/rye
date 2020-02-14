@@ -49,19 +49,6 @@ pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
 
     let inner_fn_ident = Ident::new("__inner__", ident.span());
 
-    let register = if asyncness.is_some() {
-        quote! {
-            fn __async_inner__() -> #rye_path::_internal::BoxFuture<'static, ()> {
-                Box::pin(#inner_fn_ident())
-            }
-            suite.register_async(desc, __async_inner__);
-        }
-    } else {
-        quote! {
-            suite.register(desc, #inner_fn_ident);
-        }
-    };
-
     let test_name = ident.to_string();
 
     let section_map_entries = sections.iter().map(|section| SectionMapEntry {
@@ -87,19 +74,26 @@ pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
         attrs.push(attr);
     }
 
+    let test_fn: syn::Expr = if asyncness.is_some() {
+        syn::parse_quote!(#rye_path::_internal::TestFn::AsyncTest(|| Box::pin(#inner_fn_ident())))
+    } else {
+        syn::parse_quote!(#rye_path::_internal::TestFn::SyncTest(#inner_fn_ident))
+    };
+
     quote! {
-        #vis #fn_token #ident (suite: &mut #rye_path::_internal::TestSuite<'_>) {
+        #vis #fn_token #ident (__suite: &mut #rye_path::_internal::TestSuite<'_>) {
             #(#attrs)*
             #asyncness #fn_token #inner_fn_ident() #output #block
-
-            let desc = #rye_path::_internal::TestDesc {
-                name: #test_name,
-                module_path: module_path!(),
-                ignored: #ignored,
-                sections: #rye_path::_internal::hashmap! { #(#section_map_entries,)* },
-                leaf_sections: &[ #(#leaf_section_ids),* ],
-            };
-            #register
+            __suite.add_test_case(#rye_path::_internal::TestCase {
+                desc: #rye_path::_internal::TestDesc {
+                    name: #test_name,
+                    module_path: #rye_path::_internal::module_path!(),
+                    ignored: #ignored,
+                    sections: #rye_path::_internal::hashmap! { #(#section_map_entries,)* },
+                    leaf_sections: &[ #(#leaf_section_ids),* ],
+                },
+                test_fn: #test_fn,
+            });
         }
     }
 }
@@ -321,10 +315,10 @@ impl ToTokens for SectionMapEntry<'_> {
         let ancestors = &self.section.ancestors;
         let rye_path = &*self.rye_path;
         tokens.append_all(&[quote! {
-            #id => #rye_path::_internal::Section::new(
-                #name,
-                #rye_path::_internal::hashset!(#(#ancestors),*)
-            )
+            #id => #rye_path::_internal::Section {
+                name: #name,
+                ancestors: #rye_path::_internal::hashset!(#(#ancestors),*),
+            }
         }]);
     }
 }

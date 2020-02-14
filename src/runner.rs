@@ -1,4 +1,4 @@
-use crate::test_case::{SectionId, TestDesc};
+use crate::test_case::{SectionId, TestCase, TestDesc, TestFn};
 use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{
     channel::oneshot,
@@ -15,38 +15,15 @@ use std::{
 };
 
 pub struct TestSuite<'a> {
-    test_cases: &'a mut Vec<Test<TestData>>,
+    test_cases: &'a mut Vec<Test<TestCase>>,
 }
 
 impl TestSuite<'_> {
     #[doc(hidden)] // private API
-    pub fn register(&mut self, desc: TestDesc, test_fn: fn()) {
-        let ignored = desc.ignored;
-        self.test_cases.push(
-            Test::test(
-                desc.name,
-                TestData {
-                    desc,
-                    test_fn: TestFn::SyncTest(test_fn),
-                },
-            )
-            .ignore(ignored),
-        );
-    }
-
-    #[doc(hidden)] // private API
-    pub fn register_async(&mut self, desc: TestDesc, test_fn: fn() -> BoxFuture<'static, ()>) {
-        let ignored = desc.ignored;
-        self.test_cases.push(
-            Test::test(
-                desc.name,
-                TestData {
-                    desc,
-                    test_fn: TestFn::AsyncTest(test_fn),
-                },
-            )
-            .ignore(ignored),
-        );
+    pub fn add_test_case(&mut self, test_case: TestCase) {
+        let ignored = test_case.desc.ignored;
+        self.test_cases
+            .push(Test::test(test_case.desc.name, test_case).ignore(ignored));
     }
 }
 
@@ -72,8 +49,8 @@ pub fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
     let st = futures::executor::block_on(mimicaw::run_tests(
         &args,
         test_cases,
-        |_desc, data: TestData| {
-            let TestData { desc, test_fn } = data;
+        |_desc, test_case: TestCase| {
+            let TestCase { desc, test_fn } = test_case;
             match test_fn {
                 TestFn::SyncTest(f) => runner.execute_blocking(move || {
                     let res = expected(|| {
@@ -110,16 +87,6 @@ pub fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
         },
     ));
     st.exit();
-}
-
-struct TestData {
-    desc: TestDesc,
-    test_fn: TestFn,
-}
-
-enum TestFn {
-    SyncTest(fn()),
-    AsyncTest(fn() -> BoxFuture<'static, ()>),
 }
 
 struct TestRunner {

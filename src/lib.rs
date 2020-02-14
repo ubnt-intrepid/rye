@@ -9,10 +9,10 @@ mod test_case;
 pub mod _internal {
     pub use crate::{
         runner::{run_tests, TestSuite},
-        test_case::{Section, TestDesc},
+        test_case::{Section, TestCase, TestDesc, TestFn},
     };
-    pub use futures::future::BoxFuture;
     pub use maplit::{hashmap, hashset};
+    pub use std::module_path;
 
     use crate::{runner::TestContext, test_case::SectionId};
 
