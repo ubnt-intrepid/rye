@@ -253,13 +253,13 @@ impl<'a> TestContext<'a> {
     }
 
     pub(crate) fn is_target_section(&self, id: SectionId) -> bool {
-        self.section.map_or(false, |section| {
+        self.section.map_or(false, |section_id| {
             let section = self
                 .desc
                 .sections
-                .get(&section)
+                .get(&section_id)
                 .expect("invalid section id is set");
-            section.ancestors.contains(&id)
+            section_id == id || section.ancestors.contains(&id)
         })
     }
 }
