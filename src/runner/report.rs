@@ -1,4 +1,5 @@
-use super::{printer::Printer, test::TestDesc, ExitStatus};
+use super::{exit_status::ExitStatus, printer::Printer};
+use crate::test_case::TestDesc;
 use std::{
     borrow::Cow,
     io::{self, Write},
@@ -37,6 +38,7 @@ impl Report {
 
     /// Return an iterator of skipped test cases.
     #[inline]
+    #[allow(dead_code)]
     pub fn skipped(&self) -> impl Iterator<Item = (&TestDesc, &str)> + '_ {
         let ignored = self.ignored.iter().map(|desc| (desc, "ignored"));
         let filtered_out = self.filtered_out.iter().map(|desc| (desc, "filtered out"));
@@ -51,7 +53,7 @@ impl Report {
             writeln!(printer.term())?;
             writeln!(printer.term(), "failures:")?;
             for (desc, msg) in &self.failed {
-                writeln!(printer.term(), "---- {} ----", desc.name())?;
+                writeln!(printer.term(), "---- {} ----", desc.name)?;
                 if let Some(msg) = msg {
                     write!(printer.term(), "{}", msg)?;
                     if msg.chars().last().map_or(true, |c| c != '\n') {
@@ -63,7 +65,7 @@ impl Report {
             writeln!(printer.term())?;
             writeln!(printer.term(), "failures:")?;
             for (desc, _) in &self.failed {
-                writeln!(printer.term(), "    {}", desc.name())?;
+                writeln!(printer.term(), "    {}", desc.name)?;
             }
         }
 

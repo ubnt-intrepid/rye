@@ -14,7 +14,7 @@ pub enum TestFn {
 }
 
 /// Description about a test case.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TestDesc {
     pub name: &'static str,
     pub module_path: &'static str,
@@ -25,7 +25,7 @@ pub struct TestDesc {
 
 pub(crate) type SectionId = u64;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Section {
     pub name: &'static str,
     pub ancestors: HashSet<SectionId>,

@@ -1,7 +1,8 @@
 use super::{
     args::{Args, ColorConfig, OutputFormat},
-    test::{Outcome, OutcomeKind, TestDesc, TestKind},
+    outcome::{Outcome, OutcomeKind},
 };
+use crate::test_case::TestDesc;
 use console::{Style, StyledObject, Term};
 use std::io::Write;
 
@@ -36,25 +37,18 @@ impl Printer {
         self.style.apply_to(val)
     }
 
-    pub(crate) fn print_list(&self, tests: impl IntoIterator<Item = impl AsRef<TestDesc>>) {
+    pub(crate) fn print_list(
+        &self,
+        tests: impl IntoIterator<Item = impl std::ops::Deref<Target = TestDesc>>,
+    ) {
         let quiet = self.format == super::args::OutputFormat::Terse;
 
         let mut num_tests = 0;
-        let mut num_benches = 0;
 
         for test in tests {
-            let desc = test.as_ref();
-            let kind_str = match desc.kind() {
-                TestKind::Test => {
-                    num_tests += 1;
-                    "test"
-                }
-                TestKind::Bench => {
-                    num_benches += 1;
-                    "benchmark"
-                }
-            };
-            let _ = writeln!(&self.term, "{}: {}", desc.name(), kind_str);
+            let desc = &*test;
+            num_tests += 1;
+            let _ = writeln!(&self.term, "{}: test", desc.name);
         }
 
         if !quiet {
@@ -65,16 +59,15 @@ impl Printer {
                 }
             }
 
-            if num_tests != 0 || num_benches != 0 {
+            if num_tests != 0 {
                 let _ = writeln!(&self.term);
             }
             let _ = writeln!(
                 &self.term,
-                "{} test{}, {} benchmark{}",
+                "{} test{}, 0 benchmark{}",
                 num_tests,
                 plural_suffix(num_tests),
-                num_benches,
-                plural_suffix(num_benches)
+                plural_suffix(0)
             );
         }
     }
@@ -96,7 +89,7 @@ impl Printer {
     }
 
     fn print_result_pretty(&self, desc: &TestDesc, name_length: usize, outcome: Option<&Outcome>) {
-        let name = desc.name();
+        let name = desc.name;
 
         match outcome {
             Some(outcome) => match outcome.kind() {

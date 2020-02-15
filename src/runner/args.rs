@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use super::ExitStatus;
+use super::exit_status::ExitStatus;
 use getopts::Options;
 use std::{
     path::{Path, PathBuf},
