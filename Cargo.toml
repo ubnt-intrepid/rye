@@ -12,11 +12,12 @@ readme = "README.md"
 
 [dependencies]
 rye-macros = { version = "=0.0.1", path = "./macros" }
+console = "0.9"
 expected = { version = "0.0.1", features = [ "futures" ] }
 futures = { version = "0.3", features = [ "thread-pool" ] }
+getopts = "0.2"
 maplit = "1"
 maybe-unwind = { version = "0.1", features = [ "futures" ] }
-mimicaw = "0.1.3"
 pin-project = "0.4"
 
 [dev-dependencies]

@@ -1,3 +1,4 @@
+use crate::mimicaw::{Outcome, Test};
 use crate::test_case::{SectionId, TestCase, TestDesc, TestFn};
 use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{
@@ -8,7 +9,6 @@ use futures::{
     task::{self, Poll},
 };
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
-use mimicaw::{Outcome, Test};
 use pin_project::pin_project;
 use std::{
     cell::Cell, fmt::Write as _, mem, panic::AssertUnwindSafe, pin::Pin, ptr::NonNull, sync::Once,
@@ -28,7 +28,7 @@ impl TestSuite<'_> {
 }
 
 pub fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
-    let args = mimicaw::Args::from_env().unwrap_or_else(|st| st.exit());
+    let args = crate::mimicaw::Args::from_env().unwrap_or_else(|st| st.exit());
 
     static SET_HOOK: Once = Once::new();
     SET_HOOK.call_once(|| {
@@ -46,7 +46,7 @@ pub fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
         pool: ThreadPool::new().unwrap(),
     };
 
-    let st = futures::executor::block_on(mimicaw::run_tests(
+    let st = futures::executor::block_on(crate::mimicaw::run_tests(
         &args,
         test_cases,
         |_desc, test_case: TestCase| {
