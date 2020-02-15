@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{borrow::Cow, sync::Arc};
 
 /// The outcome of performing a test.
