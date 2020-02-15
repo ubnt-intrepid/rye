@@ -2,7 +2,6 @@
 A custom unit testing framework inspired by Catch2.
 !*/
 
-mod mimicaw;
 mod runner;
 mod test_case;
 

@@ -1,4 +1,12 @@
-use crate::mimicaw::{Outcome, Test};
+#![allow(dead_code)]
+
+mod args;
+mod driver;
+mod exit_status;
+mod printer;
+mod report;
+mod test;
+
 use crate::test_case::{SectionId, TestCase, TestDesc, TestFn};
 use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{
@@ -12,6 +20,13 @@ use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use pin_project::pin_project;
 use std::{
     cell::Cell, fmt::Write as _, mem, panic::AssertUnwindSafe, pin::Pin, ptr::NonNull, sync::Once,
+};
+
+use {
+    args::Args,
+    driver::TestDriver,
+    exit_status::ExitStatus,
+    test::{Outcome, Test},
 };
 
 pub struct TestSuite<'a> {
@@ -28,7 +43,7 @@ impl TestSuite<'_> {
 }
 
 pub fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
-    let args = crate::mimicaw::Args::from_env().unwrap_or_else(|st| st.exit());
+    let args = Args::from_env().unwrap_or_else(|st| st.exit());
 
     static SET_HOOK: Once = Once::new();
     SET_HOOK.call_once(|| {
@@ -46,46 +61,48 @@ pub fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
         pool: ThreadPool::new().unwrap(),
     };
 
-    let st = futures::executor::block_on(crate::mimicaw::run_tests(
-        &args,
-        test_cases,
-        |_desc, test_case: TestCase| {
-            let TestCase { desc, test_fn } = test_case;
-            match test_fn {
-                TestFn::SyncTest(f) => runner.execute_blocking(move || {
-                    let res = expected(|| {
-                        maybe_unwind(AssertUnwindSafe(|| {
-                            if desc.leaf_sections.is_empty() {
-                                TestContext::new(&desc, None).scope(&f);
-                            } else {
-                                for &section in desc.leaf_sections {
-                                    TestContext::new(&desc, Some(section)).scope(&f);
-                                }
-                            }
-                        }))
-                    });
-                    make_outcome(res)
-                }),
-                TestFn::AsyncTest(f) => runner.execute(async move {
-                    let res = AssertUnwindSafe(async move {
+    let runner = |_desc, test_case: TestCase| {
+        let TestCase { desc, test_fn } = test_case;
+        match test_fn {
+            TestFn::SyncTest(f) => runner.execute_blocking(move || {
+                let res = expected(|| {
+                    maybe_unwind(AssertUnwindSafe(|| {
                         if desc.leaf_sections.is_empty() {
-                            TestContext::new(&desc, None).scope_async(f()).await;
+                            TestContext::new(&desc, None).scope(&f);
                         } else {
                             for &section in desc.leaf_sections {
-                                TestContext::new(&desc, Some(section))
-                                    .scope_async(f())
-                                    .await;
+                                TestContext::new(&desc, Some(section)).scope(&f);
                             }
                         }
-                    })
-                    .maybe_unwind()
-                    .expected()
-                    .await;
-                    make_outcome(res)
-                }),
-            }
-        },
-    ));
+                    }))
+                });
+                make_outcome(res)
+            }),
+            TestFn::AsyncTest(f) => runner.execute(async move {
+                let res = AssertUnwindSafe(async move {
+                    if desc.leaf_sections.is_empty() {
+                        TestContext::new(&desc, None).scope_async(f()).await;
+                    } else {
+                        for &section in desc.leaf_sections {
+                            TestContext::new(&desc, Some(section))
+                                .scope_async(f())
+                                .await;
+                        }
+                    }
+                })
+                .maybe_unwind()
+                .expected()
+                .await;
+                make_outcome(res)
+            }),
+        }
+    };
+
+    let driver = TestDriver::new(&args);
+    let st = match futures::executor::block_on(driver.run_tests(test_cases, runner)) {
+        Ok(report) => report.status(),
+        Err(status) => status,
+    };
     st.exit();
 }
 
