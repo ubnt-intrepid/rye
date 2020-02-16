@@ -5,6 +5,7 @@ A custom unit testing framework inspired by Catch2.
 mod args;
 mod context;
 mod driver;
+mod executor;
 mod exit_status;
 mod outcome;
 mod printer;
@@ -15,6 +16,8 @@ mod test_suite;
 #[doc(hidden)]
 pub mod _internal {
     pub use crate::{
+        executor::{DefaultTestExecutor, TestExecutor},
+        exit_status::ExitStatus,
         test_case::{Section, TestCase, TestDesc, TestFn},
         test_suite::TestSuite,
     };
@@ -30,9 +33,18 @@ pub mod _internal {
         TestContext::with(|ctx| ctx.is_target_section(id))
     }
 
-    #[inline(never)]
-    pub async fn run_tests(tests: &[&dyn Fn(&mut TestSuite<'_>)]) {
-        let args = Args::from_env().unwrap_or_else(|st| st.exit());
+    #[inline]
+    pub async fn run_tests<E: ?Sized>(
+        tests: &[&dyn Fn(&mut TestSuite<'_>)],
+        executor: &mut E,
+    ) -> ExitStatus
+    where
+        E: TestExecutor,
+    {
+        let args = match Args::from_env() {
+            Ok(args) => args,
+            Err(st) => return st,
+        };
 
         static SET_HOOK: Once = Once::new();
         SET_HOOK.call_once(|| {
@@ -47,20 +59,21 @@ pub mod _internal {
         }
 
         let mut driver = TestDriver::new(&args);
-        let st = match driver.run_tests(test_cases).await {
+        match driver.run_tests(test_cases, &mut *executor).await {
             Ok(report) => report.status(),
             Err(status) => status,
-        };
-        st.exit();
+        }
     }
 
     #[macro_export]
     macro_rules! test_main {
         ($($test_case:path),*$(,)?) => {
             fn main() {
-                $crate::_internal::block_on(
-                    $crate::_internal::run_tests(&[$(&$test_case),*])
+                let mut executor = $crate::_internal::DefaultTestExecutor::new().unwrap();
+                let status = $crate::_internal::block_on(
+                    $crate::_internal::run_tests(&[$(&$test_case),*], &mut executor)
                 );
+                status.exit();
             }
         };
     }

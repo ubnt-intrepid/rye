@@ -1,6 +1,7 @@
 use super::{
     args::Args,
     context::TestContext,
+    executor::TestExecutor,
     exit_status::ExitStatus,
     outcome::{Outcome, OutcomeKind},
     printer::Printer,
@@ -9,140 +10,34 @@ use super::{
 use crate::test_case::{TestCase, TestFn};
 use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{
-    executor::ThreadPool,
-    future::{BoxFuture, Future},
+    future::Future,
     ready,
-    task::{self, Poll, SpawnExt as _},
+    stream::StreamExt as _,
+    task::{self, Poll},
 };
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use pin_project::pin_project;
 use std::{collections::HashSet, io::Write, panic::AssertUnwindSafe, pin::Pin};
 
-#[pin_project]
-struct PendingTest<'a> {
-    test_case: TestCase,
-    #[pin]
-    handle: Option<BoxFuture<'static, Outcome>>,
-    outcome: Option<Outcome>,
-    printer: &'a Printer,
-    name_length: usize,
-}
-
-impl PendingTest<'_> {
-    fn start(self: Pin<&mut Self>, args: &Args, name_length: usize, pool: &mut ThreadPool) {
-        let mut me = self.project();
-
-        *me.name_length = name_length;
-
-        let ignored = (me.test_case.desc.ignored && !args.run_ignored) || !args.run_tests;
-
-        if !ignored {
-            let handle: BoxFuture<'static, Outcome> = {
-                let desc = me.test_case.desc.clone();
-                match me.test_case.test_fn {
-                    TestFn::SyncTest(f) => {
-                        let f = move || {
-                            let res = expected(|| {
-                                maybe_unwind(AssertUnwindSafe(|| {
-                                    if desc.leaf_sections.is_empty() {
-                                        TestContext::new(&desc, None).scope(&f);
-                                    } else {
-                                        for &section in desc.leaf_sections {
-                                            TestContext::new(&desc, Some(section)).scope(&f);
-                                        }
-                                    }
-                                }))
-                            });
-                            make_outcome(res)
-                        };
-                        let (tx, rx) = futures::channel::oneshot::channel();
-                        std::thread::spawn(move || {
-                            let _ = tx.send(f());
-                        });
-                        Box::pin(async move {
-                            rx.await.unwrap_or_else(|rx_err| {
-                                Outcome::failed()
-                                    .error_message(format!("unknown error: {}", rx_err))
-                            })
-                        })
-                    }
-                    TestFn::AsyncTest(f) => {
-                        let fut = async move {
-                            let res = AssertUnwindSafe(async move {
-                                if desc.leaf_sections.is_empty() {
-                                    TestContext::new(&desc, None).scope_async(f()).await;
-                                } else {
-                                    for &section in desc.leaf_sections {
-                                        TestContext::new(&desc, Some(section))
-                                            .scope_async(f())
-                                            .await;
-                                    }
-                                }
-                            })
-                            .maybe_unwind()
-                            .expected()
-                            .await;
-                            make_outcome(res)
-                        };
-                        let handle = pool.spawn_with_handle(fut);
-                        Box::pin(async move {
-                            match handle {
-                                Ok(handle) => handle.await,
-                                Err(spawn_err) => Outcome::failed()
-                                    .error_message(format!("unknown error: {}", spawn_err)),
-                            }
-                        })
-                    }
-                }
-            };
-            me.handle.set(Some(handle));
-        }
-    }
-}
-
-impl Future for PendingTest<'_> {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        let me = self.project();
-
-        match me.handle.as_pin_mut() {
-            Some(handle) => {
-                let outcome = ready!(handle.poll(cx));
-                me.printer
-                    .print_result(&me.test_case.desc, *me.name_length, Some(&outcome));
-                me.outcome.replace(outcome);
-            }
-            None => {
-                me.printer
-                    .print_result(&me.test_case.desc, *me.name_length, None);
-            }
-        }
-
-        Poll::Ready(())
-    }
-}
-
 pub(crate) struct TestDriver<'a> {
     args: &'a Args,
     printer: Printer,
-    pool: ThreadPool,
 }
 
 impl<'a> TestDriver<'a> {
     pub(crate) fn new(args: &'a Args) -> Self {
         let printer = Printer::new(&args);
-        Self {
-            args,
-            printer,
-            pool: ThreadPool::new().unwrap(),
-        }
+        Self { args, printer }
     }
 
-    pub(crate) async fn run_tests(
+    pub(crate) async fn run_tests<E: ?Sized>(
         &mut self,
         test_cases: impl IntoIterator<Item = TestCase>,
-    ) -> Result<Report, ExitStatus> {
+        executor: &mut E,
+    ) -> Result<Report, ExitStatus>
+    where
+        E: TestExecutor,
+    {
         // First, convert each test case to PendingTest for tracking the running state.
         // Test cases that satisfy the skip condition are filtered out here.
         let mut pending_tests = vec![];
@@ -189,12 +84,14 @@ impl<'a> TestDriver<'a> {
             .max()
             .unwrap_or(0);
 
-        for pending_test in pending_tests.iter_mut() {
-            pending_test
-                .as_mut()
-                .start(&self.args, max_name_length, &mut self.pool);
-            pending_test.as_mut().await;
-        }
+        futures::stream::iter(pending_tests.iter_mut())
+            .for_each_concurrent(None, |pending_test| {
+                pending_test
+                    .as_mut()
+                    .start(&self.args, max_name_length, &mut *executor);
+                pending_test
+            })
+            .await;
 
         let mut passed = vec![];
         let mut failed = vec![];
@@ -228,6 +125,98 @@ impl<'a> TestDriver<'a> {
         let _ = report.print(&self.printer);
 
         Ok(report)
+    }
+}
+
+#[pin_project]
+struct PendingTest<'a, T> {
+    test_case: TestCase,
+    #[pin]
+    handle: Option<T>,
+    outcome: Option<Outcome>,
+    printer: &'a Printer,
+    name_length: usize,
+}
+
+impl<T> PendingTest<'_, T>
+where
+    T: Future<Output = Outcome>,
+{
+    fn start<E: ?Sized>(self: Pin<&mut Self>, args: &Args, name_length: usize, executor: &mut E)
+    where
+        E: TestExecutor<Handle = T>,
+    {
+        let mut me = self.project();
+
+        *me.name_length = name_length;
+
+        let ignored = (me.test_case.desc.ignored && !args.run_ignored) || !args.run_tests;
+
+        if !ignored {
+            let handle = {
+                let desc = me.test_case.desc.clone();
+                match me.test_case.test_fn {
+                    TestFn::SyncTest(f) => executor.execute_blocking(move || {
+                        let res = expected(|| {
+                            maybe_unwind(AssertUnwindSafe(|| {
+                                if desc.leaf_sections.is_empty() {
+                                    TestContext::new(&desc, None).scope(&f);
+                                } else {
+                                    for &section in desc.leaf_sections {
+                                        TestContext::new(&desc, Some(section)).scope(&f);
+                                    }
+                                }
+                            }))
+                        });
+                        make_outcome(res)
+                    }),
+                    TestFn::AsyncTest(f) => executor.execute(async move {
+                        let res = AssertUnwindSafe(async move {
+                            if desc.leaf_sections.is_empty() {
+                                TestContext::new(&desc, None).scope_async(f()).await;
+                            } else {
+                                for &section in desc.leaf_sections {
+                                    TestContext::new(&desc, Some(section))
+                                        .scope_async(f())
+                                        .await;
+                                }
+                            }
+                        })
+                        .maybe_unwind()
+                        .expected()
+                        .await;
+                        make_outcome(res)
+                    }),
+                }
+            };
+            me.handle.set(Some(handle));
+        }
+    }
+}
+
+impl<T> Future for PendingTest<'_, T>
+where
+    T: Future<Output = Outcome>,
+{
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        let me = self.project();
+
+        match me.handle.as_pin_mut() {
+            Some(handle) => {
+                let outcome = ready!(handle.poll(cx));
+                me.printer
+                    .print_result(&me.test_case.desc, *me.name_length, Some(&outcome));
+                me.outcome.replace(outcome);
+            }
+            None => {
+                me.printer
+                    .print_result(&me.test_case.desc, *me.name_length, None);
+            }
+        }
+
+        Poll::Ready(())
     }
 }
 
