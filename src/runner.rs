@@ -1,11 +1,9 @@
 use super::{
-    args::Args,
+    cli::{Args, ExitStatus},
     executor::TestExecutor,
-    exit_status::ExitStatus,
-    outcome::OutcomeKind,
-    printer::Printer,
     registry::{register_all, Registry, RegistryError},
     report::Report,
+    report::{OutcomeKind, Printer},
 };
 use futures::stream::StreamExt as _;
 use std::{io::Write, sync::Once};

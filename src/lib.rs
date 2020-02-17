@@ -2,12 +2,8 @@
 A custom unit testing framework inspired by Catch2.
 !*/
 
-mod args;
-mod context;
+mod cli;
 mod executor;
-mod exit_status;
-mod outcome;
-mod printer;
 mod registry;
 mod report;
 mod runner;
@@ -16,8 +12,8 @@ mod test_case;
 #[doc(hidden)]
 pub mod _internal {
     pub use crate::{
+        cli::ExitStatus,
         executor::{DefaultTestExecutor, TestExecutor},
-        exit_status::ExitStatus,
         registry::{Registry, RegistryError},
         runner::run_tests,
         test_case::{Section, TestCase, TestDesc, TestFn},
@@ -26,7 +22,7 @@ pub mod _internal {
     pub use maplit::{hashmap, hashset};
     pub use std::module_path;
 
-    use crate::{context::TestContext, test_case::SectionId};
+    use crate::{executor::TestContext, test_case::SectionId};
 
     #[inline]
     pub fn is_target(id: SectionId) -> bool {

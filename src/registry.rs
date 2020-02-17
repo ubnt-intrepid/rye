@@ -1,4 +1,4 @@
-use crate::{args::Args, test_case::TestCase};
+use crate::{cli::Args, test_case::TestCase};
 use std::collections::HashSet;
 
 pub struct RegistryError(());
