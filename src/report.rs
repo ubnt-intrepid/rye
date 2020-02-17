@@ -1,5 +1,5 @@
 use crate::{
-    cli::{Args, ColorConfig, ExitStatus, OutputFormat},
+    cli::{Args, ColorConfig, ExitStatus},
     test_case::TestDesc,
 };
 use console::{Style, StyledObject, Term};
@@ -86,7 +86,6 @@ impl Report {
 
 pub(crate) struct Printer {
     term: Term,
-    format: OutputFormat,
     style: Style,
 }
 
@@ -94,7 +93,6 @@ impl Printer {
     pub(crate) fn new(args: &Args) -> Self {
         Self {
             term: Term::buffered_stdout(),
-            format: args.format,
             style: {
                 let mut style = Style::new();
                 match args.color {
@@ -119,8 +117,6 @@ impl Printer {
         &self,
         tests: impl IntoIterator<Item = impl std::ops::Deref<Target = TestDesc>>,
     ) -> io::Result<()> {
-        let quiet = self.format == OutputFormat::Terse;
-
         let mut num_tests = 0;
 
         for test in tests {
@@ -129,42 +125,22 @@ impl Printer {
             writeln!(&self.term, "{}: test", desc.name)?;
         }
 
-        if !quiet {
-            fn plural_suffix(n: usize) -> &'static str {
-                match n {
-                    1 => "",
-                    _ => "s",
-                }
+        fn plural_suffix(n: usize) -> &'static str {
+            match n {
+                1 => "",
+                _ => "s",
             }
-
-            if num_tests != 0 {
-                writeln!(&self.term)?;
-            }
-            writeln!(
-                &self.term,
-                "{} test{}, 0 benchmark{}",
-                num_tests,
-                plural_suffix(num_tests),
-                plural_suffix(0)
-            )?;
         }
+
+        if num_tests != 0 {
+            writeln!(&self.term)?;
+        }
+        writeln!(&self.term, "{} test{}", num_tests, plural_suffix(num_tests),)?;
 
         Ok(())
     }
 
     pub(crate) fn print_result(
-        &self,
-        desc: &TestDesc,
-        name_length: usize,
-        outcome: &Outcome,
-    ) -> io::Result<()> {
-        match self.format {
-            OutputFormat::Pretty => self.print_result_pretty(desc, name_length, outcome),
-            OutputFormat::Terse => self.print_result_terse(desc, name_length, outcome),
-        }
-    }
-
-    pub(crate) fn print_result_pretty(
         &self,
         desc: &TestDesc,
         name_length: usize,
@@ -179,15 +155,6 @@ impl Printer {
             "test {0:<1$} ... {2}",
             desc.name, name_length, result
         )?;
-        self.term.flush()
-    }
-
-    fn print_result_terse(&self, _: &TestDesc, _: usize, outcome: &Outcome) -> io::Result<()> {
-        let ch = match outcome.kind() {
-            OutcomeKind::Passed => ".",
-            OutcomeKind::Failed => "F",
-        };
-        self.term.write_str(ch)?;
         self.term.flush()
     }
 

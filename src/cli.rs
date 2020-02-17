@@ -11,7 +11,6 @@ pub struct Args {
     pub filter: Option<String>,
     pub filter_exact: bool,
     pub color: ColorConfig,
-    pub format: OutputFormat,
     pub skip: Vec<String>,
 }
 
@@ -81,30 +80,6 @@ impl FromStr for ColorConfig {
     }
 }
 
-/// The output format.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum OutputFormat {
-    Pretty,
-    Terse,
-}
-
-impl FromStr for OutputFormat {
-    type Err = Box<dyn std::error::Error>;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "pretty" => Ok(OutputFormat::Pretty),
-            "terse" => Ok(OutputFormat::Terse),
-            s => Err(format!(
-                "argument for --format must be pretty, terse, or json (was {})",
-                s
-            )
-            .into()),
-        }
-    }
-}
-
 struct Parser {
     args: Vec<String>,
     opts: Options,
@@ -122,11 +97,6 @@ impl Parser {
             "FILTER",
         );
         opts.optflag(
-            "q",
-            "quiet",
-            "Display one character per test instead of one line. Alias to --format=terse",
-        );
-        opts.optflag(
             "",
             "exact",
             "Exactly match filters rather than by substring",
@@ -139,14 +109,6 @@ impl Parser {
                 always = always colorize output;
                 never  = never colorize output;",
             "auto|always|never",
-        );
-        opts.optopt(
-            "",
-            "format",
-            "Configure formatting of output:
-                pretty = Print verbose output;
-                terse  = Display one character per test",
-            "pretty|terse",
         );
 
         Self {
@@ -181,19 +143,10 @@ impl Parser {
         }
 
         let filter = matches.free.get(0).cloned();
-        let quiet = matches.opt_present("quiet");
         let filter_exact = matches.opt_present("exact");
         let list = matches.opt_present("list");
 
         let color = matches.opt_get("color")?.unwrap_or(ColorConfig::Auto);
-
-        let format = matches.opt_get("format")?.unwrap_or_else(|| {
-            if quiet {
-                OutputFormat::Terse
-            } else {
-                OutputFormat::Pretty
-            }
-        });
 
         let skip = matches.opt_strs("skip");
 
@@ -202,7 +155,6 @@ impl Parser {
             filter,
             filter_exact,
             color,
-            format,
             skip,
         }))
     }
