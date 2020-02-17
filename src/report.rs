@@ -95,7 +95,7 @@ impl Printer {
             term: Term::buffered_stdout(),
             style: {
                 let mut style = Style::new();
-                match args.color {
+                match args.color() {
                     ColorConfig::Always => style = style.force_styling(true),
                     ColorConfig::Never => style = style.force_styling(false),
                     _ => (),

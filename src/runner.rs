@@ -33,7 +33,7 @@ where
 
     let printer = Printer::new(&args);
 
-    if args.list {
+    if args.list_tests() {
         let _ = printer.print_list(pending_tests.iter().map(|test| &test.desc));
         return ExitStatus::OK;
     }
