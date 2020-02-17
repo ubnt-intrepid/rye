@@ -27,11 +27,6 @@ impl Registry<'_> {
             return Err(RegistryError(()));
         }
 
-        if self.args.run_ignored && !test.desc.ignored {
-            self.inner.filtered_out_tests.push(test);
-            return Ok(());
-        }
-
         if self.args.is_filtered(test.desc.name) {
             self.inner.filtered_out_tests.push(test);
         } else {

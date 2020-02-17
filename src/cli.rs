@@ -10,7 +10,6 @@ pub struct Args {
     pub list: bool,
     pub filter: Option<String>,
     pub filter_exact: bool,
-    pub run_ignored: bool,
     pub color: ColorConfig,
     pub format: OutputFormat,
     pub skip: Vec<String>,
@@ -116,7 +115,6 @@ impl Parser {
         let mut opts = Options::new();
         opts.optflag("h", "help", "Display this message (longer with --help)");
         opts.optflag("", "list", "List all tests and benchmarks");
-        opts.optflag("", "ignored", "Run only ignored tests");
         opts.optmulti(
             "",
             "skip",
@@ -148,7 +146,7 @@ impl Parser {
             "Configure formatting of output:
                 pretty = Print verbose output;
                 terse  = Display one character per test",
-            "pretty|terse|json",
+            "pretty|terse",
         );
 
         Self {
@@ -183,7 +181,6 @@ impl Parser {
         }
 
         let filter = matches.free.get(0).cloned();
-        let run_ignored = matches.opt_present("ignored");
         let quiet = matches.opt_present("quiet");
         let filter_exact = matches.opt_present("exact");
         let list = matches.opt_present("list");
@@ -204,7 +201,6 @@ impl Parser {
             list,
             filter,
             filter_exact,
-            run_ignored,
             color,
             format,
             skip,

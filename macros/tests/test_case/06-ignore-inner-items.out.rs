@@ -11,7 +11,6 @@ fn ignore_inner_items(__suite: &mut ::rye::_internal::Registry<'_>)
         desc: ::rye::_internal::TestDesc {
             name: "ignore_inner_items",
             module_path: ::rye::_internal::module_path!(),
-            ignored: false,
             sections: ::rye::_internal::hashmap! {},
             leaf_sections: &[],
         },

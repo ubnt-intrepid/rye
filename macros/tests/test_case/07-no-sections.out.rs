@@ -9,7 +9,6 @@ fn no_sections(__suite: &mut ::rye::_internal::Registry<'_>)
         desc: ::rye::_internal::TestDesc {
             name: "no_sections",
             module_path: ::rye::_internal::module_path!(),
-            ignored: false,
             sections: ::rye::_internal::hashmap! {},
             leaf_sections: &[],
         },

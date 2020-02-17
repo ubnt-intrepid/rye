@@ -21,7 +21,6 @@ fn case_sync_nested(__suite: &mut ::rye::_internal::Registry<'_>)
         desc: ::rye::_internal::TestDesc {
             name: "case_sync_nested",
             module_path: ::rye::_internal::module_path!(),
-            ignored: false,
             sections: ::rye::_internal::hashmap! {
                 0u64 => ::rye::_internal::Section {
                     name: "resizing bigger changes size and capacity",

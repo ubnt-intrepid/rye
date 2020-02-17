@@ -84,27 +84,10 @@ mod sub {
     }
 }
 
-#[rye::test_case]
-#[ignored]
-fn ignored() {
-    let mut vec = vec![0usize; 5];
-
-    assert_eq!(vec.len(), 5);
-    assert!(vec.capacity() >= 5);
-
-    section!("resizing bigger changes size and capacity", {
-        vec.resize(10, 0);
-
-        assert_eq!(vec.len(), 10);
-        assert!(vec.capacity() >= 5);
-    });
-}
-
 rye::test_main! {
     case_sync,
     nested,
     case_async,
     sub::sub_test,
     sub::modified_rye_path,
-    ignored,
 }

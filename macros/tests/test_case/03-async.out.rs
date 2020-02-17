@@ -15,7 +15,6 @@ fn case_async(__suite: &mut ::rye::_internal::Registry<'_>)
         desc: ::rye::_internal::TestDesc {
             name: "case_async",
             module_path: ::rye::_internal::module_path!(),
-            ignored: false,
             sections: ::rye::_internal::hashmap! {
                 0u64 => ::rye::_internal::Section {
                     name: "resizing bigger changes size and capacity",

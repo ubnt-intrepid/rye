@@ -64,13 +64,8 @@ pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
         }
     });
 
-    let mut ignored = false;
     let mut attrs = vec![];
     for attr in item.attrs.drain(..) {
-        if attr.path.is_ident("ignored") {
-            ignored = true;
-            continue;
-        }
         attrs.push(attr);
     }
 
@@ -89,7 +84,6 @@ pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
                 desc: #rye_path::_internal::TestDesc {
                     name: #test_name,
                     module_path: #rye_path::_internal::module_path!(),
-                    ignored: #ignored,
                     sections: #rye_path::_internal::hashmap! { #(#section_map_entries,)* },
                     leaf_sections: &[ #(#leaf_section_ids),* ],
                 },
@@ -377,10 +371,5 @@ mod tests {
     #[test]
     fn no_sections() {
         test_expanded("07-no-sections");
-    }
-
-    #[test]
-    fn attributes() {
-        test_expanded("08-attributes");
     }
 }

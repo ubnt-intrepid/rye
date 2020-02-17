@@ -25,7 +25,6 @@ fn multi_section_in_scope(__suite: &mut ::rye::_internal::Registry<'_>)
         desc: ::rye::_internal::TestDesc {
             name: "multi_section_in_scope",
             module_path: ::rye::_internal::module_path!(),
-            ignored: false,
             sections: ::rye::_internal::hashmap! {
                 0u64 => ::rye::_internal::Section { name: "section1"     , ancestors: ::rye::_internal::hashset!()           , },
                 1u64 => ::rye::_internal::Section { name: "section2"     , ancestors: ::rye::_internal::hashset!()           , },

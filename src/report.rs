@@ -69,9 +69,6 @@ pub struct Report {
     /// Failed test cases with the error messages.
     pub failed: Vec<(TestDesc, Option<Arc<Cow<'static, str>>>)>,
 
-    /// Test cases skipped because they do not satisfy the execution conditions.
-    pub ignored: Vec<TestDesc>,
-
     /// Test cases filtered out.
     pub filtered_out: Vec<TestDesc>,
 }
@@ -84,15 +81,6 @@ impl Report {
         } else {
             ExitStatus::FAILED
         }
-    }
-
-    /// Return an iterator of skipped test cases.
-    #[inline]
-    #[allow(dead_code)]
-    pub fn skipped(&self) -> impl Iterator<Item = (&TestDesc, &str)> + '_ {
-        let ignored = self.ignored.iter().map(|desc| (desc, "ignored"));
-        let filtered_out = self.filtered_out.iter().map(|desc| (desc, "filtered out"));
-        ignored.chain(filtered_out)
     }
 }
 
@@ -168,7 +156,7 @@ impl Printer {
         &self,
         desc: &TestDesc,
         name_length: usize,
-        outcome: Option<&Outcome>,
+        outcome: &Outcome,
     ) -> io::Result<()> {
         match self.format {
             OutputFormat::Pretty => self.print_result_pretty(desc, name_length, outcome),
@@ -180,56 +168,24 @@ impl Printer {
         &self,
         desc: &TestDesc,
         name_length: usize,
-        outcome: Option<&Outcome>,
+        outcome: &Outcome,
     ) -> io::Result<()> {
-        let name = desc.name;
-
-        match outcome {
-            Some(outcome) => match outcome.kind() {
-                OutcomeKind::Passed => {
-                    writeln!(
-                        &self.term,
-                        "test {0:<1$} ... {2}",
-                        name,
-                        name_length,
-                        self.styled("ok").green()
-                    )?;
-                }
-                OutcomeKind::Failed => {
-                    writeln!(
-                        &self.term,
-                        "test {0:<1$} ... {2}",
-                        name,
-                        name_length,
-                        self.styled("FAILED").red()
-                    )?;
-                }
-            },
-            None => {
-                writeln!(
-                    &self.term,
-                    "test {0:<1$} ... {2}",
-                    name,
-                    name_length,
-                    self.styled("ignored").yellow()
-                )?;
-            }
-        }
+        let result = match outcome.kind() {
+            OutcomeKind::Passed => self.styled("ok").green(),
+            OutcomeKind::Failed => self.styled("FAILED").red(),
+        };
+        writeln!(
+            &self.term,
+            "test {0:<1$} ... {2}",
+            desc.name, name_length, result
+        )?;
         self.term.flush()
     }
 
-    fn print_result_terse(
-        &self,
-        _: &TestDesc,
-        _: usize,
-        outcome: Option<&Outcome>,
-    ) -> io::Result<()> {
-        let ch = match outcome {
-            Some(o) => match o.kind() {
-                OutcomeKind::Passed => ".",
-                OutcomeKind::Failed => "F",
-            },
-            None => "i",
+    fn print_result_terse(&self, _: &TestDesc, _: usize, outcome: &Outcome) -> io::Result<()> {
+        let ch = match outcome.kind() {
+            OutcomeKind::Passed => ".",
+            OutcomeKind::Failed => "F",
         };
         self.term.write_str(ch)?;
         self.term.flush()
@@ -260,11 +216,12 @@ impl Printer {
         }
 
         writeln!(self.term())?;
-        writeln!(self.term(), "test result: {status}. {passed} passed; {failed} failed; {ignored} ignored; {filtered_out} filtered out",
+        writeln!(
+            self.term(),
+            "test result: {status}. {passed} passed; {failed} failed; {filtered_out} filtered out",
             status = status,
             passed = report.passed.len(),
             failed = report.failed.len(),
-            ignored = report.ignored.len(),
             filtered_out = report.filtered_out.len(),
         )?;
 

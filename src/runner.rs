@@ -49,17 +49,10 @@ where
         let completed_tests = futures::lock::Mutex::new(vec![]);
         futures::stream::iter(pending_tests)
             .for_each_concurrent(None, |test| {
-                let handle = if args.run_ignored || !test.desc.ignored {
-                    Some(crate::executor::start_test(&test, &mut *executor))
-                } else {
-                    None
-                };
+                let handle = crate::executor::start_test(&test, &mut *executor);
                 async {
-                    let outcome = match handle {
-                        Some(handle) => Some(handle.await),
-                        None => None,
-                    };
-                    let _ = printer.print_result(&test.desc, name_length, outcome.as_ref());
+                    let outcome = handle.await;
+                    let _ = printer.print_result(&test.desc, name_length, &outcome);
                     completed_tests.lock().await.push((test, outcome));
                 }
             })
@@ -69,21 +62,16 @@ where
 
     let mut passed = vec![];
     let mut failed = vec![];
-    let mut ignored = vec![];
     for (test, outcome) in completed_tests {
-        match outcome {
-            Some(ref outcome) => match outcome.kind() {
-                OutcomeKind::Passed => passed.push(test.desc),
-                OutcomeKind::Failed => failed.push((test.desc, outcome.err_msg())),
-            },
-            None => ignored.push(test.desc),
+        match outcome.kind() {
+            OutcomeKind::Passed => passed.push(test.desc),
+            OutcomeKind::Failed => failed.push((test.desc, outcome.err_msg())),
         }
     }
 
     let report = Report {
         passed,
         failed,
-        ignored,
         filtered_out: filtered_out_tests
             .into_iter()
             .map(|test| test.desc)
