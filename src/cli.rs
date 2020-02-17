@@ -1,10 +1,7 @@
 //! Definition of command line interface.
 
 use getopts::Options;
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{path::Path, str::FromStr};
 
 /// Command line arguments.
 #[derive(Debug)]
@@ -14,13 +11,8 @@ pub struct Args {
     pub filter: Option<String>,
     pub filter_exact: bool,
     pub run_ignored: bool,
-    pub run_tests: bool,
-    pub run_benchmarks: bool,
-    pub logfile: Option<PathBuf>,
-    pub nocapture: bool,
     pub color: ColorConfig,
     pub format: OutputFormat,
-    pub test_threads: Option<usize>,
     pub skip: Vec<String>,
 }
 
@@ -64,25 +56,6 @@ impl Args {
     }
 }
 
-struct TestThreads(usize);
-
-impl FromStr for TestThreads {
-    type Err = Box<dyn std::error::Error>;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let n = s.parse().map_err(|e| {
-            format!(
-                "argument for --test-threads must be a number > 0 (error: {})",
-                e
-            )
-        })?;
-        if n == 0 {
-            return Err("argument for --test-threads must not be 0".into());
-        }
-        Ok(Self(n))
-    }
-}
-
 /// The color configuration.
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[non_exhaustive]
@@ -115,7 +88,6 @@ impl FromStr for ColorConfig {
 pub enum OutputFormat {
     Pretty,
     Terse,
-    Json,
 }
 
 impl FromStr for OutputFormat {
@@ -125,7 +97,6 @@ impl FromStr for OutputFormat {
         match s {
             "pretty" => Ok(OutputFormat::Pretty),
             "terse" => Ok(OutputFormat::Terse),
-            "json" => Ok(OutputFormat::Json),
             s => Err(format!(
                 "argument for --format must be pretty, terse, or json (was {})",
                 s
@@ -143,31 +114,9 @@ struct Parser {
 impl Parser {
     fn new() -> Self {
         let mut opts = Options::new();
-        opts.optflag("", "ignored", "Run only ignored tests");
-        opts.optflag("", "test", "Run tests and not benchmarks");
-        opts.optflag("", "bench", "Run benchmarks instead of tests");
-        opts.optflag("", "list", "List all tests and benchmarks");
         opts.optflag("h", "help", "Display this message (longer with --help)");
-        opts.optopt(
-            "",
-            "logfile",
-            "Write logs to the specified file instead of stdout.
-             (placeholder. not implemented yet)",
-            "PATH",
-        );
-        opts.optflag(
-            "",
-            "nocapture",
-            "don't capture stdout/stderr of each task, allow printing directly.
-             (placeholder, not implemented yet)",
-        );
-        opts.optopt(
-            "",
-            "test-threads",
-            "Number of threads used for running tests in parallel.
-             (placeholder, not implemented yet)",
-            "n_threads",
-        );
+        opts.optflag("", "list", "List all tests and benchmarks");
+        opts.optflag("", "ignored", "Run only ignored tests");
         opts.optmulti(
             "",
             "skip",
@@ -198,8 +147,7 @@ impl Parser {
             "format",
             "Configure formatting of output:
                 pretty = Print verbose output;
-                terse  = Display one character per test;
-                json   = Output a json document (placeholder, not implemented yet)",
+                terse  = Display one character per test",
             "pretty|terse|json",
         );
 
@@ -239,18 +187,6 @@ impl Parser {
         let quiet = matches.opt_present("quiet");
         let filter_exact = matches.opt_present("exact");
         let list = matches.opt_present("list");
-        let logfile = matches.opt_get("logfile")?;
-
-        let run_benchmarks = matches.opt_present("bench");
-        let run_tests = !run_benchmarks || matches.opt_present("test");
-
-        let nocapture = matches.opt_present("nocapture") || {
-            std::env::var("RUST_TEST_NOCAPTURE")
-                .ok()
-                .map_or(false, |val| &val != "0")
-        };
-
-        let test_threads = matches.opt_get("test-threads")?.map(|TestThreads(n)| n);
 
         let color = matches.opt_get("color")?.unwrap_or(ColorConfig::Auto);
 
@@ -269,13 +205,8 @@ impl Parser {
             filter,
             filter_exact,
             run_ignored,
-            run_tests,
-            run_benchmarks,
-            logfile,
-            nocapture,
             color,
             format,
-            test_threads,
             skip,
         }))
     }

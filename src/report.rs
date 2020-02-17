@@ -36,11 +36,6 @@ impl Outcome {
         Self::new(OutcomeKind::Failed)
     }
 
-    /// Create an `Outcome` representing that the benchmark test was successfully run.
-    pub fn measured(average: u64, variance: u64) -> Self {
-        Self::new(OutcomeKind::Measured { average, variance })
-    }
-
     /// Specify the error message.
     pub fn error_message(self, err_msg: impl Into<Cow<'static, str>>) -> Self {
         Self {
@@ -62,7 +57,6 @@ impl Outcome {
 pub(crate) enum OutcomeKind {
     Passed,
     Failed,
-    Measured { average: u64, variance: u64 },
 }
 
 /// A report on test suite execution.
@@ -74,9 +68,6 @@ pub struct Report {
 
     /// Failed test cases with the error messages.
     pub failed: Vec<(TestDesc, Option<Arc<Cow<'static, str>>>)>,
-
-    /// Benchmark results.
-    pub measured: Vec<(TestDesc, (u64, u64))>,
 
     /// Test cases skipped because they do not satisfy the execution conditions.
     pub ignored: Vec<TestDesc>,
@@ -102,43 +93,6 @@ impl Report {
         let ignored = self.ignored.iter().map(|desc| (desc, "ignored"));
         let filtered_out = self.filtered_out.iter().map(|desc| (desc, "filtered out"));
         ignored.chain(filtered_out)
-    }
-
-    pub(crate) fn print(&self, printer: &Printer) -> io::Result<()> {
-        let mut status = printer.styled("ok").green();
-
-        if !self.failed.is_empty() {
-            status = printer.styled("FAILED").red();
-            writeln!(printer.term())?;
-            writeln!(printer.term(), "failures:")?;
-            for (desc, msg) in &self.failed {
-                writeln!(printer.term(), "---- {} ----", desc.name)?;
-                if let Some(msg) = msg {
-                    write!(printer.term(), "{}", msg)?;
-                    if msg.chars().last().map_or(true, |c| c != '\n') {
-                        writeln!(printer.term())?;
-                    }
-                }
-            }
-
-            writeln!(printer.term())?;
-            writeln!(printer.term(), "failures:")?;
-            for (desc, _) in &self.failed {
-                writeln!(printer.term(), "    {}", desc.name)?;
-            }
-        }
-
-        writeln!(printer.term())?;
-        writeln!(printer.term(), "test result: {status}. {passed} passed; {failed} failed; {ignored} ignored; {measured} measured; {filtered_out} filtered out",
-            status = status,
-            passed = self.passed.len(),
-            failed = self.failed.len(),
-            ignored = self.ignored.len(),
-            measured = self.measured.len(),
-            filtered_out = self.filtered_out.len(),
-        )?;
-
-        Ok(())
     }
 }
 
@@ -169,14 +123,14 @@ impl Printer {
         &self.term
     }
 
-    pub(crate) fn styled<D>(&self, val: D) -> StyledObject<D> {
+    fn styled<D>(&self, val: D) -> StyledObject<D> {
         self.style.apply_to(val)
     }
 
     pub(crate) fn print_list(
         &self,
         tests: impl IntoIterator<Item = impl std::ops::Deref<Target = TestDesc>>,
-    ) {
+    ) -> io::Result<()> {
         let quiet = self.format == OutputFormat::Terse;
 
         let mut num_tests = 0;
@@ -184,7 +138,7 @@ impl Printer {
         for test in tests {
             let desc = &*test;
             num_tests += 1;
-            let _ = writeln!(&self.term, "{}: test", desc.name);
+            writeln!(&self.term, "{}: test", desc.name)?;
         }
 
         if !quiet {
@@ -196,16 +150,18 @@ impl Printer {
             }
 
             if num_tests != 0 {
-                let _ = writeln!(&self.term);
+                writeln!(&self.term)?;
             }
-            let _ = writeln!(
+            writeln!(
                 &self.term,
                 "{} test{}, 0 benchmark{}",
                 num_tests,
                 plural_suffix(num_tests),
                 plural_suffix(0)
-            );
+            )?;
         }
+
+        Ok(())
     }
 
     pub(crate) fn print_result(
@@ -213,78 +169,105 @@ impl Printer {
         desc: &TestDesc,
         name_length: usize,
         outcome: Option<&Outcome>,
-    ) {
+    ) -> io::Result<()> {
         match self.format {
             OutputFormat::Pretty => self.print_result_pretty(desc, name_length, outcome),
             OutputFormat::Terse => self.print_result_terse(desc, name_length, outcome),
-            OutputFormat::Json => eprintln!(
-                "{warning}: JSON format is not supported",
-                warning = self.styled("warning").yellow()
-            ),
         }
     }
 
-    fn print_result_pretty(&self, desc: &TestDesc, name_length: usize, outcome: Option<&Outcome>) {
+    pub(crate) fn print_result_pretty(
+        &self,
+        desc: &TestDesc,
+        name_length: usize,
+        outcome: Option<&Outcome>,
+    ) -> io::Result<()> {
         let name = desc.name;
 
         match outcome {
             Some(outcome) => match outcome.kind() {
                 OutcomeKind::Passed => {
-                    let _ = writeln!(
+                    writeln!(
                         &self.term,
                         "test {0:<1$} ... {2}",
                         name,
                         name_length,
                         self.styled("ok").green()
-                    );
+                    )?;
                 }
                 OutcomeKind::Failed => {
-                    let _ = writeln!(
+                    writeln!(
                         &self.term,
                         "test {0:<1$} ... {2}",
                         name,
                         name_length,
                         self.styled("FAILED").red()
-                    );
-                }
-                OutcomeKind::Measured { average, variance } => {
-                    let _ = writeln!(
-                        &self.term,
-                        "test {0:<1$} ... {2}: {3:>11} ns/iter (+/- {4})",
-                        name,
-                        name_length,
-                        self.styled("bench").cyan(),
-                        average,
-                        variance
-                    );
+                    )?;
                 }
             },
             None => {
-                let _ = writeln!(
+                writeln!(
                     &self.term,
                     "test {0:<1$} ... {2}",
                     name,
                     name_length,
                     self.styled("ignored").yellow()
-                );
+                )?;
             }
         }
-        let _ = self.term.flush();
+        self.term.flush()
     }
 
-    fn print_result_terse(&self, desc: &TestDesc, name_length: usize, outcome: Option<&Outcome>) {
+    fn print_result_terse(
+        &self,
+        _: &TestDesc,
+        _: usize,
+        outcome: Option<&Outcome>,
+    ) -> io::Result<()> {
         let ch = match outcome {
             Some(o) => match o.kind() {
                 OutcomeKind::Passed => ".",
                 OutcomeKind::Failed => "F",
-                OutcomeKind::Measured { .. } => {
-                    // benchmark test does not support terse format.
-                    return self.print_result_pretty(desc, name_length, outcome);
-                }
             },
             None => "i",
         };
-        let _ = self.term.write_str(ch);
-        let _ = self.term.flush();
+        self.term.write_str(ch)?;
+        self.term.flush()
+    }
+
+    pub(crate) fn print_report(&self, report: &Report) -> io::Result<()> {
+        let mut status = self.styled("ok").green();
+
+        if !report.failed.is_empty() {
+            status = self.styled("FAILED").red();
+            writeln!(self.term())?;
+            writeln!(self.term(), "failures:")?;
+            for (desc, msg) in &report.failed {
+                writeln!(self.term(), "---- {} ----", desc.name)?;
+                if let Some(msg) = msg {
+                    write!(self.term(), "{}", msg)?;
+                    if msg.chars().last().map_or(true, |c| c != '\n') {
+                        writeln!(self.term())?;
+                    }
+                }
+            }
+
+            writeln!(self.term())?;
+            writeln!(self.term(), "failures:")?;
+            for (desc, _) in &report.failed {
+                writeln!(self.term(), "    {}", desc.name)?;
+            }
+        }
+
+        writeln!(self.term())?;
+        writeln!(self.term(), "test result: {status}. {passed} passed; {failed} failed; {ignored} ignored; {filtered_out} filtered out",
+            status = status,
+            passed = report.passed.len(),
+            failed = report.failed.len(),
+            ignored = report.ignored.len(),
+            filtered_out = report.filtered_out.len(),
+        )?;
+
+        Ok(())
     }
 }

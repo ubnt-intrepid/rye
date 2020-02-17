@@ -34,7 +34,7 @@ where
     let printer = Printer::new(&args);
 
     if args.list {
-        printer.print_list(pending_tests.iter().map(|test| &test.desc));
+        let _ = printer.print_list(pending_tests.iter().map(|test| &test.desc));
         return ExitStatus::OK;
     }
 
@@ -59,7 +59,7 @@ where
                         Some(handle) => Some(handle.await),
                         None => None,
                     };
-                    printer.print_result(&test.desc, name_length, outcome.as_ref());
+                    let _ = printer.print_result(&test.desc, name_length, outcome.as_ref());
                     completed_tests.lock().await.push((test, outcome));
                 }
             })
@@ -69,16 +69,12 @@ where
 
     let mut passed = vec![];
     let mut failed = vec![];
-    let mut measured = vec![];
     let mut ignored = vec![];
     for (test, outcome) in completed_tests {
         match outcome {
             Some(ref outcome) => match outcome.kind() {
                 OutcomeKind::Passed => passed.push(test.desc),
                 OutcomeKind::Failed => failed.push((test.desc, outcome.err_msg())),
-                OutcomeKind::Measured { average, variance } => {
-                    measured.push((test.desc, (*average, *variance)))
-                }
             },
             None => ignored.push(test.desc),
         }
@@ -87,14 +83,13 @@ where
     let report = Report {
         passed,
         failed,
-        measured,
         ignored,
         filtered_out: filtered_out_tests
             .into_iter()
             .map(|test| test.desc)
             .collect(),
     };
-    let _ = report.print(&printer);
+    let _ = printer.print_report(&report);
 
     report.status()
 }
