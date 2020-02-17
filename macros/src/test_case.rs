@@ -82,7 +82,7 @@ pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
 
     quote! {
         #vis #fn_token #ident (__suite: &mut #rye_path::_internal::Registry<'_>)
-            -> ::std::result::Result<(), ::rye::_internal::RegistryError> {
+            -> ::std::result::Result<(), #rye_path::_internal::RegistryError> {
             #(#attrs)*
             #asyncness #fn_token #inner_fn_ident() #output #block
             __suite.add_test_case(#rye_path::_internal::TestCase {
