@@ -81,7 +81,8 @@ pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #vis #fn_token #ident (__suite: &mut #rye_path::_internal::TestSuite<'_>) {
+        #vis #fn_token #ident (__suite: &mut #rye_path::_internal::Registry<'_>)
+            -> ::std::result::Result<(), ::rye::_internal::RegistryError> {
             #(#attrs)*
             #asyncness #fn_token #inner_fn_ident() #output #block
             __suite.add_test_case(#rye_path::_internal::TestCase {
@@ -93,7 +94,8 @@ pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
                     leaf_sections: &[ #(#leaf_section_ids),* ],
                 },
                 test_fn: #test_fn,
-            });
+            })?;
+            Ok(())
         }
     }
 }

@@ -8,6 +8,7 @@ mod executor;
 mod exit_status;
 mod outcome;
 mod printer;
+mod registry;
 mod report;
 mod runner;
 mod test_case;
@@ -17,7 +18,8 @@ pub mod _internal {
     pub use crate::{
         executor::{DefaultTestExecutor, TestExecutor},
         exit_status::ExitStatus,
-        runner::{run_tests, TestSuite},
+        registry::{Registry, RegistryError},
+        runner::run_tests,
         test_case::{Section, TestCase, TestDesc, TestFn},
     };
     pub use futures::executor::block_on;

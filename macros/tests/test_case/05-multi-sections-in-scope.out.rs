@@ -1,4 +1,5 @@
-fn multi_section_in_scope(__suite: &mut ::rye::_internal::TestSuite<'_>) {
+fn multi_section_in_scope(__suite: &mut ::rye::_internal::Registry<'_>)
+    -> ::std::result::Result<(), ::rye::_internal::RegistryError> {
     fn __inner__() {
         if ::rye::_internal::is_target(0u64) {
             assert!(1 + 1 == 2);
@@ -36,5 +37,6 @@ fn multi_section_in_scope(__suite: &mut ::rye::_internal::TestSuite<'_>) {
             leaf_sections: &[ 0u64, 3u64, 4u64, 5u64 ],
         },
         test_fn: ::rye::_internal::TestFn::SyncTest(__inner__),
-    });
+    })?;
+    Ok(())
 }

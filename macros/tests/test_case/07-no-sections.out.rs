@@ -1,4 +1,5 @@
-fn no_sections(__suite: &mut ::rye::_internal::TestSuite<'_>) {
+fn no_sections(__suite: &mut ::rye::_internal::Registry<'_>)
+    -> ::std::result::Result<(), ::rye::_internal::RegistryError> {
     fn __inner__() {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
@@ -13,5 +14,6 @@ fn no_sections(__suite: &mut ::rye::_internal::TestSuite<'_>) {
             leaf_sections: &[],
         },
         test_fn: ::rye::_internal::TestFn::SyncTest(__inner__),
-    });
+    })?;
+    Ok(())
 }

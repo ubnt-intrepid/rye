@@ -1,4 +1,5 @@
-fn ignore_inner_items(__suite: &mut ::rye::_internal::TestSuite<'_>) {
+fn ignore_inner_items(__suite: &mut ::rye::_internal::Registry<'_>)
+    -> ::std::result::Result<(), ::rye::_internal::RegistryError> {
     fn __inner__() {
         fn inner() {
             section!("section1", {
@@ -15,5 +16,6 @@ fn ignore_inner_items(__suite: &mut ::rye::_internal::TestSuite<'_>) {
             leaf_sections: &[],
         },
         test_fn: ::rye::_internal::TestFn::SyncTest(__inner__),
-    });
+    })?;
+    Ok(())
 }

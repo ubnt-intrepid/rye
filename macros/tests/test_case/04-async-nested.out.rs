@@ -1,4 +1,5 @@
-fn case_async_nested(__suite: &mut ::rye::_internal::TestSuite<'_>) {
+fn case_async_nested(__suite: &mut ::rye::_internal::Registry<'_>)
+    -> ::std::result::Result<(), ::rye::_internal::RegistryError> {
     async fn __inner__() {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
@@ -34,5 +35,6 @@ fn case_async_nested(__suite: &mut ::rye::_internal::TestSuite<'_>) {
             leaf_sections: &[ 1u64 ],
         },
         test_fn: ::rye::_internal::TestFn::AsyncTest(|| Box::pin(__inner__())),
-    });
+    })?;
+    Ok(())
 }
