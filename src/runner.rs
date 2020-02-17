@@ -6,8 +6,8 @@ use super::{
     outcome::{Outcome, OutcomeKind},
     printer::Printer,
     report::Report,
+    test_case::{TestCase, TestFn},
 };
-use crate::test_case::{TestCase, TestFn};
 use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{
     future::Future,
@@ -17,114 +17,131 @@ use futures::{
 };
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use pin_project::pin_project;
-use std::{collections::HashSet, io::Write, panic::AssertUnwindSafe, pin::Pin};
+use std::{collections::HashSet, io::Write, panic::AssertUnwindSafe, pin::Pin, sync::Once};
 
-pub(crate) struct TestDriver<'a> {
-    args: &'a Args,
-    printer: Printer,
-}
+#[inline]
+pub async fn run_tests<E: ?Sized>(
+    tests: &[&dyn Fn(&mut TestSuite<'_>)],
+    executor: &mut E,
+) -> ExitStatus
+where
+    E: TestExecutor,
+{
+    let args = match Args::from_env() {
+        Ok(args) => args,
+        Err(st) => return st,
+    };
 
-impl<'a> TestDriver<'a> {
-    pub(crate) fn new(args: &'a Args) -> Self {
-        let printer = Printer::new(&args);
-        Self { args, printer }
+    static SET_HOOK: Once = Once::new();
+    SET_HOOK.call_once(|| {
+        maybe_unwind::set_hook();
+    });
+
+    let printer = Printer::new(&args);
+
+    let mut test_cases = vec![];
+    for &test in tests {
+        test(&mut TestSuite {
+            test_cases: &mut test_cases,
+        });
     }
 
-    pub(crate) async fn run_tests<E: ?Sized>(
-        &mut self,
-        test_cases: impl IntoIterator<Item = TestCase>,
-        executor: &mut E,
-    ) -> Result<Report, ExitStatus>
-    where
-        E: TestExecutor,
-    {
-        // First, convert each test case to PendingTest for tracking the running state.
-        // Test cases that satisfy the skip condition are filtered out here.
-        let mut pending_tests = vec![];
-        let mut filtered_out_tests = vec![];
-        let mut unique_test_names = HashSet::new();
-        for test in test_cases {
-            if !unique_test_names.insert(test.desc.name.to_string()) {
-                let _ = writeln!(
-                    self.printer.term(),
-                    "the test name is conflicted: {}",
-                    test.desc.name
-                );
-                return Err(ExitStatus::FAILED);
-            }
-
-            if self.args.is_filtered(test.desc.name) {
-                filtered_out_tests.push(test);
-                continue;
-            }
-
-            // Since PendingTest may contain the immovable state must be pinned
-            // before starting any operations.
-            // Here, each test case is allocated on the heap.
-            pending_tests.push(Box::pin(PendingTest {
-                test_case: test,
-                handle: None,
-                outcome: None,
-                printer: &self.printer,
-                name_length: 0,
-            }));
+    // First, convert each test case to PendingTest for tracking the running state.
+    // Test cases that satisfy the skip condition are filtered out here.
+    let mut pending_tests = vec![];
+    let mut filtered_out_tests = vec![];
+    let mut unique_test_names = HashSet::new();
+    for test in test_cases {
+        if !unique_test_names.insert(test.desc.name.to_string()) {
+            let _ = writeln!(
+                printer.term(),
+                "the test name is conflicted: {}",
+                test.desc.name
+            );
+            return ExitStatus::FAILED;
         }
 
-        if self.args.list {
-            self.printer
-                .print_list(pending_tests.iter().map(|test| &test.test_case.desc));
-            return Err(ExitStatus::OK);
+        if args.is_filtered(test.desc.name) {
+            filtered_out_tests.push(test);
+            continue;
         }
 
-        let _ = writeln!(self.printer.term(), "running {} tests", pending_tests.len());
+        // Since PendingTest may contain the immovable state must be pinned
+        // before starting any operations.
+        // Here, each test case is allocated on the heap.
+        pending_tests.push(Box::pin(PendingTest {
+            test_case: test,
+            handle: None,
+            outcome: None,
+            printer: &printer,
+            name_length: 0,
+        }));
+    }
 
-        let max_name_length = pending_tests
-            .iter()
-            .map(|test| test.test_case.desc.name.len())
-            .max()
-            .unwrap_or(0);
+    if args.list {
+        printer.print_list(pending_tests.iter().map(|test| &test.test_case.desc));
+        return ExitStatus::OK;
+    }
 
-        futures::stream::iter(pending_tests.iter_mut())
-            .for_each_concurrent(None, |pending_test| {
-                pending_test
-                    .as_mut()
-                    .start(&self.args, max_name_length, &mut *executor);
-                pending_test
-            })
-            .await;
+    let _ = writeln!(printer.term(), "running {} tests", pending_tests.len());
 
-        let mut passed = vec![];
-        let mut failed = vec![];
-        let mut measured = vec![];
-        let mut ignored = vec![];
-        for test in &pending_tests {
-            match test.outcome {
-                Some(ref outcome) => match outcome.kind() {
-                    OutcomeKind::Passed => passed.push(test.test_case.desc.clone()),
-                    OutcomeKind::Failed => {
-                        failed.push((test.test_case.desc.clone(), outcome.err_msg()))
-                    }
-                    OutcomeKind::Measured { average, variance } => {
-                        measured.push((test.test_case.desc.clone(), (*average, *variance)))
-                    }
-                },
-                None => ignored.push(test.test_case.desc.clone()),
-            }
+    let max_name_length = pending_tests
+        .iter()
+        .map(|test| test.test_case.desc.name.len())
+        .max()
+        .unwrap_or(0);
+
+    futures::stream::iter(pending_tests.iter_mut())
+        .for_each_concurrent(None, |pending_test| {
+            pending_test
+                .as_mut()
+                .start(&args, max_name_length, &mut *executor);
+            pending_test
+        })
+        .await;
+
+    let mut passed = vec![];
+    let mut failed = vec![];
+    let mut measured = vec![];
+    let mut ignored = vec![];
+    for test in &pending_tests {
+        match test.outcome {
+            Some(ref outcome) => match outcome.kind() {
+                OutcomeKind::Passed => passed.push(test.test_case.desc.clone()),
+                OutcomeKind::Failed => {
+                    failed.push((test.test_case.desc.clone(), outcome.err_msg()))
+                }
+                OutcomeKind::Measured { average, variance } => {
+                    measured.push((test.test_case.desc.clone(), (*average, *variance)))
+                }
+            },
+            None => ignored.push(test.test_case.desc.clone()),
         }
+    }
 
-        let report = Report {
-            passed,
-            failed,
-            measured,
-            ignored,
-            filtered_out: filtered_out_tests
-                .into_iter()
-                .map(|test| test.desc)
-                .collect(),
-        };
-        let _ = report.print(&self.printer);
+    let report = Report {
+        passed,
+        failed,
+        measured,
+        ignored,
+        filtered_out: filtered_out_tests
+            .into_iter()
+            .map(|test| test.desc)
+            .collect(),
+    };
+    let _ = report.print(&printer);
 
-        Ok(report)
+    report.status()
+}
+
+pub struct TestSuite<'a> {
+    pub(crate) test_cases: &'a mut Vec<TestCase>,
+}
+
+impl TestSuite<'_> {
+    #[doc(hidden)] // private API
+    pub fn add_test_case(&mut self, test_case: TestCase) {
+        self.test_cases.push(test_case);
     }
 }
 
