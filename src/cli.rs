@@ -90,6 +90,20 @@ impl Parser {
             "auto|always|never",
         );
 
+        // The following options and flags are reserved for keeping the compatibility with
+        // the built-in test harness.
+        opts.optflag("", "ignored", "");
+        opts.optflag("", "test", "");
+        opts.optflag("", "bench", "");
+        opts.optflag("", "nocapture", "");
+        opts.optflag("q", "quiet", "");
+        opts.optflag("", "exact", "");
+        opts.optopt("", "logfile", "", "PATH");
+        opts.optopt("", "test-threads", "", "n_threads");
+        opts.optopt("", "skip", "", "FILTER");
+        opts.optopt("", "format", "", "");
+        opts.optopt("Z", "", "", "unstable-options");
+
         Self {
             args: std::env::args().collect(),
             opts,
