@@ -1,6 +1,6 @@
 fn main() {}
 
-#[rye::test_case]
+#[rye::test]
 fn section_in_loop() {
     loop {
         section!("section", {
@@ -9,7 +9,7 @@ fn section_in_loop() {
     }
 }
 
-#[rye::test_case]
+#[rye::test]
 fn section_in_for_loop() {
     for _ in 0..10 {
         section!("section", {
@@ -18,7 +18,7 @@ fn section_in_for_loop() {
     }
 }
 
-#[rye::test_case]
+#[rye::test]
 fn section_in_while_loop() {
     while false {
         section!("section", {

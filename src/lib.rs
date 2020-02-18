@@ -7,7 +7,7 @@ mod executor;
 mod registry;
 mod report;
 mod runner;
-mod test_case;
+mod test;
 
 #[doc(hidden)]
 pub mod _internal {
@@ -16,13 +16,13 @@ pub mod _internal {
         executor::{DefaultTestExecutor, TestExecutor},
         registry::{Registry, RegistryError},
         runner::run_tests,
-        test_case::{Section, TestCase, TestDesc, TestFn},
+        test::{Section, Test, TestDesc, TestFn},
     };
     pub use futures::executor::block_on;
     pub use maplit::{hashmap, hashset};
     pub use std::module_path;
 
-    use crate::{executor::TestContext, test_case::SectionId};
+    use crate::{executor::TestContext, test::SectionId};
 
     #[inline]
     pub fn is_target(id: SectionId) -> bool {
@@ -43,5 +43,5 @@ pub mod _internal {
     }
 }
 
-/// Generate a test case.
-pub use rye_macros::test_case;
+/// Declare a single test.
+pub use rye_macros::test;

@@ -21,7 +21,7 @@ fn multi_section_in_scope(__suite: &mut ::rye::_internal::Registry<'_>)
             assert!(false);
         }
     }
-    __suite.add_test_case(::rye::_internal::TestCase {
+    __suite.add_test(::rye::_internal::Test {
         desc: ::rye::_internal::TestDesc {
             name: "multi_section_in_scope",
             module_path: ::rye::_internal::module_path!(),

@@ -1,4 +1,4 @@
-use crate::{cli::Args, test_case::TestCase};
+use crate::{cli::Args, test::Test};
 use std::collections::HashSet;
 
 pub struct RegistryError(());
@@ -10,14 +10,14 @@ pub struct Registry<'a> {
 
 #[derive(Default)]
 struct RegistryInner {
-    pending_tests: Vec<TestCase>,
-    filtered_out_tests: Vec<TestCase>,
+    pending_tests: Vec<Test>,
+    filtered_out_tests: Vec<Test>,
     unique_test_names: HashSet<String>,
 }
 
 impl Registry<'_> {
     #[doc(hidden)] // private API
-    pub fn add_test_case(&mut self, test: TestCase) -> Result<(), RegistryError> {
+    pub fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
         if !self
             .inner
             .unique_test_names
@@ -40,7 +40,7 @@ impl Registry<'_> {
 pub(crate) fn register_all(
     tests: &[&dyn Fn(&mut Registry<'_>) -> Result<(), RegistryError>],
     args: &Args,
-) -> Result<(Vec<TestCase>, Vec<TestCase>), RegistryError> {
+) -> Result<(Vec<Test>, Vec<Test>), RegistryError> {
     let mut inner = RegistryInner::default();
     for test in tests {
         test(&mut Registry {

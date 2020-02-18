@@ -19,7 +19,7 @@ macro_rules! parse {
     };
 }
 
-pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse!(args as Args);
     let mut item = parse!(item as ItemFn);
 
@@ -80,7 +80,7 @@ pub(crate) fn test_case(args: TokenStream, item: TokenStream) -> TokenStream {
             -> ::std::result::Result<(), #rye_path::_internal::RegistryError> {
             #(#attrs)*
             #asyncness #fn_token #inner_fn_ident() #output #block
-            __suite.add_test_case(#rye_path::_internal::TestCase {
+            __suite.add_test(#rye_path::_internal::Test {
                 desc: #rye_path::_internal::TestDesc {
                     name: #test_name,
                     module_path: #rye_path::_internal::module_path!(),
@@ -332,9 +332,9 @@ mod tests {
 
     fn test_expanded(name: &str) {
         let args = TokenStream::new();
-        let item = read_file(format!("tests/test_case/{}.in.rs", name));
-        let expected = read_file(format!("tests/test_case/{}.out.rs", name));
-        let output = test_case(args, item);
+        let item = read_file(format!("tests/test/{}.in.rs", name));
+        let expected = read_file(format!("tests/test/{}.out.rs", name));
+        let output = test(args, item);
         assert_eq!(expected.to_string(), output.to_string());
     }
 

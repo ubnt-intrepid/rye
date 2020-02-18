@@ -2,7 +2,7 @@ use futures::future::BoxFuture;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
-pub struct TestCase {
+pub struct Test {
     pub desc: TestDesc,
     pub test_fn: TestFn,
 }

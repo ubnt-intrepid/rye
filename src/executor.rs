@@ -1,6 +1,6 @@
 use crate::{
     report::Outcome,
-    test_case::{SectionId, TestCase, TestDesc, TestFn},
+    test::{SectionId, Test, TestDesc, TestFn},
 };
 use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{
@@ -70,7 +70,7 @@ impl TestExecutor for DefaultTestExecutor {
     }
 }
 
-pub(crate) fn start_test<E: ?Sized>(test_case: &TestCase, executor: &mut E) -> E::Handle
+pub(crate) fn start_test<E: ?Sized>(test_case: &Test, executor: &mut E) -> E::Handle
 where
     E: TestExecutor,
 {

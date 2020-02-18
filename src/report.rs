@@ -1,6 +1,6 @@
 use crate::{
     cli::{Args, ColorConfig, ExitStatus},
-    test_case::TestDesc,
+    test::TestDesc,
 };
 use console::{Style, StyledObject, Term};
 use std::{

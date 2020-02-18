@@ -1,6 +1,6 @@
 fn main() {}
 
-#[rye::test_case]
+#[rye::test]
 fn nested() {
     let mut vec = vec![0usize; 5];
 
@@ -22,7 +22,7 @@ fn nested() {
     });
 }
 
-#[rye::test_case]
+#[rye::test]
 async fn case_async() {
     let mut vec = vec![0usize; 5];
 

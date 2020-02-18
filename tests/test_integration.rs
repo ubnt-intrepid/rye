@@ -1,4 +1,4 @@
-#[rye::test_case]
+#[rye::test]
 fn case_sync() {
     let mut vec = vec![0usize; 5];
 
@@ -13,7 +13,7 @@ fn case_sync() {
     });
 }
 
-#[rye::test_case]
+#[rye::test]
 fn nested() {
     let mut vec = vec![0usize; 5];
 
@@ -35,7 +35,7 @@ fn nested() {
     });
 }
 
-#[rye::test_case]
+#[rye::test]
 async fn case_async() {
     let mut vec = vec![0usize; 5];
 
@@ -51,7 +51,7 @@ async fn case_async() {
 }
 
 mod sub {
-    #[rye::test_case]
+    #[rye::test]
     pub fn sub_test() {
         let mut vec = vec![0usize; 5];
 
@@ -68,7 +68,7 @@ mod sub {
 
     use rye as catcher_in_the_rye;
 
-    #[rye::test_case(rye_path = "catcher_in_the_rye")]
+    #[rye::test(rye_path = "catcher_in_the_rye")]
     pub fn modified_rye_path() {
         let mut vec = vec![0usize; 5];
 

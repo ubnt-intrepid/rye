@@ -2,8 +2,7 @@ use super::{
     cli::{Args, ExitStatus},
     executor::TestExecutor,
     registry::{register_all, Registry, RegistryError},
-    report::Report,
-    report::{OutcomeKind, Printer},
+    report::{OutcomeKind, Printer, Report},
 };
 use futures::stream::StreamExt as _;
 use std::{io::Write, sync::Once};

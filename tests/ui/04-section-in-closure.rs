@@ -1,6 +1,6 @@
 fn main() {}
 
-#[rye::test_case]
+#[rye::test]
 fn section_in_closure() {
     std::convert::identity(|| {
         section!("section", {

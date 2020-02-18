@@ -1,17 +1,17 @@
 fn main() {}
 
-#[rye::test_case]
+#[rye::test]
 fn one_section() {
     section!();
 }
 
-#[rye::test_case]
+#[rye::test]
 fn multi_sections() {
     section!();
     section!();
 }
 
-#[rye::test_case]
+#[rye::test]
 fn nested_sections() {
     section!("a", {
         section!();
