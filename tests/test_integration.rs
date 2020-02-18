@@ -88,6 +88,5 @@ rye::test_main! {
     case_sync,
     nested,
     case_async,
-    sub::sub_test,
-    sub::modified_rye_path,
+    sub::{sub_test, modified_rye_path},
 }

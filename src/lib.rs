@@ -37,20 +37,10 @@ pub mod _internal {
             Some(module) => Cow::Owned(format!("{}::{}", module, title)),
         }
     }
-
-    #[macro_export]
-    macro_rules! test_main {
-        ($($test_case:path),*$(,)?) => {
-            fn main() {
-                let mut executor = $crate::_internal::DefaultTestExecutor::new().unwrap();
-                let status = $crate::_internal::block_on(
-                    $crate::_internal::run_tests(&[$(&$test_case),*], &mut executor)
-                );
-                status.exit();
-            }
-        };
-    }
 }
 
 /// Declare a single test.
 pub use rye_macros::test;
+
+/// Generate a main function.
+pub use rye_macros::test_main;
