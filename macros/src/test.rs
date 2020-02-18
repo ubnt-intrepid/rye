@@ -70,25 +70,25 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let test_fn: syn::Expr = if asyncness.is_some() {
-        syn::parse_quote!(#rye_path::_internal::TestFn::AsyncTest(|| Box::pin(#inner_fn_ident())))
+        syn::parse_quote!(#rye_path::_internal::TestFn::AsyncTest(|| ::rye::_internal::Box::pin(#inner_fn_ident())))
     } else {
         syn::parse_quote!(#rye_path::_internal::TestFn::SyncTest(#inner_fn_ident))
     };
 
     quote! {
         #vis #fn_token #ident (__suite: &mut #rye_path::_internal::Registry<'_>)
-            -> ::std::result::Result<(), #rye_path::_internal::RegistryError> {
+            -> ::rye::_internal::Result<(), #rye_path::_internal::RegistryError> {
             #(#attrs)*
             #asyncness #fn_token #inner_fn_ident() #output #block
             __suite.add_test(#rye_path::_internal::Test {
                 desc: #rye_path::_internal::TestDesc {
                     name: #rye_path::_internal::test_name(#rye_path::_internal::module_path!(), #test_name),
                     sections: #rye_path::_internal::hashmap! { #(#section_map_entries,)* },
-                    leaf_sections: &[ #(#leaf_section_ids),* ],
+                    leaf_sections: #rye_path::_internal::vec![ #(#leaf_section_ids),* ],
                 },
                 test_fn: #test_fn,
             })?;
-            Ok(())
+            #rye_path::_internal::Result::Ok(())
         }
     }
 }

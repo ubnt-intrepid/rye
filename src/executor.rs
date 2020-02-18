@@ -80,10 +80,18 @@ where
             let res = expected(|| {
                 maybe_unwind(AssertUnwindSafe(|| {
                     if desc.leaf_sections.is_empty() {
-                        TestContext::new(&desc, None).scope(&f);
+                        TestContext {
+                            desc: &desc,
+                            section: None,
+                        }
+                        .scope(&f);
                     } else {
-                        for &section in desc.leaf_sections {
-                            TestContext::new(&desc, Some(section)).scope(&f);
+                        for &section in &desc.leaf_sections {
+                            TestContext {
+                                desc: &desc,
+                                section: Some(section),
+                            }
+                            .scope(&f);
                         }
                     }
                 }))
@@ -93,12 +101,20 @@ where
         TestFn::AsyncTest(f) => executor.execute(async move {
             let res = AssertUnwindSafe(async move {
                 if desc.leaf_sections.is_empty() {
-                    TestContext::new(&desc, None).scope_async(f()).await;
+                    TestContext {
+                        desc: &desc,
+                        section: None,
+                    }
+                    .scope_async(f())
+                    .await;
                 } else {
-                    for &section in desc.leaf_sections {
-                        TestContext::new(&desc, Some(section))
-                            .scope_async(f())
-                            .await;
+                    for &section in &desc.leaf_sections {
+                        TestContext {
+                            desc: &desc,
+                            section: Some(section),
+                        }
+                        .scope_async(f())
+                        .await;
                     }
                 }
             })
@@ -144,11 +160,7 @@ impl Drop for Guard {
 }
 
 impl<'a> TestContext<'a> {
-    pub(crate) fn new(desc: &'a TestDesc, section: Option<SectionId>) -> Self {
-        Self { desc, section }
-    }
-
-    pub(crate) fn scope<F, R>(&mut self, f: F) -> R
+    fn scope<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce() -> R,
     {
@@ -160,7 +172,8 @@ impl<'a> TestContext<'a> {
         f()
     }
 
-    pub(crate) async fn scope_async<Fut>(&mut self, fut: Fut) -> Fut::Output
+    #[inline]
+    async fn scope_async<Fut>(&mut self, fut: Fut) -> Fut::Output
     where
         Fut: Future,
     {

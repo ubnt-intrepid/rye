@@ -1,5 +1,5 @@
 fn ignore_inner_items(__suite: &mut ::rye::_internal::Registry<'_>)
-    -> ::std::result::Result<(), ::rye::_internal::RegistryError> {
+    -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
     fn __inner__() {
         fn inner() {
             section!("section1", {
@@ -11,9 +11,9 @@ fn ignore_inner_items(__suite: &mut ::rye::_internal::Registry<'_>)
         desc: ::rye::_internal::TestDesc {
             name: ::rye::_internal::test_name(::rye::_internal::module_path!(), "ignore_inner_items"),
             sections: ::rye::_internal::hashmap! {},
-            leaf_sections: &[],
+            leaf_sections: ::rye::_internal::vec![],
         },
         test_fn: ::rye::_internal::TestFn::SyncTest(__inner__),
     })?;
-    Ok(())
+    ::rye::_internal::Result::Ok(())
 }

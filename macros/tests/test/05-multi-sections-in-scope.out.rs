@@ -1,5 +1,5 @@
 fn multi_section_in_scope(__suite: &mut ::rye::_internal::Registry<'_>)
-    -> ::std::result::Result<(), ::rye::_internal::RegistryError> {
+    -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
     fn __inner__() {
         if ::rye::_internal::is_target(0u64) {
             assert!(1 + 1 == 2);
@@ -32,9 +32,9 @@ fn multi_section_in_scope(__suite: &mut ::rye::_internal::Registry<'_>)
                 4u64 => ::rye::_internal::Section { name: "section2-2"   , ancestors: ::rye::_internal::hashset!(1u64)       , },
                 5u64 => ::rye::_internal::Section { name: "section3"     , ancestors: ::rye::_internal::hashset!()           , },
             },
-            leaf_sections: &[ 0u64, 3u64, 4u64, 5u64 ],
+            leaf_sections: ::rye::_internal::vec![ 0u64, 3u64, 4u64, 5u64 ],
         },
         test_fn: ::rye::_internal::TestFn::SyncTest(__inner__),
     })?;
-    Ok(())
+    ::rye::_internal::Result::Ok(())
 }

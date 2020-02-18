@@ -1,5 +1,5 @@
 fn case_sync(__suite: &mut ::rye::_internal::Registry<'_>)
-    -> ::std::result::Result<(), ::rye::_internal::RegistryError> {
+    -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
     fn __inner__() {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
@@ -20,9 +20,9 @@ fn case_sync(__suite: &mut ::rye::_internal::Registry<'_>)
                     ancestors: ::rye::_internal::hashset!(),
                 },
             },
-            leaf_sections: &[ 0u64 ],
+            leaf_sections: ::rye::_internal::vec![ 0u64 ],
         },
         test_fn: ::rye::_internal::TestFn::SyncTest(__inner__),
     })?;
-    Ok(())
+    ::rye::_internal::Result::Ok(())
 }

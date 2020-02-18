@@ -20,7 +20,7 @@ pub mod _internal {
     };
     pub use futures::executor::block_on;
     pub use maplit::{hashmap, hashset};
-    pub use std::module_path;
+    pub use std::{boxed::Box, module_path, result::Result, vec};
 
     use crate::{executor::TestContext, test::SectionId};
     use std::borrow::Cow;
