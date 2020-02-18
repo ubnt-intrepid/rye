@@ -13,8 +13,7 @@ fn case_sync(__suite: &mut ::rye::_internal::Registry<'_>)
     }
     __suite.add_test(::rye::_internal::Test {
         desc: ::rye::_internal::TestDesc {
-            name: "case_sync",
-            module_path: ::rye::_internal::module_path!(),
+            name: ::rye::_internal::test_name(::rye::_internal::module_path!(), "case_sync"),
             sections: ::rye::_internal::hashmap! {
                 0u64 => ::rye::_internal::Section {
                     name: "resizing bigger changes size and capacity",

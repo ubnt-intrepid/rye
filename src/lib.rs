@@ -23,10 +23,19 @@ pub mod _internal {
     pub use std::module_path;
 
     use crate::{executor::TestContext, test::SectionId};
+    use std::borrow::Cow;
 
     #[inline]
     pub fn is_target(id: SectionId) -> bool {
         TestContext::with(|ctx| ctx.is_target_section(id))
+    }
+
+    #[inline]
+    pub fn test_name(module_path: &'static str, title: &'static str) -> Cow<'static, str> {
+        match module_path.splitn(2, "::").nth(1) {
+            Some("") | None => Cow::Borrowed(title),
+            Some(module) => Cow::Owned(format!("{}::{}", module, title)),
+        }
     }
 
     #[macro_export]

@@ -9,8 +9,7 @@ fn ignore_inner_items(__suite: &mut ::rye::_internal::Registry<'_>)
     }
     __suite.add_test(::rye::_internal::Test {
         desc: ::rye::_internal::TestDesc {
-            name: "ignore_inner_items",
-            module_path: ::rye::_internal::module_path!(),
+            name: ::rye::_internal::test_name(::rye::_internal::module_path!(), "ignore_inner_items"),
             sections: ::rye::_internal::hashmap! {},
             leaf_sections: &[],
         },

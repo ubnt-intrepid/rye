@@ -1,5 +1,8 @@
 use futures::future::BoxFuture;
-use std::collections::{HashMap, HashSet};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 
 #[derive(Debug)]
 pub struct Test {
@@ -16,8 +19,7 @@ pub enum TestFn {
 /// Description about a test case.
 #[derive(Debug, Clone)]
 pub struct TestDesc {
-    pub name: &'static str,
-    pub module_path: &'static str,
+    pub name: Cow<'static, str>,
     pub sections: HashMap<SectionId, Section>,
     pub leaf_sections: &'static [SectionId],
 }

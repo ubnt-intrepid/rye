@@ -27,7 +27,7 @@ impl Registry<'_> {
             return Err(RegistryError(()));
         }
 
-        if self.args.is_match(test.desc.name) {
+        if self.args.is_match(&*test.desc.name) {
             self.inner.pending_tests.push(test);
         } else {
             self.inner.filtered_out_tests.push(test);

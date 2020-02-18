@@ -7,8 +7,7 @@ fn no_sections(__suite: &mut ::rye::_internal::Registry<'_>)
     }
     __suite.add_test(::rye::_internal::Test {
         desc: ::rye::_internal::TestDesc {
-            name: "no_sections",
-            module_path: ::rye::_internal::module_path!(),
+            name: ::rye::_internal::test_name(::rye::_internal::module_path!(), "no_sections"),
             sections: ::rye::_internal::hashmap! {},
             leaf_sections: &[],
         },

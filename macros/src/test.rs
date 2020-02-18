@@ -82,8 +82,7 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
             #asyncness #fn_token #inner_fn_ident() #output #block
             __suite.add_test(#rye_path::_internal::Test {
                 desc: #rye_path::_internal::TestDesc {
-                    name: #test_name,
-                    module_path: #rye_path::_internal::module_path!(),
+                    name: #rye_path::_internal::test_name(#rye_path::_internal::module_path!(), #test_name),
                     sections: #rye_path::_internal::hashmap! { #(#section_map_entries,)* },
                     leaf_sections: &[ #(#leaf_section_ids),* ],
                 },
