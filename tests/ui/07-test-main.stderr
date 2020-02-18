@@ -1,41 +1,11 @@
 error: glob pattern is forbidden
- --> $DIR/07-test-main.rs:8:9
+ --> $DIR/07-test-main.rs:5:5
   |
-8 |         *,
-  |         ^
+5 |     *,
+  |     ^
 
 error: rename pattern is forbidden
- --> $DIR/07-test-main.rs:9:9
+ --> $DIR/07-test-main.rs:6:5
   |
-9 |         foo as bar,
-  |         ^^^^^^^^^^
-
-error[E0433]: failed to resolve: use of undeclared type or module `b`
-  --> $DIR/07-test-main.rs:16:9
-   |
-16 |         b::c,
-   |         ^ use of undeclared type or module `b`
-
-error[E0433]: failed to resolve: use of undeclared type or module `f`
-  --> $DIR/07-test-main.rs:18:9
-   |
-18 |         f::g::{h, i},
-   |         ^ use of undeclared type or module `f`
-
-error[E0425]: cannot find value `a` in this scope
-  --> $DIR/07-test-main.rs:15:9
-   |
-15 |         a,
-   |         ^ not found in this scope
-
-error[E0425]: cannot find value `d` in this scope
-  --> $DIR/07-test-main.rs:17:10
-   |
-17 |         {d, e},
-   |          ^ not found in this scope
-
-error[E0425]: cannot find value `e` in this scope
-  --> $DIR/07-test-main.rs:17:13
-   |
-17 |         {d, e},
-   |             ^ not found in this scope
+6 |     foo as bar,
+  |     ^^^^^^^^^^
