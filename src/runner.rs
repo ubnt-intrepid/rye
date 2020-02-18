@@ -1,17 +1,14 @@
 use super::{
     cli::{Args, ExitStatus},
     executor::TestExecutor,
-    registry::{register_all, Registry, RegistryError},
+    registry::{register_all, Registration},
     report::{OutcomeKind, Printer, Report},
 };
 use futures::stream::StreamExt as _;
 use std::{io::Write, sync::Once};
 
 #[inline]
-pub async fn run_tests<E: ?Sized>(
-    tests: &[&dyn Fn(&mut Registry<'_>) -> Result<(), RegistryError>],
-    executor: &mut E,
-) -> ExitStatus
+pub async fn run_tests<E: ?Sized>(tests: &[&dyn Registration], executor: &mut E) -> ExitStatus
 where
     E: TestExecutor,
 {
@@ -40,7 +37,7 @@ where
     let _ = writeln!(printer.term(), "running {} tests", pending_tests.len());
     let name_length = pending_tests
         .iter()
-        .map(|test| test.desc.name.len())
+        .map(|test| test.desc.test_name().len())
         .max()
         .unwrap_or(0);
 

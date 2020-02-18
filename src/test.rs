@@ -1,8 +1,5 @@
 use futures::future::BoxFuture;
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 
 /// Data about a single test case.
 #[derive(Debug)]
@@ -15,13 +12,23 @@ pub struct Test {
 #[derive(Debug, Clone)]
 pub struct TestDesc {
     /// The name of the test.
-    pub name: Cow<'static, str>,
+    pub module_path: &'static str,
 
     /// A collection of sections described in the test.
     pub sections: HashMap<SectionId, Section>,
 
     /// A collection of section IDs to be run.
     pub leaf_sections: Vec<SectionId>,
+}
+
+impl TestDesc {
+    #[inline]
+    pub fn test_name(&self) -> &'static str {
+        self.module_path
+            .splitn(2, "::")
+            .nth(1)
+            .unwrap_or("<unknown>")
+    }
 }
 
 pub(crate) type SectionId = u64;

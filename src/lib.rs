@@ -14,7 +14,7 @@ pub mod _internal {
     pub use crate::{
         cli::ExitStatus,
         executor::{DefaultTestExecutor, TestExecutor},
-        registry::{Registry, RegistryError},
+        registry::{Registration, Registry, RegistryError},
         runner::run_tests,
         test::{Section, Test, TestDesc, TestFn},
     };
@@ -23,19 +23,10 @@ pub mod _internal {
     pub use std::{boxed::Box, module_path, result::Result, vec};
 
     use crate::{executor::TestContext, test::SectionId};
-    use std::borrow::Cow;
 
     #[inline]
     pub fn is_target(id: SectionId) -> bool {
         TestContext::with(|ctx| ctx.is_target_section(id))
-    }
-
-    #[inline]
-    pub fn test_name(module_path: &'static str, title: &'static str) -> Cow<'static, str> {
-        match module_path.splitn(2, "::").nth(1) {
-            Some("") | None => Cow::Borrowed(title),
-            Some(module) => Cow::Owned(format!("{}::{}", module, title)),
-        }
     }
 }
 
@@ -44,3 +35,11 @@ pub use rye_macros::test;
 
 /// Generate a main function.
 pub use rye_macros::test_main;
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __annotate_test_case {
+    ($item:item) => {
+        $item
+    };
+}

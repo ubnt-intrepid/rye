@@ -1,4 +1,4 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
     parse::{Error, Parse, ParseStream, Result},
@@ -79,8 +79,14 @@ fn expand_use_tree(
 ) {
     match tree {
         UseTree::Name(UseName { ident }) => {
-            let path: Punctuated<&Ident, Token![::]> =
-                ancestors.iter().copied().chain(Some(ident)).collect();
+            #[allow(nonstandard_style)]
+            let __REGISTRATION = syn::Ident::new("__REGISTRATION", Span::call_site());
+            let path: Punctuated<&Ident, Token![::]> = ancestors
+                .iter()
+                .copied()
+                .chain(Some(ident))
+                .chain(Some(&__REGISTRATION))
+                .collect();
             paths.push(syn::parse_quote!(#path));
         }
         UseTree::Path(UsePath { ident, tree, .. }) => {

@@ -122,7 +122,7 @@ impl Printer {
         for test in tests {
             let desc = &*test;
             num_tests += 1;
-            writeln!(&self.term, "{}: test", desc.name)?;
+            writeln!(&self.term, "{}: test", desc.test_name())?;
         }
 
         fn plural_suffix(n: usize) -> &'static str {
@@ -153,7 +153,9 @@ impl Printer {
         writeln!(
             &self.term,
             "test {0:<1$} ... {2}",
-            desc.name, name_length, result
+            desc.test_name(),
+            name_length,
+            result
         )?;
         self.term.flush()
     }
@@ -166,7 +168,7 @@ impl Printer {
             writeln!(self.term())?;
             writeln!(self.term(), "failures:")?;
             for (desc, msg) in &report.failed {
-                writeln!(self.term(), "---- {} ----", desc.name)?;
+                writeln!(self.term(), "---- {} ----", desc.test_name())?;
                 if let Some(msg) = msg {
                     write!(self.term(), "{}", msg)?;
                     if msg.chars().last().map_or(true, |c| c != '\n') {
@@ -178,7 +180,7 @@ impl Printer {
             writeln!(self.term())?;
             writeln!(self.term(), "failures:")?;
             for (desc, _) in &report.failed {
-                writeln!(self.term(), "    {}", desc.name)?;
+                writeln!(self.term(), "    {}", desc.test_name())?;
             }
         }
 
