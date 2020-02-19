@@ -10,6 +10,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/ubnt-intrepid/rye.git"
 readme = "README.md"
 
+[features]
+frameworks = []
+
 [dependencies]
 rye-macros = { version = "=0.0.1", path = "./macros" }
 futures = "0.3"
@@ -31,6 +34,11 @@ default-features = false
 name = "test_integration"
 path = "tests/test_integration.rs"
 harness = false
+
+[[test]]
+name = "test_frameworks"
+path = "tests/test_frameworks.rs"
+required-features = [ "frameworks" ]
 
 [workspace]
 members = [

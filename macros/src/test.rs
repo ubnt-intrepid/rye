@@ -396,7 +396,8 @@ impl ToTokens for Generated<'_> {
             pub(crate) mod #ident {
                 use super::*;
 
-                pub(crate) struct __registration(());
+                #[doc(hidden)]
+                pub struct __registration(());
 
                 impl #rye_path::_internal::Registration for __registration {
                     fn register(&self, __registry: &mut dyn #rye_path::_internal::Registry) -> #rye_path::_internal::Result<(), #rye_path::_internal::RegistryError> {

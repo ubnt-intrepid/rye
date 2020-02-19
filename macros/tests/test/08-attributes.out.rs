@@ -8,7 +8,8 @@ fn attributes() {
 pub(crate) mod attributes {
     use super::*;
 
-    pub(crate) struct __registration(());
+    #[doc(hidden)]
+    pub struct __registration(());
 
     impl path::to::rye::_internal::Registration for __registration {
         fn register(&self, __registry: &mut dyn path::to::rye::_internal::Registry) -> path::to::rye::_internal::Result<(), path::to::rye::_internal::RegistryError> {
