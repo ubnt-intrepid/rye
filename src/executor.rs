@@ -19,6 +19,7 @@ pub trait TestExecutor {
     fn execute<Fut>(&mut self, fut: Fut) -> Self::Handle
     where
         Fut: Future<Output = Outcome> + Send + 'static;
+
     fn execute_blocking<F>(&mut self, f: F) -> Self::Handle
     where
         F: FnOnce() -> Outcome + Send + 'static;
@@ -70,27 +71,28 @@ impl TestExecutor for DefaultTestExecutor {
     }
 }
 
-pub(crate) fn start_test<E: ?Sized>(test_case: &Test, executor: &mut E) -> E::Handle
-where
-    E: TestExecutor,
-{
-    let desc = test_case.desc.clone();
-    match test_case.test_fn {
-        TestFn::SyncTest(f) => executor.execute_blocking(move || {
-            let res = expected(|| maybe_unwind(AssertUnwindSafe(|| run_sync(&desc, f))));
-            make_outcome(res)
-        }),
-        TestFn::AsyncTest(f) => executor.execute(async move {
-            let res = AssertUnwindSafe(async move {
-                run_async(&desc, f).await;
-            })
-            .maybe_unwind()
-            .expected()
-            .await;
-            make_outcome(res)
-        }),
+pub(crate) trait TestExecutorExt: TestExecutor {
+    fn execute_test_case(&mut self, test_case: &Test) -> Self::Handle {
+        let desc = test_case.desc.clone();
+        match test_case.test_fn {
+            TestFn::SyncTest(f) => self.execute_blocking(move || {
+                let res = expected(|| maybe_unwind(AssertUnwindSafe(|| run_sync(&desc, f))));
+                make_outcome(res)
+            }),
+            TestFn::AsyncTest(f) => self.execute(async move {
+                let res = AssertUnwindSafe(async move {
+                    run_async(&desc, f).await;
+                })
+                .maybe_unwind()
+                .expected()
+                .await;
+                make_outcome(res)
+            }),
+        }
     }
 }
+
+impl<E: TestExecutor + ?Sized> TestExecutorExt for E {}
 
 fn make_outcome(res: (Result<(), Unwind>, Option<Disappoints>)) -> Outcome {
     match res {

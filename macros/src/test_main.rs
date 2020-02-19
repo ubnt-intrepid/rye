@@ -39,11 +39,7 @@ pub(crate) fn test_main(input: TokenStream) -> TokenStream {
     let paths = try_parse!(extract_test_cases(&input));
     quote! {
         fn main() {
-            let mut executor = ::rye::_internal::DefaultTestExecutor::new().unwrap();
-            let status = ::rye::_internal::block_on(
-                ::rye::_internal::run_tests(&[#( & #paths ),*], &mut executor)
-            );
-            status.exit();
+            ::rye::_internal::default_runner(&[#( & #paths ),*]);
         }
     }
 }
