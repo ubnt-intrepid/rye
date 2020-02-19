@@ -77,46 +77,12 @@ where
     let desc = test_case.desc.clone();
     match test_case.test_fn {
         TestFn::SyncTest(f) => executor.execute_blocking(move || {
-            let res = expected(|| {
-                maybe_unwind(AssertUnwindSafe(|| {
-                    if desc.leaf_sections.is_empty() {
-                        TestContext {
-                            desc: &desc,
-                            section: None,
-                        }
-                        .scope(&f);
-                    } else {
-                        for &section in &desc.leaf_sections {
-                            TestContext {
-                                desc: &desc,
-                                section: Some(section),
-                            }
-                            .scope(&f);
-                        }
-                    }
-                }))
-            });
+            let res = expected(|| maybe_unwind(AssertUnwindSafe(|| run_sync(&desc, f))));
             make_outcome(res)
         }),
         TestFn::AsyncTest(f) => executor.execute(async move {
             let res = AssertUnwindSafe(async move {
-                if desc.leaf_sections.is_empty() {
-                    TestContext {
-                        desc: &desc,
-                        section: None,
-                    }
-                    .scope_async(f())
-                    .await;
-                } else {
-                    for &section in &desc.leaf_sections {
-                        TestContext {
-                            desc: &desc,
-                            section: Some(section),
-                        }
-                        .scope_async(f())
-                        .await;
-                    }
-                }
+                run_async(&desc, f).await;
             })
             .maybe_unwind()
             .expected()
@@ -138,6 +104,44 @@ fn make_outcome(res: (Result<(), Unwind>, Option<Disappoints>)) -> Outcome {
                 let _ = writeln!(&mut msg, "{}", disappoints);
             }
             Outcome::failed().error_message(msg)
+        }
+    }
+}
+
+fn run_sync(desc: &TestDesc, f: fn()) {
+    if desc.leaf_sections.is_empty() {
+        TestContext {
+            desc: &desc,
+            section: None,
+        }
+        .scope(&f);
+    } else {
+        for &section in &desc.leaf_sections {
+            TestContext {
+                desc: &desc,
+                section: Some(section),
+            }
+            .scope(&f);
+        }
+    }
+}
+
+async fn run_async(desc: &TestDesc, f: fn() -> BoxFuture<'static, ()>) {
+    if desc.leaf_sections.is_empty() {
+        TestContext {
+            desc: &desc,
+            section: None,
+        }
+        .scope_async(f())
+        .await;
+    } else {
+        for &section in &desc.leaf_sections {
+            TestContext {
+                desc: &desc,
+                section: Some(section),
+            }
+            .scope_async(f())
+            .await;
         }
     }
 }
@@ -232,4 +236,283 @@ impl<'a> TestContext<'a> {
 #[derive(Debug)]
 pub(crate) struct AccessError {
     _p: (),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::{Registration, Registry, RegistryError};
+    use scoped_tls::{scoped_thread_local, ScopedKey};
+    use std::cell::RefCell;
+
+    trait ScopedKeyExt<T> {
+        fn set_async<'a, Fut>(&'static self, t: &'a T, fut: Fut) -> SetAsync<'a, T, Fut>
+        where
+            T: 'static,
+            Fut: Future;
+    }
+
+    impl<T> ScopedKeyExt<T> for ScopedKey<T> {
+        fn set_async<'a, Fut>(&'static self, t: &'a T, fut: Fut) -> SetAsync<'a, T, Fut>
+        where
+            T: 'static,
+            Fut: Future,
+        {
+            SetAsync { key: self, t, fut }
+        }
+    }
+
+    #[pin_project::pin_project]
+    struct SetAsync<'a, T: 'static, Fut> {
+        key: &'static ScopedKey<T>,
+        t: &'a T,
+        #[pin]
+        fut: Fut,
+    }
+
+    impl<T, Fut> Future for SetAsync<'_, T, Fut>
+    where
+        Fut: Future,
+    {
+        type Output = Fut::Output;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+            let me = self.project();
+            let key = me.key;
+            let t = *me.t;
+            let fut = me.fut;
+            key.set(t, || fut.poll(cx))
+        }
+    }
+
+    scoped_thread_local!(static HISTORY: RefCell<Vec<&'static str>>);
+
+    fn append_history(v: &'static str) {
+        HISTORY.with(|history| history.borrow_mut().push(v));
+    }
+
+    struct MockRegistry<'a>(&'a mut Option<Test>);
+    impl Registry for MockRegistry<'_> {
+        fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
+            self.0.replace(test);
+            Ok(())
+        }
+    }
+
+    fn run_test(r: &dyn Registration) -> Vec<&'static str> {
+        let test = {
+            let mut test = None;
+            r.register(&mut MockRegistry(&mut test)).unwrap();
+            test.take().expect("test is not registered")
+        };
+
+        let history = RefCell::new(vec![]);
+        match test.test_fn {
+            TestFn::SyncTest(f) => HISTORY.set(&history, || run_sync(&test.desc, f)),
+            TestFn::AsyncTest(f) => futures::executor::block_on(
+                HISTORY.set_async(&history, async { run_async(&test.desc, f).await }),
+            ),
+        }
+
+        history.into_inner()
+    }
+
+    mod no_section {
+        use super::*;
+
+        #[crate::test(rye_path = "crate")]
+        fn test_case() {
+            append_history("test");
+        }
+
+        #[test]
+        fn test() {
+            let history = run_test(&test_case::__REGISTRATION);
+            assert_eq!(history, vec!["test"]);
+        }
+    }
+
+    mod one_section {
+        use super::*;
+
+        #[crate::test(rye_path = "crate")]
+        fn test_case() {
+            append_history("setup");
+
+            section!("section1", {
+                append_history("section1");
+            });
+
+            append_history("teardown");
+        }
+
+        #[test]
+        fn test() {
+            let history = run_test(&test_case::__REGISTRATION);
+            assert_eq!(history, vec!["setup", "section1", "teardown"]);
+        }
+    }
+
+    mod multi_section {
+        use super::*;
+
+        #[crate::test(rye_path = "crate")]
+        fn test_case() {
+            HISTORY.with(|history| history.borrow_mut().push("setup"));
+
+            section!("section1", {
+                append_history("section1");
+            });
+
+            section!("section2", {
+                append_history("section2");
+            });
+
+            append_history("teardown");
+        }
+
+        #[test]
+        fn test() {
+            let history = run_test(&test_case::__REGISTRATION);
+            assert_eq!(
+                history,
+                vec![
+                    // phase 1
+                    "setup", "section1", "teardown", //
+                    // phase 2
+                    "setup", "section2", "teardown",
+                ]
+            );
+        }
+    }
+
+    mod nested_section {
+        use super::*;
+
+        #[crate::test(rye_path = "crate")]
+        fn test_case() {
+            append_history("setup");
+
+            section!("section1", {
+                append_history("section1:setup");
+
+                section!("section2", {
+                    append_history("section2");
+                });
+
+                section!("section3", {
+                    append_history("section3");
+                });
+
+                append_history("section1:teardown");
+            });
+
+            append_history("test");
+
+            section!("section4", {
+                append_history("section4");
+            });
+
+            append_history("teardown");
+        }
+
+        #[test]
+        fn test() {
+            let history = run_test(&test_case::__REGISTRATION);
+            assert_eq!(
+                history,
+                vec![
+                    // phase 1
+                    "setup",
+                    "section1:setup",
+                    "section2",
+                    "section1:teardown",
+                    "test",
+                    "teardown",
+                    // phase 2
+                    "setup",
+                    "section1:setup",
+                    "section3",
+                    "section1:teardown",
+                    "test",
+                    "teardown",
+                    // phase 3
+                    "setup",
+                    "test",
+                    "section4",
+                    "teardown",
+                ]
+            );
+        }
+    }
+
+    mod smoke_async {
+        use super::*;
+
+        #[crate::test(rye_path = "crate")]
+        async fn test_case() {
+            use futures_test::future::FutureTestExt as _;
+
+            append_history("setup");
+            async {}.pending_once().await;
+
+            section!("section1", {
+                append_history("section1:setup");
+                async {}.pending_once().await;
+
+                section!("section2", {
+                    async {}.pending_once().await;
+                    append_history("section2");
+                });
+
+                section!("section3", {
+                    async {}.pending_once().await;
+                    append_history("section3");
+                });
+
+                async {}.pending_once().await;
+                append_history("section1:teardown");
+            });
+
+            append_history("test");
+            async {}.pending_once().await;
+
+            section!("section4", {
+                async {}.pending_once().await;
+                append_history("section4");
+            });
+
+            async {}.pending_once().await;
+            append_history("teardown");
+        }
+
+        #[test]
+        fn test() {
+            let history = run_test(&test_case::__REGISTRATION);
+            assert_eq!(
+                history,
+                vec![
+                    // phase 1
+                    "setup",
+                    "section1:setup",
+                    "section2",
+                    "section1:teardown",
+                    "test",
+                    "teardown",
+                    // phase 2
+                    "setup",
+                    "section1:setup",
+                    "section3",
+                    "section1:teardown",
+                    "test",
+                    "teardown",
+                    // phase 3
+                    "setup",
+                    "test",
+                    "section4",
+                    "teardown",
+                ]
+            );
+        }
+    }
 }

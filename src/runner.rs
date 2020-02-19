@@ -1,11 +1,12 @@
 use super::{
     cli::{Args, ExitStatus},
     executor::TestExecutor,
-    registry::{register_all, Registration},
+    registry::{Registration, Registry, RegistryError},
     report::{OutcomeKind, Printer, Report},
+    test::Test,
 };
 use futures::stream::StreamExt as _;
-use std::{io::Write, sync::Once};
+use std::{collections::HashSet, io::Write, sync::Once};
 
 #[inline]
 pub async fn run_tests<E: ?Sized>(tests: &[&dyn Registration], executor: &mut E) -> ExitStatus
@@ -76,4 +77,47 @@ where
     let _ = printer.print_report(&report);
 
     report.status()
+}
+
+struct MainRegistry<'a> {
+    args: &'a Args,
+    inner: &'a mut MainRegistryInner,
+}
+
+#[derive(Default)]
+struct MainRegistryInner {
+    pending_tests: Vec<Test>,
+    filtered_out_tests: Vec<Test>,
+    unique_test_names: HashSet<&'static str>,
+}
+
+impl Registry for MainRegistry<'_> {
+    fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
+        if !self.inner.unique_test_names.insert(test.desc.test_name()) {
+            eprintln!("the test name is conflicted: {}", test.desc.test_name());
+            return Err(RegistryError::new());
+        }
+
+        if self.args.is_match(test.desc.test_name()) {
+            self.inner.pending_tests.push(test);
+        } else {
+            self.inner.filtered_out_tests.push(test);
+        }
+
+        Ok(())
+    }
+}
+
+fn register_all(
+    registrations: &[&dyn Registration],
+    args: &Args,
+) -> Result<(Vec<Test>, Vec<Test>), RegistryError> {
+    let mut inner = MainRegistryInner::default();
+    for registration in registrations {
+        registration.register(&mut MainRegistry {
+            args,
+            inner: &mut inner,
+        })?;
+    }
+    Ok((inner.pending_tests, inner.filtered_out_tests))
 }

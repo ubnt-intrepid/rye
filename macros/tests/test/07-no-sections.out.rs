@@ -11,7 +11,7 @@ pub mod no_sections {
     pub struct __registration(());
 
     impl ::rye::_internal::Registration for __registration {
-        fn register(&self, __registry: &mut ::rye::_internal::Registry<'_>) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
+        fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
             __registry.add_test(::rye::_internal::Test {
                 desc: ::rye::_internal::TestDesc {
                     module_path: ::rye::_internal::module_path!(),
