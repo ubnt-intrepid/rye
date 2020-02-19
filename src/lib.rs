@@ -216,9 +216,20 @@ pub mod _internal {
     }
 
     #[doc(hidden)]
+    #[cfg(not(feature = "frameworks"))]
     #[macro_export]
     macro_rules! __annotate_test_case {
         ($item:item) => {
+            $item
+        };
+    }
+
+    #[doc(hidden)]
+    #[cfg(feature = "frameworks")]
+    #[macro_export]
+    macro_rules! __annotate_test_case {
+        ($item:item) => {
+            #[test_case]
             $item
         };
     }

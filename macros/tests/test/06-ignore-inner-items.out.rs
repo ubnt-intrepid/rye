@@ -9,7 +9,8 @@ fn ignore_inner_items() {
 pub(crate) mod ignore_inner_items {
     use super::*;
 
-    pub(crate) struct __registration(());
+    #[doc(hidden)]
+    pub struct __registration(());
 
     impl ::rye::_internal::Registration for __registration {
         fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
