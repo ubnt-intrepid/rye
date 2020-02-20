@@ -24,22 +24,69 @@ macro_rules! try_parse {
 
 struct Input {
     test_cases: Punctuated<UseTree, Token![,]>,
+    runner: Path,
+    rye_path: Path,
 }
 
 impl Parse for Input {
     fn parse(input: ParseStream) -> Result<Self> {
+        let mut test_cases = None;
+        let mut runner = None;
+        let mut rye_path = None;
+
+        while !input.is_empty() {
+            let name: Ident = input.parse()?;
+            let _eq_token: Token![=] = input.parse()?;
+
+            match &name {
+                name if name == "test_cases" => {
+                    if test_cases.is_some() {
+                        return Err(Error::new_spanned(&name, "duplicated parameter"));
+                    }
+                    let content;
+                    let _brace_token = syn::braced!(content in input);
+                    test_cases.replace(Punctuated::parse_terminated(&content)?);
+                }
+                name if name == "runner" => {
+                    if runner.is_some() {
+                        return Err(Error::new_spanned(&name, "duplicated parameter"));
+                    }
+                    runner.replace(input.parse()?);
+                }
+                name if name == "rye_path" => {
+                    if rye_path.is_some() {
+                        return Err(Error::new_spanned(&name, "duplicated parameter"));
+                    }
+                    rye_path.replace(input.parse()?);
+                }
+                _ => {
+                    return Err(Error::new_spanned(
+                        &name,
+                        format!("unknown parameter: '{}'", name),
+                    ))
+                }
+            }
+
+            let _: Token![;] = input.parse()?;
+        }
+
         Ok(Self {
-            test_cases: Punctuated::parse_terminated(input)?,
+            test_cases: test_cases
+                .ok_or_else(|| Error::new(Span::call_site(), "missing parameter: `test_cases'"))?,
+            runner: runner.unwrap_or_else(|| syn::parse_quote!(::rye::_internal::default_runner)),
+            rye_path: rye_path.unwrap_or_else(|| syn::parse_quote!(::rye)),
         })
     }
 }
 
 pub(crate) fn test_main(input: TokenStream) -> TokenStream {
     let input: Input = try_parse!(syn::parse2(input));
+    let runner = &input.runner;
+    let rye_path = &input.rye_path;
     let paths = try_parse!(extract_test_cases(&input));
     quote! {
         fn main() {
-            ::rye::_internal::default_runner(&[#( & #paths ),*]);
+            #runner(&[#( & #paths as &dyn #rye_path::_internal::Registration ),*]);
         }
     }
 }

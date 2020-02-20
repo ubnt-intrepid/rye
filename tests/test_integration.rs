@@ -85,8 +85,10 @@ mod sub {
 }
 
 rye::test_main! {
-    case_sync,
-    nested,
-    case_async,
-    sub::{sub_test, modified_rye_path},
+    test_cases = {
+        case_sync,
+        nested,
+        case_async,
+        sub::{sub_test, modified_rye_path},
+    };
 }

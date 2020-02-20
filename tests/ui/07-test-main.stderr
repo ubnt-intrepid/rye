@@ -1,11 +1,29 @@
-error: glob pattern is forbidden
- --> $DIR/07-test-main.rs:5:5
+error: missing parameter: `test_cases'
+ --> $DIR/07-test-main.rs:4:5
   |
-5 |     *,
-  |     ^
+4 |     rye::test_main! {}
+  |     ^^^^^^^^^^^^^^^^^^ in this macro invocation
+
+error: glob pattern is forbidden
+  --> $DIR/07-test-main.rs:13:13
+   |
+13 |             *,
+   |             ^
 
 error: rename pattern is forbidden
- --> $DIR/07-test-main.rs:6:5
-  |
-6 |     foo as bar,
-  |     ^^^^^^^^^^
+  --> $DIR/07-test-main.rs:14:13
+   |
+14 |             foo as bar,
+   |             ^^^^^^^^^^
+
+error: unknown parameter: 'foo'
+  --> $DIR/07-test-main.rs:21:9
+   |
+21 |         foo = bar;
+   |         ^^^
+
+error[E0425]: cannot find function `the_quick_brown_fox_jumps_over_the_lazy_dog` in this scope
+  --> $DIR/07-test-main.rs:28:18
+   |
+28 |         runner = the_quick_brown_fox_jumps_over_the_lazy_dog;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
