@@ -1,7 +1,17 @@
 fn main() {}
 
+fn dummy(_: &[&dyn rye::Registration]) {}
+
 mod missing_test_cases {
-    rye::test_main! {}
+    rye::test_main! {
+        runner = crate::dummy;
+    }
+}
+
+mod missing_runner {
+    rye::test_main! {
+        test_cases = {};
+    }
 }
 
 mod unsupported_patterns {
@@ -13,6 +23,7 @@ mod unsupported_patterns {
             *,
             foo as bar,
         };
+        runner = crate::dummy;
     }
 }
 

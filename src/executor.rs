@@ -1,111 +1,35 @@
-use crate::{
-    report::Outcome,
-    test::{SectionId, Test, TestDesc, TestFn},
-};
-use expected::{expected, Disappoints, FutureExpectedExt as _};
+use crate::test::{SectionId, Test, TestDesc, TestFn};
 use futures::{
-    executor::ThreadPool,
     future::{BoxFuture, Future},
-    task::SpawnExt as _,
     task::{self, Poll},
 };
-use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use pin_project::pin_project;
-use std::{cell::Cell, io, mem, panic::AssertUnwindSafe, pin::Pin, ptr::NonNull};
+use std::{cell::Cell, mem, pin::Pin, ptr::NonNull};
 
 pub trait TestExecutor {
-    type Handle: Future<Output = Outcome>;
+    type Handle;
 
     fn execute<Fut>(&mut self, fut: Fut) -> Self::Handle
     where
-        Fut: Future<Output = Outcome> + Send + 'static;
+        Fut: Future<Output = ()> + Send + 'static;
 
     fn execute_blocking<F>(&mut self, f: F) -> Self::Handle
     where
-        F: FnOnce() -> Outcome + Send + 'static;
+        F: FnOnce() + Send + 'static;
 }
 
-pub struct DefaultTestExecutor {
-    pool: ThreadPool,
-}
-
-impl DefaultTestExecutor {
-    pub fn new() -> io::Result<Self> {
-        Ok(Self {
-            pool: ThreadPool::new()?,
-        })
-    }
-}
-
-impl TestExecutor for DefaultTestExecutor {
-    type Handle = BoxFuture<'static, Outcome>;
-
-    fn execute<Fut>(&mut self, fut: Fut) -> Self::Handle
+impl Test {
+    /// Execute the test function using the specified test executor.
+    pub fn execute<E: ?Sized>(&self, exec: &mut E) -> E::Handle
     where
-        Fut: Future<Output = Outcome> + Send + 'static,
+        E: TestExecutor,
     {
-        let handle = self.pool.spawn_with_handle(fut);
-        Box::pin(async move {
-            match handle {
-                Ok(handle) => handle.await,
-                Err(spawn_err) => {
-                    Outcome::failed().error_message(format!("unknown error: {}", spawn_err))
-                }
-            }
-        })
-    }
-
-    fn execute_blocking<F>(&mut self, f: F) -> Self::Handle
-    where
-        F: FnOnce() -> Outcome + Send + 'static,
-    {
-        let (tx, rx) = futures::channel::oneshot::channel();
-        std::thread::spawn(move || {
-            let _ = tx.send(f());
-        });
-        Box::pin(async move {
-            rx.await.unwrap_or_else(|rx_err| {
-                Outcome::failed().error_message(format!("unknown error: {}", rx_err))
-            })
-        })
-    }
-}
-
-pub(crate) trait TestExecutorExt: TestExecutor {
-    fn execute_test_case(&mut self, test_case: &Test) -> Self::Handle {
-        let desc = test_case.desc.clone();
-        match test_case.test_fn {
-            TestFn::SyncTest(f) => self.execute_blocking(move || {
-                let res = expected(|| maybe_unwind(AssertUnwindSafe(|| run_sync(&desc, f))));
-                make_outcome(res)
+        let desc = self.desc.clone();
+        match self.test_fn {
+            TestFn::SyncTest(f) => exec.execute_blocking(move || run_sync(&desc, f)),
+            TestFn::AsyncTest(f) => exec.execute(async move {
+                run_async(&desc, f).await;
             }),
-            TestFn::AsyncTest(f) => self.execute(async move {
-                let res = AssertUnwindSafe(async move {
-                    run_async(&desc, f).await;
-                })
-                .maybe_unwind()
-                .expected()
-                .await;
-                make_outcome(res)
-            }),
-        }
-    }
-}
-
-impl<E: TestExecutor + ?Sized> TestExecutorExt for E {}
-
-fn make_outcome(res: (Result<(), Unwind>, Option<Disappoints>)) -> Outcome {
-    match res {
-        (Ok(()), None) => Outcome::passed(),
-        (Ok(()), Some(disappoints)) => Outcome::failed().error_message(disappoints.to_string()),
-        (Err(unwind), disappoints) => {
-            use std::fmt::Write as _;
-            let mut msg = String::new();
-            let _ = writeln!(&mut msg, "{}", unwind);
-            if let Some(disappoints) = disappoints {
-                let _ = writeln!(&mut msg, "{}", disappoints);
-            }
-            Outcome::failed().error_message(msg)
         }
     }
 }
@@ -243,7 +167,7 @@ pub(crate) struct AccessError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::{Registration, Registry, RegistryError};
+    use crate::registration::{Registration, Registry, RegistryError};
     use scoped_tls::{scoped_thread_local, ScopedKey};
     use std::cell::RefCell;
 

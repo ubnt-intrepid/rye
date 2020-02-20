@@ -395,16 +395,12 @@ name = "rye"
 version = "0.0.1"
 dependencies = [
  "cargo-husky",
- "console",
- "expected",
  "futures",
  "futures-test",
- "getopts",
- "globset",
  "maplit",
- "maybe-unwind",
  "pin-project",
  "rye-macros",
+ "rye-runner",
  "scoped-tls",
  "trybuild",
 ]
@@ -417,6 +413,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "rye-runner"
+version = "0.0.0"
+dependencies = [
+ "console",
+ "expected",
+ "futures",
+ "getopts",
+ "globset",
+ "maybe-unwind",
+ "pin-project",
+ "rye",
 ]
 
 [[package]]

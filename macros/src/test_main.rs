@@ -72,8 +72,9 @@ impl Parse for Input {
 
         Ok(Self {
             test_cases: test_cases
-                .ok_or_else(|| Error::new(Span::call_site(), "missing parameter: `test_cases'"))?,
-            runner: runner.unwrap_or_else(|| syn::parse_quote!(::rye::_internal::default_runner)),
+                .ok_or_else(|| Error::new(Span::call_site(), "missing parameter: 'test_cases'"))?,
+            runner: runner
+                .ok_or_else(|| Error::new(Span::call_site(), "missing parameter: 'runner'"))?,
             rye_path: rye_path.unwrap_or_else(|| syn::parse_quote!(::rye)),
         })
     }

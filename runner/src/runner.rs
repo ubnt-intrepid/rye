@@ -1,10 +1,9 @@
-use crate::{
-    cli::ExitStatus, executor::DefaultTestExecutor, registry::Registration, session::Session,
-};
+use crate::{cli::ExitStatus, executor::DefaultTestExecutor, session::Session};
 use futures::executor::block_on;
+use rye::_internal::Registration;
 use std::{io::Write, sync::Once};
 
-pub fn default_runner(tests: &[&dyn Registration]) {
+pub fn runner(tests: &[&dyn Registration]) {
     run_tests(tests, |session| {
         let mut executor = DefaultTestExecutor::new().unwrap();
         block_on(session.run_tests_concurrent(&mut executor));
@@ -31,9 +30,7 @@ where
     };
 
     if session.args.list_tests() {
-        let _ = session
-            .printer
-            .print_list(session.pending_tests.iter().map(|test| &test.desc));
+        let _ = session.printer.print_list(session.pending_tests.iter());
         return ExitStatus::OK;
     }
 

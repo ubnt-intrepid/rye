@@ -91,4 +91,5 @@ rye::test_main! {
         case_async,
         sub::{sub_test, modified_rye_path},
     };
+    runner = rye_runner::runner;
 }

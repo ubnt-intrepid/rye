@@ -12,7 +12,8 @@ pub trait Registry {
 pub struct RegistryError(());
 
 impl RegistryError {
-    pub(crate) fn new() -> Self {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
         Self(())
     }
 }

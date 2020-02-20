@@ -2,20 +2,14 @@
 A custom unit testing framework inspired by Catch2.
 !*/
 
-mod cli;
 mod executor;
-mod registry;
-mod report;
-mod runner;
-mod session;
+mod registration;
 mod test;
 
 #[doc(hidden)]
 pub mod _internal {
     pub use crate::{
-        cli::ExitStatus,
-        registry::{Registration, Registry, RegistryError},
-        runner::default_runner,
+        registration::{Registration, Registry, RegistryError},
         test::{Section, Test, TestDesc, TestFn},
     };
     pub use maplit::{hashmap, hashset};
@@ -36,6 +30,12 @@ pub mod _internal {
         };
     }
 }
+
+pub use crate::{
+    executor::TestExecutor,
+    registration::{Registration, Registry, RegistryError},
+    test::Test,
+};
 
 /// Declare a single test.
 pub use rye_macros::test;
