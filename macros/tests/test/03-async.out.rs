@@ -10,11 +10,10 @@ async fn case_async() {
     }
 }
 
-#[doc(hidden)]
-pub mod case_async {
+pub(crate) mod case_async {
     use super::*;
 
-    pub struct __registration(());
+    pub(crate) struct __registration(());
 
     impl ::rye::_internal::Registration for __registration {
         fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
@@ -36,6 +35,6 @@ pub mod case_async {
     }
 
     ::rye::__annotate_test_case! {
-        pub const __REGISTRATION: __registration = __registration(());
+        pub(crate) const __REGISTRATION: __registration = __registration(());
     }
 }

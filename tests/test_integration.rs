@@ -52,7 +52,7 @@ async fn case_async() {
 
 mod sub {
     #[rye::test]
-    pub fn sub_test() {
+    fn sub_test() {
         let mut vec = vec![0usize; 5];
 
         assert_eq!(vec.len(), 5);
@@ -69,7 +69,7 @@ mod sub {
     use rye as catcher_in_the_rye;
 
     #[rye::test(rye_path = "catcher_in_the_rye")]
-    pub fn modified_rye_path() {
+    fn modified_rye_path() {
         let mut vec = vec![0usize; 5];
 
         assert_eq!(vec.len(), 5);

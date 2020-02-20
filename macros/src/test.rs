@@ -305,11 +305,10 @@ impl ToTokens for Generated<'_> {
         };
 
         tokens.append_all(vec![quote! {
-            #[doc(hidden)]
-            pub mod #ident {
+            pub(crate) mod #ident {
                 use super::*;
 
-                pub struct __registration(());
+                pub(crate) struct __registration(());
 
                 impl #rye_path::_internal::Registration for __registration {
                     fn register(&self, __registry: &mut dyn #rye_path::_internal::Registry) -> #rye_path::_internal::Result<(), #rye_path::_internal::RegistryError> {
@@ -326,7 +325,7 @@ impl ToTokens for Generated<'_> {
                 }
 
                 #rye_path::__annotate_test_case! {
-                    pub const __REGISTRATION: __registration = __registration(());
+                    pub(crate) const __REGISTRATION: __registration = __registration(());
                 }
             }
         }]);
