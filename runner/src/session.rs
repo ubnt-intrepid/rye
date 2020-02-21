@@ -1,11 +1,10 @@
-use super::{
+use crate::{
     cli::{Args, ExitStatus},
-    executor::{TestExecutor, TestExecutorExt as _},
-    registry::{Registration, Registry, RegistryError},
+    executor::DefaultTestExecutor,
     report::{Outcome, OutcomeKind, Printer, Report},
-    test::Test,
 };
 use futures::stream::StreamExt as _;
+use rye::{Registration, Registry, RegistryError, Test};
 use std::collections::HashSet;
 
 pub(crate) struct Session {
@@ -39,14 +38,11 @@ impl Session {
         Ok(())
     }
 
-    pub(crate) async fn run_tests_concurrent<E: ?Sized>(&mut self, executor: &mut E)
-    where
-        E: TestExecutor,
-    {
+    pub(crate) async fn run_tests_concurrent(&mut self, executor: &mut DefaultTestExecutor) {
         let name_length = self
             .pending_tests
             .iter()
-            .map(|test| test.desc.test_name().len())
+            .map(|test| test.name().len())
             .max()
             .unwrap_or(0);
 
@@ -54,10 +50,10 @@ impl Session {
         let printer = &self.printer;
         futures::stream::iter(self.pending_tests.drain(..))
             .for_each_concurrent(None, |test| {
-                let handle = executor.execute_test_case(&test);
+                let handle = test.execute(&mut *executor);
                 async {
                     let outcome = handle.await;
-                    let _ = printer.print_result(&test.desc, name_length, &outcome);
+                    let _ = printer.print_result(&test, name_length, &outcome);
                     completed_tests.lock().await.push((test, outcome));
                 }
             })
@@ -71,18 +67,14 @@ impl Session {
         let mut failed = vec![];
         for (test, outcome) in self.completed_tests.drain(..) {
             match outcome.kind() {
-                OutcomeKind::Passed => passed.push(test.desc),
-                OutcomeKind::Failed => failed.push((test.desc, outcome.err_msg())),
+                OutcomeKind::Passed => passed.push(test),
+                OutcomeKind::Failed => failed.push((test, outcome.err_msg())),
             }
         }
         Report {
             passed,
             failed,
-            filtered_out: self
-                .filtered_out_tests
-                .drain(..)
-                .map(|test| test.desc)
-                .collect(),
+            filtered_out: self.filtered_out_tests.drain(..).collect(),
         }
     }
 }
@@ -96,17 +88,17 @@ struct MainRegistry<'a> {
 struct MainRegistryInner {
     pending_tests: Vec<Test>,
     filtered_out_tests: Vec<Test>,
-    unique_test_names: HashSet<&'static str>,
+    unique_test_names: HashSet<String>,
 }
 
 impl Registry for MainRegistry<'_> {
     fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
-        if !self.inner.unique_test_names.insert(test.desc.test_name()) {
-            eprintln!("the test name is conflicted: {}", test.desc.test_name());
+        if !self.inner.unique_test_names.insert(test.name().into()) {
+            eprintln!("the test name is conflicted: {}", test.name());
             return Err(RegistryError::new());
         }
 
-        if self.args.is_match(test.desc.test_name()) {
+        if self.args.is_match(test.name()) {
             self.inner.pending_tests.push(test);
         } else {
             self.inner.filtered_out_tests.push(test);

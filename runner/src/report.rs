@@ -1,8 +1,6 @@
-use crate::{
-    cli::{Args, ColorConfig, ExitStatus},
-    test::TestDesc,
-};
+use crate::cli::{Args, ColorConfig, ExitStatus};
 use console::{Style, StyledObject, Term};
+use rye::Test;
 use std::{
     borrow::Cow,
     io::{self, Write},
@@ -64,13 +62,13 @@ pub(crate) enum OutcomeKind {
 #[non_exhaustive]
 pub struct Report {
     /// Passed test cases.
-    pub passed: Vec<TestDesc>,
+    pub passed: Vec<Test>,
 
     /// Failed test cases with the error messages.
-    pub failed: Vec<(TestDesc, Option<Arc<Cow<'static, str>>>)>,
+    pub failed: Vec<(Test, Option<Arc<Cow<'static, str>>>)>,
 
     /// Test cases filtered out.
-    pub filtered_out: Vec<TestDesc>,
+    pub filtered_out: Vec<Test>,
 }
 
 impl Report {
@@ -115,14 +113,14 @@ impl Printer {
 
     pub(crate) fn print_list(
         &self,
-        tests: impl IntoIterator<Item = impl std::ops::Deref<Target = TestDesc>>,
+        tests: impl IntoIterator<Item = impl std::ops::Deref<Target = Test>>,
     ) -> io::Result<()> {
         let mut num_tests = 0;
 
         for test in tests {
             let desc = &*test;
             num_tests += 1;
-            writeln!(&self.term, "{}: test", desc.test_name())?;
+            writeln!(&self.term, "{}: test", desc.name())?;
         }
 
         fn plural_suffix(n: usize) -> &'static str {
@@ -142,7 +140,7 @@ impl Printer {
 
     pub(crate) fn print_result(
         &self,
-        desc: &TestDesc,
+        desc: &Test,
         name_length: usize,
         outcome: &Outcome,
     ) -> io::Result<()> {
@@ -153,7 +151,7 @@ impl Printer {
         writeln!(
             &self.term,
             "test {0:<1$} ... {2}",
-            desc.test_name(),
+            desc.name(),
             name_length,
             result
         )?;
@@ -168,7 +166,7 @@ impl Printer {
             writeln!(self.term())?;
             writeln!(self.term(), "failures:")?;
             for (desc, msg) in &report.failed {
-                writeln!(self.term(), "---- {} ----", desc.test_name())?;
+                writeln!(self.term(), "---- {} ----", desc.name())?;
                 if let Some(msg) = msg {
                     write!(self.term(), "{}", msg)?;
                     if msg.chars().last().map_or(true, |c| c != '\n') {
@@ -180,7 +178,7 @@ impl Printer {
             writeln!(self.term())?;
             writeln!(self.term(), "failures:")?;
             for (desc, _) in &report.failed {
-                writeln!(self.term(), "    {}", desc.test_name())?;
+                writeln!(self.term(), "    {}", desc.name())?;
             }
         }
 

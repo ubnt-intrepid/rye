@@ -1,149 +1,97 @@
-use crate::{
-    report::Outcome,
-    test::{SectionId, Test, TestDesc, TestFn},
-};
-use expected::{expected, Disappoints, FutureExpectedExt as _};
+//! Abstraction of test execution in the rye.
+
+use crate::test::{SectionId, Test, TestDesc, TestFn};
 use futures::{
-    executor::ThreadPool,
     future::{BoxFuture, Future},
-    task::SpawnExt as _,
     task::{self, Poll},
 };
-use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use pin_project::pin_project;
-use std::{cell::Cell, io, mem, panic::AssertUnwindSafe, pin::Pin, ptr::NonNull};
+use std::{cell::Cell, marker::PhantomData, mem, pin::Pin, ptr::NonNull};
 
+/// Test executor.
 pub trait TestExecutor {
-    type Handle: Future<Output = Outcome>;
+    /// The type of handle for awaiting the test completation.
+    type Handle;
 
-    fn execute<Fut>(&mut self, fut: Fut) -> Self::Handle
-    where
-        Fut: Future<Output = Outcome> + Send + 'static;
+    /// Execute a test body.
+    fn execute(&mut self, test: TestBody) -> Self::Handle;
 
-    fn execute_blocking<F>(&mut self, f: F) -> Self::Handle
-    where
-        F: FnOnce() -> Outcome + Send + 'static;
+    /// Execute an asynchronous test body.
+    fn execute_async(&mut self, test: AsyncTestBody) -> Self::Handle;
 }
 
-pub struct DefaultTestExecutor {
-    pool: ThreadPool,
-}
-
-impl DefaultTestExecutor {
-    pub fn new() -> io::Result<Self> {
-        Ok(Self {
-            pool: ThreadPool::new()?,
-        })
+impl Test {
+    /// Execute the test function using the specified test executor.
+    pub fn execute<E: ?Sized>(&self, exec: &mut E) -> E::Handle
+    where
+        E: TestExecutor,
+    {
+        let desc = self.desc.clone();
+        match self.test_fn {
+            TestFn::SyncTest(f) => exec.execute(TestBody {
+                desc,
+                f,
+                _marker: PhantomData,
+            }),
+            TestFn::AsyncTest(f) => exec.execute_async(AsyncTestBody {
+                desc,
+                f,
+                _marker: PhantomData,
+            }),
+        }
     }
 }
 
-impl TestExecutor for DefaultTestExecutor {
-    type Handle = BoxFuture<'static, Outcome>;
+pub struct TestBody {
+    desc: TestDesc,
+    f: fn(),
+    _marker: PhantomData<Cell<()>>,
+}
 
-    fn execute<Fut>(&mut self, fut: Fut) -> Self::Handle
-    where
-        Fut: Future<Output = Outcome> + Send + 'static,
-    {
-        let handle = self.pool.spawn_with_handle(fut);
-        Box::pin(async move {
-            match handle {
-                Ok(handle) => handle.await,
-                Err(spawn_err) => {
-                    Outcome::failed().error_message(format!("unknown error: {}", spawn_err))
+impl TestBody {
+    pub fn run(&mut self) {
+        if self.desc.leaf_sections.is_empty() {
+            TestContext {
+                desc: &self.desc,
+                section: None,
+            }
+            .scope(&self.f);
+        } else {
+            for &section in &self.desc.leaf_sections {
+                TestContext {
+                    desc: &self.desc,
+                    section: Some(section),
                 }
+                .scope(&self.f);
             }
-        })
-    }
-
-    fn execute_blocking<F>(&mut self, f: F) -> Self::Handle
-    where
-        F: FnOnce() -> Outcome + Send + 'static,
-    {
-        let (tx, rx) = futures::channel::oneshot::channel();
-        std::thread::spawn(move || {
-            let _ = tx.send(f());
-        });
-        Box::pin(async move {
-            rx.await.unwrap_or_else(|rx_err| {
-                Outcome::failed().error_message(format!("unknown error: {}", rx_err))
-            })
-        })
-    }
-}
-
-pub(crate) trait TestExecutorExt: TestExecutor {
-    fn execute_test_case(&mut self, test_case: &Test) -> Self::Handle {
-        let desc = test_case.desc.clone();
-        match test_case.test_fn {
-            TestFn::SyncTest(f) => self.execute_blocking(move || {
-                let res = expected(|| maybe_unwind(AssertUnwindSafe(|| run_sync(&desc, f))));
-                make_outcome(res)
-            }),
-            TestFn::AsyncTest(f) => self.execute(async move {
-                let res = AssertUnwindSafe(async move {
-                    run_async(&desc, f).await;
-                })
-                .maybe_unwind()
-                .expected()
-                .await;
-                make_outcome(res)
-            }),
         }
     }
 }
 
-impl<E: TestExecutor + ?Sized> TestExecutorExt for E {}
-
-fn make_outcome(res: (Result<(), Unwind>, Option<Disappoints>)) -> Outcome {
-    match res {
-        (Ok(()), None) => Outcome::passed(),
-        (Ok(()), Some(disappoints)) => Outcome::failed().error_message(disappoints.to_string()),
-        (Err(unwind), disappoints) => {
-            use std::fmt::Write as _;
-            let mut msg = String::new();
-            let _ = writeln!(&mut msg, "{}", unwind);
-            if let Some(disappoints) = disappoints {
-                let _ = writeln!(&mut msg, "{}", disappoints);
-            }
-            Outcome::failed().error_message(msg)
-        }
-    }
+pub struct AsyncTestBody {
+    desc: TestDesc,
+    f: fn() -> BoxFuture<'static, ()>,
+    _marker: PhantomData<Cell<()>>,
 }
 
-fn run_sync(desc: &TestDesc, f: fn()) {
-    if desc.leaf_sections.is_empty() {
-        TestContext {
-            desc: &desc,
-            section: None,
-        }
-        .scope(&f);
-    } else {
-        for &section in &desc.leaf_sections {
+impl AsyncTestBody {
+    pub async fn run(&mut self) {
+        if self.desc.leaf_sections.is_empty() {
             TestContext {
-                desc: &desc,
-                section: Some(section),
+                desc: &self.desc,
+                section: None,
             }
-            .scope(&f);
-        }
-    }
-}
-
-async fn run_async(desc: &TestDesc, f: fn() -> BoxFuture<'static, ()>) {
-    if desc.leaf_sections.is_empty() {
-        TestContext {
-            desc: &desc,
-            section: None,
-        }
-        .scope_async(f())
-        .await;
-    } else {
-        for &section in &desc.leaf_sections {
-            TestContext {
-                desc: &desc,
-                section: Some(section),
-            }
-            .scope_async(f())
+            .scope_async((self.f)())
             .await;
+        } else {
+            for &section in &self.desc.leaf_sections {
+                TestContext {
+                    desc: &self.desc,
+                    section: Some(section),
+                }
+                .scope_async((self.f)())
+                .await;
+            }
         }
     }
 }
@@ -243,7 +191,7 @@ pub(crate) struct AccessError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::{Registration, Registry, RegistryError};
+    use crate::registration::{Registration, Registry, RegistryError};
     use scoped_tls::{scoped_thread_local, ScopedKey};
     use std::cell::RefCell;
 
@@ -310,10 +258,25 @@ mod tests {
 
         let history = RefCell::new(vec![]);
         match test.test_fn {
-            TestFn::SyncTest(f) => HISTORY.set(&history, || run_sync(&test.desc, f)),
-            TestFn::AsyncTest(f) => futures::executor::block_on(
-                HISTORY.set_async(&history, async { run_async(&test.desc, f).await }),
-            ),
+            TestFn::SyncTest(f) => HISTORY.set(&history, || {
+                TestBody {
+                    desc: test.desc,
+                    f,
+                    _marker: PhantomData,
+                }
+                .run()
+            }),
+            TestFn::AsyncTest(f) => {
+                futures::executor::block_on(HISTORY.set_async(&history, async {
+                    AsyncTestBody {
+                        desc: test.desc,
+                        f,
+                        _marker: PhantomData,
+                    }
+                    .run()
+                    .await
+                }))
+            }
         }
 
         history.into_inner()

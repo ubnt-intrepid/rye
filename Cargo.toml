@@ -12,16 +12,12 @@ readme = "README.md"
 
 [dependencies]
 rye-macros = { version = "=0.0.1", path = "./macros" }
-console = "0.9"
-expected = { version = "0.0.1", features = [ "futures" ] }
-futures = { version = "0.3", features = [ "thread-pool" ] }
-getopts = "0.2"
-globset = "0.4"
+futures = "0.3"
 maplit = "1"
-maybe-unwind = { version = "0.1", features = [ "futures" ] }
 pin-project = "0.4"
 
 [dev-dependencies]
+rye-runner = { path = "runner" }
 futures-test = "0.3"
 scoped-tls = "1"
 trybuild = "1"
@@ -40,4 +36,5 @@ harness = false
 members = [
   ".",
   "macros",
+  "runner",
 ]
