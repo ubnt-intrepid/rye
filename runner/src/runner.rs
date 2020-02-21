@@ -1,12 +1,13 @@
 use crate::{cli::ExitStatus, executor::DefaultTestExecutor, session::Session};
-use futures::executor::block_on;
+use futures::executor::LocalPool;
 use rye::_internal::Registration;
 use std::{io::Write, sync::Once};
 
 pub fn runner(tests: &[&dyn Registration]) {
     run_tests(tests, |session| {
-        let mut executor = DefaultTestExecutor::new().unwrap();
-        block_on(session.run_tests_concurrent(&mut executor));
+        let mut local_pool = LocalPool::new();
+        let mut executor = DefaultTestExecutor::new(local_pool.spawner()).unwrap();
+        local_pool.run_until(session.run_tests_concurrent(&mut executor));
     })
     .exit();
 }

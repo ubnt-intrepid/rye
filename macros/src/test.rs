@@ -18,8 +18,13 @@ macro_rules! try_quote {
     };
 }
 
-pub(crate) fn test(_args: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut item = try_quote!(syn::parse2::<ItemFn>(item));
+
+    if item.sig.asyncness.is_none() && !args.is_empty() {
+        return Error::new_spanned(&args, "accepted only for async functions").to_compile_error();
+    }
+    let args = try_quote!(syn::parse2::<Args>(args));
 
     // extract attributes
     let params = try_quote!(Params::from_attrs(&mut item.attrs));
@@ -40,12 +45,43 @@ pub(crate) fn test(_args: TokenStream, item: TokenStream) -> TokenStream {
     let generated = Generated {
         item: &item,
         params: &params,
+        args: &args,
         sections: &sections,
     };
 
     quote! {
         #item
         #generated
+    }
+}
+
+struct Args {
+    local: bool,
+}
+
+mod kw {
+    syn::custom_keyword!(Send);
+}
+
+impl Parse for Args {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.is_empty() {
+            return Ok(Self { local: false });
+        }
+
+        let span = input.span();
+        let error = || Error::new(span, "only '?Send' or '!Send' is accepted");
+
+        if input.peek(Token![?]) {
+            let _: Token![?] = input.parse().unwrap();
+        } else if input.peek(Token![!]) {
+            let _: Token![!] = input.parse().unwrap();
+        } else {
+            return Err(error());
+        }
+        input.parse::<kw::Send>().map_err(|_| error())?;
+
+        Ok(Args { local: true })
     }
 }
 
@@ -278,6 +314,7 @@ impl VisitMut for ExpandBlock<'_> {
 
 struct Generated<'a> {
     params: &'a Params,
+    args: &'a Args,
     item: &'a ItemFn,
     sections: &'a [Section],
 }
@@ -320,7 +357,16 @@ impl ToTokens for Generated<'_> {
         let rye_path = &self.params.rye_path;
 
         let test_fn: syn::Expr = if self.item.sig.asyncness.is_some() {
-            syn::parse_quote!(#rye_path::_internal::TestFn::AsyncTest(|| #rye_path::_internal::Box::pin(super::#ident())))
+            let local = self.args.local;
+            let constructor = if local {
+                quote!(new_local)
+            } else {
+                quote!(new)
+            };
+            syn::parse_quote!(#rye_path::_internal::TestFn::AsyncTest {
+                f: || #rye_path::_internal::TestFuture::#constructor(super::#ident()),
+                local: #local,
+            })
         } else {
             syn::parse_quote!(#rye_path::_internal::TestFn::SyncTest(super::#ident))
         };

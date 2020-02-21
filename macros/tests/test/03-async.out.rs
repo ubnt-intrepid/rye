@@ -28,7 +28,10 @@ pub(crate) mod case_async {
                     },
                     leaf_sections: ::rye::_internal::vec![ 0u64 ],
                 },
-                test_fn: ::rye::_internal::TestFn::AsyncTest(|| ::rye::_internal::Box::pin(super::case_async())),
+                test_fn: ::rye::_internal::TestFn::AsyncTest {
+                    f: || ::rye::_internal::TestFuture::new(super::case_async()),
+                    local: false,
+                },
             })?;
             ::rye::_internal::Result::Ok(())
         }

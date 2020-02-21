@@ -1,18 +1,24 @@
 use crate::report::Outcome;
 use expected::{expected, Disappoints, FutureExpectedExt as _};
-use futures::{executor::ThreadPool, future::BoxFuture, task::SpawnExt as _};
+use futures::{
+    executor::{LocalSpawner, ThreadPool},
+    future::{BoxFuture, Future},
+    task::{LocalSpawnExt as _, SpawnExt as _},
+};
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use rye::executor::{AsyncTestBody, TestBody, TestExecutor};
 use std::{io, panic::AssertUnwindSafe};
 
 pub struct DefaultTestExecutor {
     pool: ThreadPool,
+    local_spawner: LocalSpawner,
 }
 
 impl DefaultTestExecutor {
-    pub fn new() -> io::Result<Self> {
+    pub fn new(local_spawner: LocalSpawner) -> io::Result<Self> {
         Ok(Self {
             pool: ThreadPool::new()?,
+            local_spawner,
         })
     }
 }
@@ -34,10 +40,21 @@ impl TestExecutor for DefaultTestExecutor {
     }
 
     fn execute_async(&mut self, mut test: AsyncTestBody) -> Self::Handle {
-        let handle = self.pool.spawn_with_handle(async move {
-            let res = AssertUnwindSafe(test.run()).maybe_unwind().expected().await;
+        async fn run_test<Fut>(fut: Fut) -> Outcome
+        where
+            Fut: Future<Output = ()>,
+        {
+            let res = AssertUnwindSafe(fut).maybe_unwind().expected().await;
             make_outcome(res)
-        });
+        }
+
+        let handle = if test.is_local() {
+            self.local_spawner
+                .spawn_local_with_handle(async move { run_test(test.run_local()).await })
+        } else {
+            self.pool
+                .spawn_with_handle(async move { run_test(test.run()).await })
+        };
         Box::pin(async move {
             match handle {
                 Ok(handle) => handle.await,

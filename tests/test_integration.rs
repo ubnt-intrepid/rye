@@ -50,6 +50,25 @@ async fn case_async() {
     });
 }
 
+#[rye::test(?Send)]
+async fn case_async_nosend() {
+    let mut vec = vec![0usize; 5];
+    let _rc = std::rc::Rc::new(());
+
+    (async {
+        assert_eq!(vec.len(), 5);
+        assert!(vec.capacity() >= 5);
+    })
+    .await;
+
+    section!("resizing bigger changes size and capacity", {
+        vec.resize(10, 0);
+
+        assert_eq!(vec.len(), 10);
+        assert!(vec.capacity() >= 5);
+    });
+}
+
 mod sub {
     #[rye::test]
     fn sub_test() {
@@ -92,6 +111,7 @@ mod sub {
 
 rye::test_group! {
     case_sync,
+    case_async_nosend,
     nested,
     case_async,
     sub,

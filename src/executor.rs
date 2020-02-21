@@ -1,8 +1,8 @@
 //! Abstraction of test execution in the rye.
 
-use crate::test::{SectionId, Test, TestDesc, TestFn};
+use crate::test::{SectionId, Test, TestDesc, TestFn, TestFuture};
 use futures::{
-    future::{BoxFuture, Future},
+    future::Future,
     task::{self, Poll},
 };
 use pin_project::pin_project;
@@ -33,9 +33,10 @@ impl Test {
                 f,
                 _marker: PhantomData,
             }),
-            TestFn::AsyncTest(f) => exec.execute_async(AsyncTestBody {
+            TestFn::AsyncTest { f, local } => exec.execute_async(AsyncTestBody {
                 desc,
                 f,
+                local,
                 _marker: PhantomData,
             }),
         }
@@ -70,29 +71,51 @@ impl TestBody {
 
 pub struct AsyncTestBody {
     desc: TestDesc,
-    f: fn() -> BoxFuture<'static, ()>,
+    f: fn() -> TestFuture,
+    local: bool,
     _marker: PhantomData<Cell<()>>,
 }
 
 impl AsyncTestBody {
-    pub async fn run(&mut self) {
+    async fn run_inner<F, Fut>(&mut self, f: F)
+    where
+        F: Fn(TestFuture) -> Fut,
+        Fut: Future<Output = ()>,
+    {
         if self.desc.leaf_sections.is_empty() {
+            let fut = f((self.f)());
             TestContext {
                 desc: &self.desc,
                 section: None,
             }
-            .scope_async((self.f)())
+            .scope_async(fut)
             .await;
         } else {
             for &section in &self.desc.leaf_sections {
+                let fut = f((self.f)());
                 TestContext {
                     desc: &self.desc,
                     section: Some(section),
                 }
-                .scope_async((self.f)())
+                .scope_async(fut)
                 .await;
             }
         }
+    }
+
+    #[inline]
+    pub fn run(&mut self) -> impl Future<Output = ()> + Send + '_ {
+        self.run_inner(TestFuture::into_future_obj)
+    }
+
+    #[inline]
+    pub fn run_local(&mut self) -> impl Future<Output = ()> + '_ {
+        self.run_inner(std::convert::identity)
+    }
+
+    #[inline]
+    pub fn is_local(&self) -> bool {
+        self.local
     }
 }
 
@@ -266,11 +289,12 @@ mod tests {
                 }
                 .run()
             }),
-            TestFn::AsyncTest(f) => {
+            TestFn::AsyncTest { f, local } => {
                 futures::executor::block_on(HISTORY.set_async(&history, async {
                     AsyncTestBody {
                         desc: test.desc,
                         f,
+                        local,
                         _marker: PhantomData,
                     }
                     .run()

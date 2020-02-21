@@ -36,15 +36,41 @@ rye::test_runner!(path::to::runner);
 
 # Asynchronous test cases
 
-WIP
+The asynchronous functions could be used in test cases.
 
 ```
 # fn main() {}
 #[rye::test]
 async fn case_async() {
+    let mut counter = 0usize;
+
     async {
-        assert_eq!(1 + 1, 2);
-    }.await;
+        counter += 1;
+    }
+    .await;
+
+    assert_eq!(counter, 1);
+}
+```
+
+By default, the future returned from the async functions are assumed to be `Send`
+and non-`Send` local variables cannot be captured across the `.await` in the test
+case. To annotate that the future is `!Send`, you need to specify the parameter to
+the attribute `#[test]` as follows:
+
+```
+# use std::{cell::Cell, rc::Rc};
+# fn main() {}
+#[rye::test(?Send)]
+async fn case_async_nosend() {
+    let counter = Rc::new(Cell::new(0usize));
+
+    async {
+        counter.set(counter.get() + 1);
+    }
+    .await;
+
+    assert_eq!(counter.get(), 1);
 }
 ```
 
@@ -177,10 +203,10 @@ mod test;
 pub mod _internal {
     pub use crate::{
         registration::{Registration, Registry, RegistryError},
-        test::{Section, Test, TestDesc, TestFn},
+        test::{Section, Test, TestDesc, TestFn, TestFuture},
     };
     pub use maplit::{hashmap, hashset};
-    pub use std::{boxed::Box, module_path, result::Result, vec};
+    pub use std::{module_path, result::Result, vec};
 
     use crate::{executor::TestContext, test::SectionId};
 
