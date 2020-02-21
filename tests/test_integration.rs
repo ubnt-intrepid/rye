@@ -82,14 +82,18 @@ mod sub {
             assert!(vec.capacity() >= 5);
         });
     }
+
+    rye::test_group! {
+        sub_test,
+        modified_rye_path,
+    }
 }
 
-rye::test_main! {
-    test_cases = {
-        case_sync,
-        nested,
-        case_async,
-        sub::{sub_test, modified_rye_path},
-    };
-    runner = rye_runner::runner;
+rye::test_group! {
+    case_sync,
+    nested,
+    case_async,
+    sub,
 }
+
+rye::test_runner!(rye_runner::runner);

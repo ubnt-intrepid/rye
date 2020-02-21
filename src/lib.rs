@@ -26,14 +26,10 @@ WIP
 # fn main() {}
 # mod inner {
 # #[rye::test] fn case1() {}
-rye::test_main! {
-    // b
-    test_cases = {
-        case1,
-    };
-    // a
-    runner = path::to::runner;
+rye::test_group! {
+    case1,
 }
+rye::test_runner!(path::to::runner);
 # mod path { pub mod to { pub fn runner(_: &[&dyn rye::registration::Registration]) {} } }
 # }
 ```
@@ -75,24 +71,27 @@ mod sub1 {
         // ...
     }
 
-    pub(crate) mod sub2 {
+    mod sub2 {
         #[rye::test]
         fn case4() {
+            // ...
         }
+
+        rye::test_group! { case4 }
+    }
+
+    rye::test_group! {
+        case2,
+        case3,
+        sub2,
     }
 }
 
-rye::test_main! {
-    test_cases = {
-        case1,
-        sub1::{
-            case2,
-            case3,
-            sub2::case4,
-        },
-    };
-    runner = path::to::runner;
+rye::test_group! {
+    case1,
+    sub1,
 }
+rye::test_runner!(path::to::runner);
 # mod path { pub mod to { pub fn runner(_: &[&dyn rye::registration::Registration]) {} } }
 # }
 ```
@@ -204,18 +203,15 @@ pub use crate::test::Test;
 /// Generate a single test case.
 pub use rye_macros::test;
 
-/// Generate a main function.
-///
-/// This macro is provided for the stable compiler without the unstable
-/// feature `custom_test_frameworks`.
-///
-/// # Parameters
-///
-/// The parameters are specified in semicolon-terminated format.
-/// The available parameters are as follows:
-///
-/// * `test_cases` - the list of test cases. the list could be described
-///   in a tree format like `use` statement.
-/// * `runner` - the path to the test runner. the test runner is a free
-///   function with the signature `fn(&[&dyn Registration])`.
-pub use rye_macros::test_main;
+/// Re-export the registration of test cases.
+pub use rye_macros::test_group;
+
+/// Generate the main function for running the test cases.
+#[macro_export]
+macro_rules! test_runner {
+    ($runner:path) => {
+        fn main() {
+            $runner(&[&self::__REGISTRATION as &dyn $crate::_internal::Registration]);
+        }
+    };
+}

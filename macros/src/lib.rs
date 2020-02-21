@@ -1,7 +1,7 @@
 extern crate proc_macro;
 
 mod test;
-mod test_main;
+mod test_group;
 
 use proc_macro::TokenStream;
 
@@ -11,6 +11,6 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn test_main(input: TokenStream) -> TokenStream {
-    crate::test_main::test_main(input.into()).into()
+pub fn test_group(input: TokenStream) -> TokenStream {
+    crate::test_group::test_group(input.into()).into()
 }
