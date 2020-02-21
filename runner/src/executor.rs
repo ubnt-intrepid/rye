@@ -1,12 +1,8 @@
 use crate::report::Outcome;
 use expected::{expected, Disappoints, FutureExpectedExt as _};
-use futures::{
-    executor::ThreadPool,
-    future::{BoxFuture, Future},
-    task::SpawnExt as _,
-};
+use futures::{executor::ThreadPool, future::BoxFuture, task::SpawnExt as _};
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
-use rye::TestExecutor;
+use rye::executor::{AsyncTestBody, TestBody, TestExecutor};
 use std::{io, panic::AssertUnwindSafe};
 
 pub struct DefaultTestExecutor {
@@ -24,12 +20,22 @@ impl DefaultTestExecutor {
 impl TestExecutor for DefaultTestExecutor {
     type Handle = BoxFuture<'static, Outcome>;
 
-    fn execute<Fut>(&mut self, fut: Fut) -> Self::Handle
-    where
-        Fut: Future<Output = ()> + Send + 'static,
-    {
+    fn execute(&mut self, mut test: TestBody) -> Self::Handle {
+        let (tx, rx) = futures::channel::oneshot::channel();
+        std::thread::spawn(move || {
+            let res = expected(|| maybe_unwind(AssertUnwindSafe(|| test.run())));
+            let _ = tx.send(make_outcome(res));
+        });
+        Box::pin(async move {
+            rx.await.unwrap_or_else(|rx_err| {
+                Outcome::failed().error_message(format!("unknown error: {}", rx_err))
+            })
+        })
+    }
+
+    fn execute_async(&mut self, mut test: AsyncTestBody) -> Self::Handle {
         let handle = self.pool.spawn_with_handle(async move {
-            let res = AssertUnwindSafe(fut).maybe_unwind().expected().await;
+            let res = AssertUnwindSafe(test.run()).maybe_unwind().expected().await;
             make_outcome(res)
         });
         Box::pin(async move {
@@ -39,22 +45,6 @@ impl TestExecutor for DefaultTestExecutor {
                     Outcome::failed().error_message(format!("unknown error: {}", spawn_err))
                 }
             }
-        })
-    }
-
-    fn execute_blocking<F>(&mut self, f: F) -> Self::Handle
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        let (tx, rx) = futures::channel::oneshot::channel();
-        std::thread::spawn(move || {
-            let res = expected(|| maybe_unwind(AssertUnwindSafe(|| f())));
-            let _ = tx.send(make_outcome(res));
-        });
-        Box::pin(async move {
-            rx.await.unwrap_or_else(|rx_err| {
-                Outcome::failed().error_message(format!("unknown error: {}", rx_err))
-            })
         })
     }
 }

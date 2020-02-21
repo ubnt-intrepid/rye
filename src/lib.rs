@@ -2,7 +2,8 @@
 A custom unit testing framework inspired by Catch2.
 !*/
 
-mod executor;
+pub mod executor;
+
 mod registration;
 mod test;
 
@@ -32,7 +33,6 @@ pub mod _internal {
 }
 
 pub use crate::{
-    executor::TestExecutor,
     registration::{Registration, Registry, RegistryError},
     test::Test,
 };

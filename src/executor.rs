@@ -1,21 +1,23 @@
+//! Abstraction of test execution in the rye.
+
 use crate::test::{SectionId, Test, TestDesc, TestFn};
 use futures::{
     future::{BoxFuture, Future},
     task::{self, Poll},
 };
 use pin_project::pin_project;
-use std::{cell::Cell, mem, pin::Pin, ptr::NonNull};
+use std::{cell::Cell, marker::PhantomData, mem, pin::Pin, ptr::NonNull};
 
+/// Test executor.
 pub trait TestExecutor {
+    /// The type of handle for awaiting the test completation.
     type Handle;
 
-    fn execute<Fut>(&mut self, fut: Fut) -> Self::Handle
-    where
-        Fut: Future<Output = ()> + Send + 'static;
+    /// Execute a test body.
+    fn execute(&mut self, test: TestBody) -> Self::Handle;
 
-    fn execute_blocking<F>(&mut self, f: F) -> Self::Handle
-    where
-        F: FnOnce() + Send + 'static;
+    /// Execute an asynchronous test body.
+    fn execute_async(&mut self, test: AsyncTestBody) -> Self::Handle;
 }
 
 impl Test {
@@ -26,48 +28,70 @@ impl Test {
     {
         let desc = self.desc.clone();
         match self.test_fn {
-            TestFn::SyncTest(f) => exec.execute_blocking(move || run_sync(&desc, f)),
-            TestFn::AsyncTest(f) => exec.execute(async move {
-                run_async(&desc, f).await;
+            TestFn::SyncTest(f) => exec.execute(TestBody {
+                desc,
+                f,
+                _marker: PhantomData,
+            }),
+            TestFn::AsyncTest(f) => exec.execute_async(AsyncTestBody {
+                desc,
+                f,
+                _marker: PhantomData,
             }),
         }
     }
 }
 
-fn run_sync(desc: &TestDesc, f: fn()) {
-    if desc.leaf_sections.is_empty() {
-        TestContext {
-            desc: &desc,
-            section: None,
-        }
-        .scope(&f);
-    } else {
-        for &section in &desc.leaf_sections {
+pub struct TestBody {
+    desc: TestDesc,
+    f: fn(),
+    _marker: PhantomData<Cell<()>>,
+}
+
+impl TestBody {
+    pub fn run(&mut self) {
+        if self.desc.leaf_sections.is_empty() {
             TestContext {
-                desc: &desc,
-                section: Some(section),
+                desc: &self.desc,
+                section: None,
             }
-            .scope(&f);
+            .scope(&self.f);
+        } else {
+            for &section in &self.desc.leaf_sections {
+                TestContext {
+                    desc: &self.desc,
+                    section: Some(section),
+                }
+                .scope(&self.f);
+            }
         }
     }
 }
 
-async fn run_async(desc: &TestDesc, f: fn() -> BoxFuture<'static, ()>) {
-    if desc.leaf_sections.is_empty() {
-        TestContext {
-            desc: &desc,
-            section: None,
-        }
-        .scope_async(f())
-        .await;
-    } else {
-        for &section in &desc.leaf_sections {
+pub struct AsyncTestBody {
+    desc: TestDesc,
+    f: fn() -> BoxFuture<'static, ()>,
+    _marker: PhantomData<Cell<()>>,
+}
+
+impl AsyncTestBody {
+    pub async fn run(&mut self) {
+        if self.desc.leaf_sections.is_empty() {
             TestContext {
-                desc: &desc,
-                section: Some(section),
+                desc: &self.desc,
+                section: None,
             }
-            .scope_async(f())
+            .scope_async((self.f)())
             .await;
+        } else {
+            for &section in &self.desc.leaf_sections {
+                TestContext {
+                    desc: &self.desc,
+                    section: Some(section),
+                }
+                .scope_async((self.f)())
+                .await;
+            }
         }
     }
 }
@@ -234,10 +258,25 @@ mod tests {
 
         let history = RefCell::new(vec![]);
         match test.test_fn {
-            TestFn::SyncTest(f) => HISTORY.set(&history, || run_sync(&test.desc, f)),
-            TestFn::AsyncTest(f) => futures::executor::block_on(
-                HISTORY.set_async(&history, async { run_async(&test.desc, f).await }),
-            ),
+            TestFn::SyncTest(f) => HISTORY.set(&history, || {
+                TestBody {
+                    desc: test.desc,
+                    f,
+                    _marker: PhantomData,
+                }
+                .run()
+            }),
+            TestFn::AsyncTest(f) => {
+                futures::executor::block_on(HISTORY.set_async(&history, async {
+                    AsyncTestBody {
+                        desc: test.desc,
+                        f,
+                        _marker: PhantomData,
+                    }
+                    .run()
+                    .await
+                }))
+            }
         }
 
         history.into_inner()
