@@ -1,23 +1,23 @@
 error: required a string literal
- --> $DIR/06-params.rs:3:24
+ --> $DIR/06-params.rs:4:18
   |
-3 | #[rye::test(rye_path = 10)]
-  |                        ^^
+4 | #[rye(rye_path = 10)]
+  |                  ^^
 
 error: duplicated parameter
- --> $DIR/06-params.rs:9:31
-  |
-9 | #[rye::test(rye_path = "rye", rye_path = "rye")]
-  |                               ^^^^^^^^^^^^^^^^
+  --> $DIR/06-params.rs:13:7
+   |
+13 | #[rye(rye_path = "rye")]
+   |       ^^^^^^^^^^^^^^^^
 
 error: unknown parameter name
-  --> $DIR/06-params.rs:12:13
+  --> $DIR/06-params.rs:17:7
    |
-12 | #[rye::test(the_quick_fox = "lazy")]
-   |             ^^^^^^^^^^^^^
+17 | #[rye(the_quick_fox = "lazy")]
+   |       ^^^^^^^^^^^^^
 
 error[E0433]: failed to resolve: use of undeclared type or module `catcher_in_the_rye`
- --> $DIR/06-params.rs:6:24
+ --> $DIR/06-params.rs:8:18
   |
-6 | #[rye::test(rye_path = "catcher_in_the_rye")]
-  |                        ^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `catcher_in_the_rye`
+8 | #[rye(rye_path = "catcher_in_the_rye")]
+  |                  ^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `catcher_in_the_rye`

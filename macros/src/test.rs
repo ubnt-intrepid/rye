@@ -4,28 +4,29 @@ use quote::{quote, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
     parse::{Error, Parse, ParseStream, Result},
-    punctuated::Punctuated,
     visit_mut::{self, VisitMut},
-    Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Item, ItemFn, Macro,
-    Stmt, Token,
+    Attribute, Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Item, ItemFn,
+    Macro, MetaNameValue, Stmt, Token,
 };
 
-macro_rules! parse {
-    ($input:ident as $t:ty) => {
-        match syn::parse2::<$t>($input) {
+macro_rules! try_quote {
+    ($e:expr) => {
+        match $e {
             Ok(parsed) => parsed,
             Err(err) => return err.to_compile_error(),
         }
     };
 }
 
-pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
-    let args = parse!(args as Args);
-    let mut item = parse!(item as ItemFn);
+pub(crate) fn test(_args: TokenStream, item: TokenStream) -> TokenStream {
+    let mut item = try_quote!(syn::parse2::<ItemFn>(item));
+
+    // extract attributes
+    let params = try_quote!(Params::from_attrs(&mut item.attrs));
 
     // expand section!()
     let mut expand = ExpandBlock {
-        args: &args,
+        params: &params,
         sections: IndexMap::new(),
         next_section_id: 0,
         parent: None,
@@ -38,7 +39,7 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 
     let generated = Generated {
         item: &item,
-        args: &args,
+        params: &params,
         sections: &sections,
     };
 
@@ -48,29 +49,49 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
-struct Args {
+struct Params {
     rye_path: syn::Path,
 }
 
-impl Parse for Args {
-    fn parse(input: ParseStream) -> Result<Self> {
+impl Params {
+    fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut rye_path = None;
+        let mut errors: Option<Error> = None;
 
-        let params = Punctuated::<syn::MetaNameValue, Token![,]>::parse_terminated(input)?;
-        for param in params {
-            if param.path.is_ident("rye_path") {
-                match param.lit {
-                    syn::Lit::Str(ref lit) if rye_path.is_none() => {
-                        rye_path.replace(lit.parse()?);
-                    }
-                    syn::Lit::Str(..) => {
-                        return Err(Error::new_spanned(&param, "duplicated parameter"))
-                    }
-                    lit => return Err(Error::new_spanned(&lit, "required a string literal")),
-                }
-            } else {
-                return Err(Error::new_spanned(&param.path, "unknown parameter name"));
+        attrs.retain(|attr| {
+            if !attr.path.is_ident("rye") {
+                return true;
             }
+
+            if let Err(error) = (|| -> Result<()> {
+                let param: MetaNameValue = attr.parse_args()?;
+                if param.path.is_ident("rye_path") {
+                    match param.lit {
+                        syn::Lit::Str(ref lit) if rye_path.is_none() => {
+                            rye_path.replace(lit.parse()?);
+                            Ok(())
+                        }
+                        syn::Lit::Str(..) => {
+                            Err(Error::new_spanned(&param, "duplicated parameter"))
+                        }
+                        lit => Err(Error::new_spanned(&lit, "required a string literal")),
+                    }
+                } else {
+                    Err(Error::new_spanned(&param.path, "unknown parameter name"))
+                }
+            })() {
+                if let Some(ref mut errors) = errors {
+                    errors.combine(error);
+                } else {
+                    errors.replace(error);
+                }
+            }
+
+            false
+        });
+
+        if let Some(errors) = errors {
+            return Err(errors);
         }
 
         Ok(Self {
@@ -105,7 +126,7 @@ impl Parse for SectionBody {
 }
 
 struct ExpandBlock<'a> {
-    args: &'a Args,
+    params: &'a Params,
     sections: IndexMap<SectionId, Section>,
     next_section_id: SectionId,
     parent: Option<SectionId>,
@@ -161,7 +182,7 @@ impl ExpandBlock<'_> {
         );
         self.next_section_id += 1;
 
-        let rye_path = &self.args.rye_path;
+        let rye_path = &self.params.rye_path;
         Ok((
             syn::parse_quote! {
                 if #rye_path::_internal::is_target(#section_id) #block
@@ -256,7 +277,7 @@ impl VisitMut for ExpandBlock<'_> {
 }
 
 struct Generated<'a> {
-    args: &'a Args,
+    params: &'a Params,
     item: &'a ItemFn,
     sections: &'a [Section],
 }
@@ -285,7 +306,7 @@ impl ToTokens for Generated<'_> {
 
         let section_map_entries = self.sections.iter().map(|section| SectionMapEntry {
             section,
-            rye_path: &self.args.rye_path,
+            rye_path: &self.params.rye_path,
         });
         let leaf_section_ids = self.sections.iter().filter_map(|section| {
             if section.children.is_empty() {
@@ -296,7 +317,7 @@ impl ToTokens for Generated<'_> {
         });
 
         let ident = &self.item.sig.ident;
-        let rye_path = &self.args.rye_path;
+        let rye_path = &self.params.rye_path;
 
         let test_fn: syn::Expr = if self.item.sig.asyncness.is_some() {
             syn::parse_quote!(#rye_path::_internal::TestFn::AsyncTest(|| #rye_path::_internal::Box::pin(super::#ident())))
@@ -393,5 +414,10 @@ mod tests {
     #[test]
     fn no_sections() {
         test_expanded("07-no-sections");
+    }
+
+    #[test]
+    fn attributes() {
+        test_expanded("08-attributes");
     }
 }
