@@ -4,7 +4,10 @@ use crate::{
     report::{Outcome, OutcomeKind, Printer, Report},
 };
 use futures::stream::StreamExt as _;
-use rye::{Registration, Registry, RegistryError, Test};
+use rye::{
+    registration::{Registration, Registry, RegistryError},
+    Test,
+};
 use std::collections::HashSet;
 
 pub(crate) struct Session {
@@ -31,7 +34,10 @@ impl Session {
     pub(crate) fn register(&mut self, tests: &[&dyn Registration]) -> Result<(), ExitStatus> {
         let (pending_tests, filtered_out_tests) = match register_all(tests, &self.args) {
             Ok(tests) => tests,
-            Err(_) => return Err(ExitStatus::FAILED),
+            Err(err) => {
+                eprintln!("registry error: {}", err);
+                return Err(ExitStatus::FAILED);
+            }
         };
         self.pending_tests = pending_tests;
         self.filtered_out_tests = filtered_out_tests;
@@ -94,8 +100,10 @@ struct MainRegistryInner {
 impl Registry for MainRegistry<'_> {
     fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
         if !self.inner.unique_test_names.insert(test.name().into()) {
-            eprintln!("the test name is conflicted: {}", test.name());
-            return Err(RegistryError::new());
+            return Err(RegistryError::new(format!(
+                "the test name '{}' is conflicted",
+                test.name()
+            )));
         }
 
         if self.args.is_match(test.name()) {
