@@ -10,7 +10,7 @@ use std::{cell::Cell, marker::PhantomData, mem, pin::Pin, ptr::NonNull};
 
 /// Test executor.
 pub trait TestExecutor {
-    /// The type of handle for awaiting the test completation.
+    /// The type of handle for awaiting the test completion.
     type Handle;
 
     /// Execute a test body.
