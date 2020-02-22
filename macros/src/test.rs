@@ -21,6 +21,27 @@ macro_rules! try_quote {
 pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut item = try_quote!(syn::parse2::<ItemFn>(item));
 
+    match &item.sig.inputs {
+        inputs if inputs.is_empty() => (),
+        inputs => {
+            return Error::new_spanned(inputs, "test functions cannot accept arguments")
+                .to_compile_error()
+        }
+    }
+
+    match &item.sig.generics {
+        generics if generics.params.is_empty() => (),
+        generics => {
+            return Error::new_spanned(generics, "test functions cannot take generic parameters")
+                .to_compile_error()
+        }
+    }
+
+    if let ref output @ syn::ReturnType::Type(..) = &item.sig.output {
+        return Error::new_spanned(output, "cannot return non-unit value from test function")
+            .to_compile_error();
+    }
+
     if item.sig.asyncness.is_none() && !args.is_empty() {
         return Error::new_spanned(&args, "accepted only for async functions").to_compile_error();
     }

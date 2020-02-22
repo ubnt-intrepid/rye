@@ -1,0 +1,17 @@
+error: cannot return non-unit value from test function
+ --> $DIR/08-invalid-signature.rs:4:18
+  |
+4 | fn nonunit_ret() -> std::io::Result<()> {
+  |                  ^^^^^^^^^^^^^^^^^^^^^^
+
+error: test functions cannot accept arguments
+ --> $DIR/08-invalid-signature.rs:9:14
+  |
+9 | fn has_input(x: u32) {}
+  |              ^^^^^^
+
+error: test functions cannot take generic parameters
+  --> $DIR/08-invalid-signature.rs:12:16
+   |
+12 | fn has_generics<T>() {}
+   |                ^^^

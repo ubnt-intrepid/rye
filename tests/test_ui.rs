@@ -8,5 +8,6 @@ fn ui_test() {
     t.compile_fail("tests/ui/05-section-in-async-block.rs");
     t.compile_fail("tests/ui/06-params.rs");
     t.compile_fail("tests/ui/07-sendness.rs");
-    //t.compile_fail("tests/ui/08-test-main.rs");
+    t.compile_fail("tests/ui/08-invalid-signature.rs");
+    //t.compile_fail("tests/ui/09-test-main.rs");
 }
