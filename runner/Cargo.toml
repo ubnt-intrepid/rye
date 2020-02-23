@@ -1,12 +1,12 @@
 [package]
 name = "rye-runner"
-version = "0.0.0"
+version = "0.1.0-dev"
 publish = false
 authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-rye = { version = "0.0.1", path = ".." }
+rye = { version = "0.1.0-dev", path = ".." }
 console = "0.9"
 futures = { version = "0.3", features = [ "thread-pool" ] }
 getopts = "0.2"

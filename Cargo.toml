@@ -1,6 +1,6 @@
 [package]
 name = "rye"
-version = "0.0.1"
+version = "0.1.0-dev"
 description = """
 A custom unit testing framework inspired by Catch2.
 """
@@ -14,7 +14,7 @@ readme = "README.md"
 frameworks = []
 
 [dependencies]
-rye-macros = { version = "=0.0.1", path = "./macros" }
+rye-macros = { version = "=0.1.0-dev", path = "./macros" }
 futures = "0.3"
 maplit = "1"
 pin-project = "0.4"
