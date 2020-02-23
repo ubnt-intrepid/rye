@@ -23,8 +23,7 @@ fn multi_section_in_scope() {
 pub(crate) mod multi_section_in_scope {
     use super::*;
 
-    #[doc(hidden)]
-    pub struct __registration(());
+    struct __registration(());
 
     impl ::rye::_internal::Registration for __registration {
         fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
@@ -48,6 +47,6 @@ pub(crate) mod multi_section_in_scope {
     }
 
     ::rye::__annotate_test_case! {
-        pub(crate) const __REGISTRATION: __registration = __registration(());
+        pub(crate) const __REGISTRATION: &dyn ::rye::_internal::Registration = &__registration(());
     }
 }

@@ -116,13 +116,13 @@ where
         let body = &self.body;
         tokens.append_all(&[
             quote! {
-                pub(crate) struct __registration(());
+                struct __registration(());
                 impl ::rye::_internal::Registration for __registration {
                     fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> Result<(), ::rye::_internal::RegistryError> {
                         #body
                     }
                 }
-                pub(crate) const __REGISTRATION: __registration = __registration(());
+                pub(crate) const __REGISTRATION: &dyn ::rye::_internal::Registration = &__registration(());
             }
         ]);
     }

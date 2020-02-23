@@ -39,7 +39,7 @@ pub(crate) fn test_runner(input: TokenStream) -> TokenStream {
 
     quote! {
         fn main() {
-            #runner(&[ & #registration as &dyn ::rye::_internal::Registration ]);
+            #runner(&[ #registration ]);
         }
     }
 }
