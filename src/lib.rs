@@ -233,11 +233,4 @@ pub use rye_macros::test;
 pub use rye_macros::test_group;
 
 /// Generate the main function for running the test cases.
-#[macro_export]
-macro_rules! test_runner {
-    ($runner:path) => {
-        fn main() {
-            $runner(&[&self::__REGISTRATION as &dyn $crate::_internal::Registration]);
-        }
-    };
-}
+pub use rye_macros::test_runner;
