@@ -1,22 +1,46 @@
 fn multi_section_in_scope() {
-    if ::rye::_internal::is_target(0u64) {
-        assert!(1 + 1 == 2);
+    {
+        let __section = ::rye::_internal::enter_section(0u64);
+        if __section.enabled() {
+            assert!(1 + 1 == 2);
+        }
     }
-    if ::rye::_internal::is_target(1u64) {
-        assert!(1 + 1 == 2);
-        if ::rye::_internal::is_target(2u64) {
-            assert!(true);
-            if ::rye::_internal::is_target(3u64) {
-                assert!(true);
+
+    {
+        let __section = ::rye::_internal::enter_section(1u64);
+        if __section.enabled() {
+            assert!(1 + 1 == 2);
+
+            {
+                let __section = ::rye::_internal::enter_section(2u64);
+                if __section.enabled() {
+                    assert!(true);
+
+                    {
+                        let __section = ::rye::_internal::enter_section(3u64);
+                        if __section.enabled() {
+                            assert!(true);
+                        }
+                    }
+                }
             }
+
+            {
+                let __section = ::rye::_internal::enter_section(4u64);
+                if __section.enabled() {
+                    assert!(true);
+                }
+            }
+            
+            assert!(1 + 2 == 3);
         }
-        if ::rye::_internal::is_target(4u64) {
-            assert!(true);
-        }
-        assert!(1 + 2 == 3);
     }
-    if ::rye::_internal::is_target(5u64) {
-        assert!(false);
+
+    {
+        let __section = ::rye::_internal::enter_section(5u64);
+        if __section.enabled() {
+            assert!(false);
+        }
     }
 }
 

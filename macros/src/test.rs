@@ -241,9 +241,10 @@ impl ExpandBlock<'_> {
 
         let rye_path = &self.params.rye_path;
         Ok((
-            syn::parse_quote! {
-                if #rye_path::_internal::is_target(#section_id) #block
-            },
+            syn::parse_quote! {{
+                let __section = #rye_path::_internal::enter_section(#section_id);
+                if __section.enabled() #block
+            }},
             section_id,
         ))
     }

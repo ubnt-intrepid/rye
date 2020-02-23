@@ -1,12 +1,11 @@
 //! Abstraction of test execution in the rye.
 
-use crate::test::{SectionId, Test, TestDesc, TestFn, TestFuture};
-use futures::{
-    future::Future,
-    task::{self, Poll},
+use crate::{
+    context::TestContext,
+    test::{Test, TestDesc, TestFn, TestFuture},
 };
-use pin_project::pin_project;
-use std::{cell::Cell, marker::PhantomData, mem, pin::Pin, ptr::NonNull};
+use futures::future::Future;
+use std::{cell::Cell, marker::PhantomData};
 
 /// Test executor.
 pub trait TestExecutor {
@@ -119,104 +118,16 @@ impl AsyncTestBody {
     }
 }
 
-pub(crate) struct TestContext<'a> {
-    desc: &'a TestDesc,
-    section: Option<SectionId>,
-}
-
-thread_local! {
-    static TLS_CTX: Cell<Option<NonNull<TestContext<'static>>>> = Cell::new(None);
-}
-
-struct Guard(Option<NonNull<TestContext<'static>>>);
-
-impl Drop for Guard {
-    fn drop(&mut self) {
-        TLS_CTX.with(|tls| tls.set(self.0.take()));
-    }
-}
-
-impl<'a> TestContext<'a> {
-    fn scope<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        let prev = TLS_CTX.with(|tls| unsafe {
-            let ctx_ptr = mem::transmute::<&mut Self, &mut TestContext<'static>>(self);
-            tls.replace(Some(NonNull::from(ctx_ptr)))
-        });
-        let _guard = Guard(prev);
-        f()
-    }
-
-    #[inline]
-    async fn scope_async<Fut>(&mut self, fut: Fut) -> Fut::Output
-    where
-        Fut: Future,
-    {
-        #[pin_project]
-        struct ScopeAsync<'a, 'ctx, Fut> {
-            #[pin]
-            fut: Fut,
-            ctx: &'a mut TestContext<'ctx>,
-        }
-
-        impl<Fut> Future for ScopeAsync<'_, '_, Fut>
-        where
-            Fut: Future,
-        {
-            type Output = Fut::Output;
-
-            fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-                let me = self.project();
-                let fut = me.fut;
-                me.ctx.scope(|| fut.poll(cx))
-            }
-        }
-
-        ScopeAsync { fut, ctx: self }.await
-    }
-
-    fn try_with<F, R>(f: F) -> Result<R, AccessError>
-    where
-        F: FnOnce(&mut TestContext<'_>) -> R,
-    {
-        let ctx_ptr = TLS_CTX.with(|tls| tls.take());
-        let _guard = Guard(ctx_ptr);
-        let mut ctx_ptr = ctx_ptr.ok_or_else(|| AccessError { _p: () })?;
-        Ok(unsafe { f(ctx_ptr.as_mut()) })
-    }
-
-    pub(crate) fn with<F, R>(f: F) -> R
-    where
-        F: FnOnce(&mut TestContext<'_>) -> R,
-    {
-        Self::try_with(f).expect("cannot acquire the test context")
-    }
-
-    pub(crate) fn is_target_section(&self, id: SectionId) -> bool {
-        self.section.map_or(false, |section_id| {
-            let section = self
-                .desc
-                .sections
-                .get(&section_id)
-                .expect("invalid section id is set");
-            section_id == id || section.ancestors.contains(&id)
-        })
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct AccessError {
-    _p: (),
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registration::{Registration, Registry, RegistryError};
+    use crate::{
+        registration::{Registration, Registry, RegistryError},
+        test::{Test, TestFn},
+    };
+    use futures::task::{self, Poll};
     use scoped_tls::{scoped_thread_local, ScopedKey};
-    use std::cell::RefCell;
+    use std::{cell::RefCell, marker::PhantomData, pin::Pin};
 
     trait ScopedKeyExt<T> {
         fn set_async<'a, Fut>(&'static self, t: &'a T, fut: Fut) -> SetAsync<'a, T, Fut>

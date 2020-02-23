@@ -197,6 +197,7 @@ teardown
 pub mod executor;
 pub mod registration;
 
+mod context;
 mod test;
 
 #[doc(hidden)]
@@ -208,11 +209,14 @@ pub mod _internal {
     pub use maplit::{hashmap, hashset};
     pub use std::{module_path, result::Result, vec};
 
-    use crate::{executor::TestContext, test::SectionId};
+    use crate::{
+        context::{EnterSection, TestContext},
+        test::SectionId,
+    };
 
     #[inline]
-    pub fn is_target(id: SectionId) -> bool {
-        TestContext::with(|ctx| ctx.is_target_section(id))
+    pub fn enter_section(id: SectionId) -> EnterSection {
+        TestContext::with(|ctx| ctx.enter_section(id))
     }
 
     #[doc(hidden)]
