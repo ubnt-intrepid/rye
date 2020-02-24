@@ -21,6 +21,7 @@ pin-project = "0.4"
 
 [dev-dependencies]
 rye-runner = { path = "runner" }
+anyhow = "1"
 futures-test = "0.3"
 scoped-tls = "1"
 trybuild = "1"

@@ -46,7 +46,9 @@ pub(crate) mod case_sync_nested {
                     },
                     leaf_sections: ::rye::_internal::vec![ 1u64 ],
                 },
-                test_fn: ::rye::_internal::TestFn::SyncTest(super::case_sync_nested),
+                test_fn: ::rye::_internal::TestFn::SyncTest {
+                    f: || ::rye::_internal::test_result(super::case_sync_nested()),
+                },
             })?;
             ::rye::_internal::Result::Ok(())
         }

@@ -19,7 +19,9 @@ pub(crate) mod ignore_inner_items {
                     sections: ::rye::_internal::hashmap! {},
                     leaf_sections: ::rye::_internal::vec![],
                 },
-                test_fn: ::rye::_internal::TestFn::SyncTest(super::ignore_inner_items),
+                test_fn: ::rye::_internal::TestFn::SyncTest {
+                    f: || ::rye::_internal::test_result(super::ignore_inner_items()),
+                },
             })?;
             ::rye::_internal::Result::Ok(())
         }

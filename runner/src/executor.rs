@@ -6,7 +6,10 @@ use futures::{
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
-use rye::executor::{AsyncTestBody, TestBody, TestExecutor};
+use rye::{
+    executor::{AsyncTestBody, TestBody, TestExecutor},
+    TestResult,
+};
 use std::{io, panic::AssertUnwindSafe};
 
 pub struct DefaultTestExecutor {
@@ -42,7 +45,7 @@ impl TestExecutor for DefaultTestExecutor {
     fn execute_async(&mut self, mut test: AsyncTestBody) -> Self::Handle {
         async fn run_test<Fut>(fut: Fut) -> Outcome
         where
-            Fut: Future<Output = ()>,
+            Fut: Future<Output = Box<dyn TestResult>>,
         {
             let res = AssertUnwindSafe(fut).maybe_unwind().expected().await;
             make_outcome(res)
@@ -66,18 +69,27 @@ impl TestExecutor for DefaultTestExecutor {
     }
 }
 
-fn make_outcome(res: (Result<(), Unwind>, Option<Disappoints>)) -> Outcome {
-    match res {
-        (Ok(()), None) => Outcome::passed(),
-        (Ok(()), Some(disappoints)) => Outcome::failed().error_message(disappoints.to_string()),
-        (Err(unwind), disappoints) => {
-            use std::fmt::Write as _;
-            let mut msg = String::new();
-            let _ = writeln!(&mut msg, "{}", unwind);
-            if let Some(disappoints) = disappoints {
-                let _ = writeln!(&mut msg, "{}", disappoints);
-            }
-            Outcome::failed().error_message(msg)
-        }
+fn make_outcome(res: (Result<Box<dyn TestResult>, Unwind>, Option<Disappoints>)) -> Outcome {
+    let (res, disappoints) = res;
+
+    let mut error_message = match res {
+        Ok(term) if term.is_success() => None,
+        Ok(term) => Some(
+            term.error_message()
+                .map_or("<unknown>".into(), |msg| format!("{:?}", msg)),
+        ),
+        Err(unwind) => Some(unwind.to_string()),
+    };
+
+    if let Some(disappoints) = disappoints {
+        let msg = error_message.get_or_insert_with(Default::default);
+
+        use std::fmt::Write as _;
+        let _ = writeln!(msg, "{}", disappoints);
+    }
+
+    match error_message {
+        Some(msg) => Outcome::failed().error_message(msg),
+        None => Outcome::passed(),
     }
 }
