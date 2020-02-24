@@ -4,12 +4,14 @@ use futures::{
     task::{self, Poll},
 };
 use pin_project::pin_project;
-use std::{cell::Cell, mem, pin::Pin, ptr::NonNull};
+use std::{cell::Cell, marker::PhantomData, mem, pin::Pin, ptr::NonNull};
 
-pub(crate) struct TestContext<'a> {
+/// Context values while running the test case.
+pub struct TestContext<'a> {
     pub(crate) desc: &'a TestDesc,
     pub(crate) target_section: Option<SectionId>,
     pub(crate) current_section: Option<SectionId>,
+    pub(crate) _marker: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
 thread_local! {
@@ -65,7 +67,10 @@ impl<'a> TestContext<'a> {
         ScopeAsync { fut, ctx: self }.await
     }
 
-    fn try_with<F, R>(f: F) -> Result<R, AccessError>
+    /// Attempt to get a reference to the test context and invoke the provided closure.
+    ///
+    /// This function returns an `AccessError` if the test context is not available.
+    pub fn try_with<F, R>(f: F) -> Result<R, AccessError>
     where
         F: FnOnce(&mut TestContext<'_>) -> R,
     {
@@ -75,11 +80,22 @@ impl<'a> TestContext<'a> {
         Ok(unsafe { f(ctx_ptr.as_mut()) })
     }
 
-    pub(crate) fn with<F, R>(f: F) -> R
+    /// Get a reference to the test context and invoke the provided closure.
+    ///
+    /// # Panics
+    /// This function causes a panic if the test context is not available.
+    #[inline]
+    pub fn with<F, R>(f: F) -> R
     where
         F: FnOnce(&mut TestContext<'_>) -> R,
     {
         Self::try_with(f).expect("cannot acquire the test context")
+    }
+
+    /// Return the name of section currently executing.
+    #[inline]
+    pub fn section_name(&self) -> Option<&str> {
+        self.current_section.map(|id| self.desc.sections[&id].name)
     }
 
     pub(crate) fn enter_section(&mut self, id: SectionId) -> EnterSection {
@@ -99,6 +115,7 @@ impl<'a> TestContext<'a> {
     }
 }
 
+#[doc(hidden)]
 pub struct EnterSection {
     enabled: bool,
     last_section: Option<SectionId>,
@@ -118,7 +135,9 @@ impl EnterSection {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct AccessError {
+/// The error value returned from `TestContext::try_with`.
+#[derive(Debug, thiserror::Error)]
+#[error("cannot access the test context outside of the test body")]
+pub struct AccessError {
     _p: (),
 }

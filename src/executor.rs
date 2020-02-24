@@ -68,6 +68,7 @@ impl BlockingTest {
                 desc: &self.desc,
                 target_section: None,
                 current_section: None,
+                _marker: PhantomData,
             }
             .scope(&self.f)
         } else {
@@ -76,6 +77,7 @@ impl BlockingTest {
                     desc: &self.desc,
                     target_section: Some(section),
                     current_section: None,
+                    _marker: PhantomData,
                 }
                 .scope(&self.f);
                 if !term.is_success() {
@@ -104,6 +106,7 @@ impl AsyncTestInner {
                 desc: &self.desc,
                 target_section: None,
                 current_section: None,
+                _marker: PhantomData,
             }
             .scope_async(fut)
             .await
@@ -114,6 +117,7 @@ impl AsyncTestInner {
                     desc: &self.desc,
                     target_section: Some(section),
                     current_section: None,
+                    _marker: PhantomData,
                 }
                 .scope_async(fut)
                 .await;

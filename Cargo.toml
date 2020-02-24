@@ -18,6 +18,7 @@ rye-macros = { version = "=0.1.0-dev", path = "./macros" }
 futures = "0.3"
 maplit = "1"
 pin-project = "0.4"
+thiserror = "1"
 
 [dev-dependencies]
 rye-runner = { path = "runner" }

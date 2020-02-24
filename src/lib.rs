@@ -263,7 +263,10 @@ pub mod _internal {
     }
 }
 
-pub use crate::test::{Test, TestResult};
+pub use crate::{
+    context::{AccessError, TestContext},
+    test::{Test, TestResult},
+};
 
 /// Generate a single test case.
 pub use rye_macros::test;
