@@ -12,5 +12,4 @@ futures = { version = "0.3", features = [ "thread-pool" ] }
 getopts = "0.2"
 globset = "0.4"
 pin-project = "0.4"
-expected = { version = "0.0.1", features = [ "futures" ] }
 maybe-unwind = { version = "0.1", features = [ "futures" ] }

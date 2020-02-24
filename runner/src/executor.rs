@@ -1,5 +1,4 @@
 use crate::report::Outcome;
-use expected::{expected, Disappoints, FutureExpectedExt as _};
 use futures::{
     executor::{LocalSpawner, ThreadPool},
     future::{BoxFuture, Future},
@@ -60,7 +59,7 @@ impl TestExecutor for DefaultTestExecutor {
     fn execute_blocking(&mut self, mut test: BlockingTest) -> Self::Handle {
         let (tx, rx) = futures::channel::oneshot::channel();
         std::thread::spawn(move || {
-            let res = expected(|| maybe_unwind(AssertUnwindSafe(|| test.run())));
+            let res = maybe_unwind(AssertUnwindSafe(|| test.run()));
             let _ = tx.send(make_outcome(res));
         });
         Box::pin(async move {
@@ -75,14 +74,12 @@ async fn run_test<Fut>(fut: Fut) -> Outcome
 where
     Fut: Future<Output = Box<dyn TestResult>>,
 {
-    let res = AssertUnwindSafe(fut).maybe_unwind().expected().await;
+    let res = AssertUnwindSafe(fut).maybe_unwind().await;
     make_outcome(res)
 }
 
-fn make_outcome(res: (Result<Box<dyn TestResult>, Unwind>, Option<Disappoints>)) -> Outcome {
-    let (res, disappoints) = res;
-
-    let mut error_message = match res {
+fn make_outcome(res: Result<Box<dyn TestResult>, Unwind>) -> Outcome {
+    let error_message = match res {
         Ok(term) if term.is_success() => None,
         Ok(term) => Some(
             term.error_message()
@@ -90,13 +87,6 @@ fn make_outcome(res: (Result<Box<dyn TestResult>, Unwind>, Option<Disappoints>))
         ),
         Err(unwind) => Some(unwind.to_string()),
     };
-
-    if let Some(disappoints) = disappoints {
-        let msg = error_message.get_or_insert_with(Default::default);
-
-        use std::fmt::Write as _;
-        let _ = writeln!(msg, "{}", disappoints);
-    }
 
     match error_message {
         Some(msg) => Outcome::failed().error_message(msg),

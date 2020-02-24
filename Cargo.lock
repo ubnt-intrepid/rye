@@ -88,17 +88,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
-name = "expected"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61d0ec4e25e8d538c3e7d9ca2a85a0271244f73cf928f6668e985d973091a455"
-dependencies = [
- "cfg-if",
- "futures-core",
- "pin-project",
-]
-
-[[package]]
 name = "fnv"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -240,9 +229,9 @@ dependencies = [
 
 [[package]]
 name = "hermit-abi"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2c55f143919fbc0bc77e427fe2d74cf23786d7c1875666f2fde3ac3c659bb67"
+checksum = "1010591b26bbfe835e9faeabeb11866061cc7dcebffd56ad7d0942d0e61aefd8"
 dependencies = [
  "libc",
 ]
@@ -428,7 +417,6 @@ name = "rye-runner"
 version = "0.1.0-dev"
 dependencies = [
  "console",
- "expected",
  "futures",
  "getopts",
  "globset",
