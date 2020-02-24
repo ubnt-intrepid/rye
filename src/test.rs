@@ -5,6 +5,7 @@ use futures::{
 use pin_project::pin_project;
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     pin::Pin,
 };
 
@@ -55,7 +56,7 @@ pub struct Section {
 #[doc(hidden)] // private API.
 #[derive(Debug)]
 pub enum TestFn {
-    SyncTest(fn()),
+    SyncTest { f: fn() -> Box<dyn TestResult> },
     AsyncTest { f: fn() -> TestFuture, local: bool },
 }
 
@@ -63,7 +64,7 @@ pub enum TestFn {
 #[pin_project]
 pub struct TestFuture {
     #[pin]
-    inner: LocalFutureObj<'static, ()>,
+    inner: LocalFutureObj<'static, Box<dyn TestResult>>,
     local: bool,
 }
 
@@ -72,10 +73,13 @@ impl TestFuture {
     #[inline]
     pub fn new<Fut>(fut: Fut) -> Self
     where
-        Fut: Future<Output = ()> + Send + 'static,
+        Fut: Future + Send + 'static,
+        Fut::Output: TestResult,
     {
         Self {
-            inner: LocalFutureObj::new(Box::pin(fut)),
+            inner: LocalFutureObj::new(Box::pin(async move {
+                Box::new(fut.await) as Box<dyn TestResult>
+            })),
             local: false,
         }
     }
@@ -84,16 +88,19 @@ impl TestFuture {
     #[inline]
     pub fn new_local<Fut>(fut: Fut) -> Self
     where
-        Fut: Future<Output = ()> + 'static,
+        Fut: Future + 'static,
+        Fut::Output: TestResult,
     {
         Self {
-            inner: LocalFutureObj::from(Box::pin(fut)),
+            inner: LocalFutureObj::new(Box::pin(async move {
+                Box::new(fut.await) as Box<dyn TestResult>
+            })),
             local: true,
         }
     }
 
     #[inline]
-    pub(crate) fn into_future_obj(self) -> FutureObj<'static, ()> {
+    pub(crate) fn into_future_obj(self) -> FutureObj<'static, Box<dyn TestResult>> {
         assert!(
             !self.local,
             "the test future cannot be converted into FutureObj when it is not Send"
@@ -103,11 +110,40 @@ impl TestFuture {
 }
 
 impl Future for TestFuture {
-    type Output = ();
+    type Output = Box<dyn TestResult>;
 
     #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         let me = self.project();
         me.inner.poll(cx)
+    }
+}
+
+pub trait TestResult: 'static {
+    fn is_success(&self) -> bool;
+
+    fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)> {
+        None
+    }
+}
+
+impl TestResult for () {
+    fn is_success(&self) -> bool {
+        true
+    }
+}
+
+impl<E> TestResult for Result<(), E>
+where
+    E: fmt::Debug + 'static,
+{
+    fn is_success(&self) -> bool {
+        self.is_ok()
+    }
+
+    fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)> {
+        self.as_ref()
+            .err()
+            .map(|e| e as &(dyn fmt::Debug + 'static))
     }
 }

@@ -109,12 +109,18 @@ mod sub {
     }
 }
 
+#[rye::test]
+fn return_result() -> anyhow::Result<()> {
+    Ok(())
+}
+
 rye::test_group! {
     case_sync,
     case_async_nosend,
     nested,
     case_async,
     sub,
+    return_result,
 }
 
 rye::test_runner!(rye_runner::runner);

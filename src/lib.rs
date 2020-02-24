@@ -23,6 +23,25 @@ fn case1() {
 WIP
 
 ```
+#[rye::test]
+fn fallible() -> std::io::Result<()> {
+    Ok(())
+}
+# fn main() {}
+```
+
+```compile_fail
+#[rye::test] //~ ERROR E0277
+fn return_int() -> i32 {
+    0
+}
+# fn main() {}
+```
+
+
+WIP
+
+```
 # fn main() {}
 # mod inner {
 # #[rye::test] fn case1() {}
@@ -211,8 +230,13 @@ pub mod _internal {
 
     use crate::{
         context::{EnterSection, TestContext},
-        test::SectionId,
+        test::{SectionId, TestResult},
     };
+
+    #[inline]
+    pub fn test_result<T: TestResult>(res: T) -> Box<dyn TestResult> {
+        Box::new(res)
+    }
 
     #[inline]
     pub fn enter_section(id: SectionId) -> EnterSection {
@@ -239,7 +263,7 @@ pub mod _internal {
     }
 }
 
-pub use crate::test::Test;
+pub use crate::test::{Test, TestResult};
 
 /// Generate a single test case.
 pub use rye_macros::test;

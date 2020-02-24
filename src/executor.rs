@@ -2,7 +2,7 @@
 
 use crate::{
     context::TestContext,
-    test::{Test, TestDesc, TestFn, TestFuture},
+    test::{Test, TestDesc, TestFn, TestFuture, TestResult},
 };
 use futures::future::Future;
 use std::{cell::Cell, marker::PhantomData};
@@ -27,7 +27,7 @@ impl Test {
     {
         let desc = self.desc.clone();
         match self.test_fn {
-            TestFn::SyncTest(f) => exec.execute(TestBody {
+            TestFn::SyncTest { f } => exec.execute(TestBody {
                 desc,
                 f,
                 _marker: PhantomData,
@@ -44,28 +44,32 @@ impl Test {
 
 pub struct TestBody {
     desc: TestDesc,
-    f: fn(),
+    f: fn() -> Box<dyn TestResult>,
     _marker: PhantomData<Cell<()>>,
 }
 
 impl TestBody {
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Box<dyn TestResult> {
         if self.desc.leaf_sections.is_empty() {
             TestContext {
                 desc: &self.desc,
                 target_section: None,
                 current_section: None,
             }
-            .scope(&self.f);
+            .scope(&self.f)
         } else {
             for &section in &self.desc.leaf_sections {
-                TestContext {
+                let term = TestContext {
                     desc: &self.desc,
                     target_section: Some(section),
                     current_section: None,
                 }
                 .scope(&self.f);
+                if !term.is_success() {
+                    return term;
+                }
             }
+            Box::new(())
         }
     }
 }
@@ -78,10 +82,10 @@ pub struct AsyncTestBody {
 }
 
 impl AsyncTestBody {
-    async fn run_inner<F, Fut>(&mut self, f: F)
+    async fn run_inner<F, Fut>(&mut self, f: F) -> Box<dyn TestResult>
     where
         F: Fn(TestFuture) -> Fut,
-        Fut: Future<Output = ()>,
+        Fut: Future<Output = Box<dyn TestResult>>,
     {
         if self.desc.leaf_sections.is_empty() {
             let fut = f((self.f)());
@@ -91,28 +95,32 @@ impl AsyncTestBody {
                 current_section: None,
             }
             .scope_async(fut)
-            .await;
+            .await
         } else {
             for &section in &self.desc.leaf_sections {
                 let fut = f((self.f)());
-                TestContext {
+                let term = TestContext {
                     desc: &self.desc,
                     target_section: Some(section),
                     current_section: None,
                 }
                 .scope_async(fut)
                 .await;
+                if !term.is_success() {
+                    return term;
+                }
             }
+            Box::new(())
         }
     }
 
     #[inline]
-    pub fn run(&mut self) -> impl Future<Output = ()> + Send + '_ {
+    pub fn run(&mut self) -> impl Future<Output = Box<dyn TestResult>> + Send + '_ {
         self.run_inner(TestFuture::into_future_obj)
     }
 
     #[inline]
-    pub fn run_local(&mut self) -> impl Future<Output = ()> + '_ {
+    pub fn run_local(&mut self) -> impl Future<Output = Box<dyn TestResult>> + '_ {
         self.run_inner(std::convert::identity)
     }
 
@@ -200,13 +208,13 @@ mod tests {
 
         let history = RefCell::new(vec![]);
         match test.test_fn {
-            TestFn::SyncTest(f) => HISTORY.set(&history, || {
+            TestFn::SyncTest { f } => HISTORY.set(&history, || {
                 TestBody {
                     desc: test.desc,
                     f,
                     _marker: PhantomData,
                 }
-                .run()
+                .run();
             }),
             TestFn::AsyncTest { f, local } => {
                 futures::executor::block_on(HISTORY.set_async(&history, async {
@@ -217,7 +225,7 @@ mod tests {
                         _marker: PhantomData,
                     }
                     .run()
-                    .await
+                    .await;
                 }))
             }
         }

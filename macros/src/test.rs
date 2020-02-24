@@ -37,11 +37,6 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    if let ref output @ syn::ReturnType::Type(..) = &item.sig.output {
-        return Error::new_spanned(output, "cannot return non-unit value from test function")
-            .to_compile_error();
-    }
-
     if item.sig.asyncness.is_none() && !args.is_empty() {
         return Error::new_spanned(&args, "accepted only for async functions").to_compile_error();
     }
@@ -391,7 +386,9 @@ impl ToTokens for Generated<'_> {
                 local: #local,
             })
         } else {
-            syn::parse_quote!(#rye_path::_internal::TestFn::SyncTest(super::#ident))
+            syn::parse_quote!(#rye_path::_internal::TestFn::SyncTest {
+                f: || #rye_path::_internal::test_result(super::#ident()),
+            })
         };
 
         tokens.append_all(vec![quote! {

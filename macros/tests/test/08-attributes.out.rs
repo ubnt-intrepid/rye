@@ -18,7 +18,9 @@ pub(crate) mod attributes {
                     sections: path::to::rye::_internal::hashmap! {},
                     leaf_sections: path::to::rye::_internal::vec![],
                 },
-                test_fn: path::to::rye::_internal::TestFn::SyncTest(super::attributes),
+                test_fn: path::to::rye::_internal::TestFn::SyncTest {
+                    f: || path::to::rye::_internal::test_result(super::attributes()),
+                },
             })?;
             path::to::rye::_internal::Result::Ok(())
         }
