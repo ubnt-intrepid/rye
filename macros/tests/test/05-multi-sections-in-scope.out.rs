@@ -4,6 +4,7 @@ fn multi_section_in_scope() {
         if __section.enabled() {
             assert!(1 + 1 == 2);
         }
+        __section.leave();
     }
 
     {
@@ -21,8 +22,10 @@ fn multi_section_in_scope() {
                         if __section.enabled() {
                             assert!(true);
                         }
+                        __section.leave();
                     }
                 }
+                __section.leave();
             }
 
             {
@@ -30,10 +33,12 @@ fn multi_section_in_scope() {
                 if __section.enabled() {
                     assert!(true);
                 }
+                __section.leave();
             }
-            
+
             assert!(1 + 2 == 3);
         }
+        __section.leave();
     }
 
     {
@@ -41,6 +46,7 @@ fn multi_section_in_scope() {
         if __section.enabled() {
             assert!(false);
         }
+        __section.leave();
     }
 }
 

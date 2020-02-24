@@ -244,6 +244,7 @@ impl ExpandBlock<'_> {
             syn::parse_quote! {{
                 let __section = #rye_path::_internal::enter_section(#section_id);
                 if __section.enabled() #block
+                __section.leave();
             }},
             section_id,
         ))

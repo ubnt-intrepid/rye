@@ -8,7 +8,8 @@ use std::{cell::Cell, mem, pin::Pin, ptr::NonNull};
 
 pub(crate) struct TestContext<'a> {
     pub(crate) desc: &'a TestDesc,
-    pub(crate) section: Option<SectionId>,
+    pub(crate) target_section: Option<SectionId>,
+    pub(crate) current_section: Option<SectionId>,
 }
 
 thread_local! {
@@ -82,7 +83,7 @@ impl<'a> TestContext<'a> {
     }
 
     pub(crate) fn enter_section(&mut self, id: SectionId) -> EnterSection {
-        let enabled = self.section.map_or(false, |section_id| {
+        let enabled = self.target_section.map_or(false, |section_id| {
             let section = self
                 .desc
                 .sections
@@ -90,18 +91,30 @@ impl<'a> TestContext<'a> {
                 .expect("invalid section id is set");
             section_id == id || section.ancestors.contains(&id)
         });
-        EnterSection { enabled }
+        let last_section = self.current_section.replace(id);
+        EnterSection {
+            enabled,
+            last_section,
+        }
     }
 }
 
 pub struct EnterSection {
     enabled: bool,
+    last_section: Option<SectionId>,
 }
 
 impl EnterSection {
     #[inline]
     pub fn enabled(&self) -> bool {
         self.enabled
+    }
+
+    #[inline]
+    pub fn leave(self) {
+        TestContext::with(|ctx| {
+            ctx.current_section = self.last_section;
+        })
     }
 }
 

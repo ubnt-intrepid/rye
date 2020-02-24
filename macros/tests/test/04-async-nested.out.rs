@@ -17,8 +17,10 @@ async fn case_async_nested() {
                     assert_eq!(vec.len(), 0);
                     assert!(vec.capacity() >= 10);
                 }
+                __section.leave();
             }
         }
+        __section.leave();
     }
 }
 

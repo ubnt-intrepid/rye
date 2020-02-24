@@ -10,6 +10,7 @@ async fn case_async() {
             assert_eq!(vec.len(), 10);
             assert!(vec.capacity() >= 5);
         }
+        __section.leave();
     }
 }
 

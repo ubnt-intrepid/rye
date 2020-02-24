@@ -53,14 +53,16 @@ impl TestBody {
         if self.desc.leaf_sections.is_empty() {
             TestContext {
                 desc: &self.desc,
-                section: None,
+                target_section: None,
+                current_section: None,
             }
             .scope(&self.f);
         } else {
             for &section in &self.desc.leaf_sections {
                 TestContext {
                     desc: &self.desc,
-                    section: Some(section),
+                    target_section: Some(section),
+                    current_section: None,
                 }
                 .scope(&self.f);
             }
@@ -85,7 +87,8 @@ impl AsyncTestBody {
             let fut = f((self.f)());
             TestContext {
                 desc: &self.desc,
-                section: None,
+                target_section: None,
+                current_section: None,
             }
             .scope_async(fut)
             .await;
@@ -94,7 +97,8 @@ impl AsyncTestBody {
                 let fut = f((self.f)());
                 TestContext {
                     desc: &self.desc,
-                    section: Some(section),
+                    target_section: Some(section),
+                    current_section: None,
                 }
                 .scope_async(fut)
                 .await;
@@ -169,10 +173,14 @@ mod tests {
         }
     }
 
-    scoped_thread_local!(static HISTORY: RefCell<Vec<&'static str>>);
+    type HistoryLog = (&'static str, Option<&'static str>);
 
-    fn append_history(v: &'static str) {
-        HISTORY.with(|history| history.borrow_mut().push(v));
+    scoped_thread_local!(static HISTORY: RefCell<Vec<HistoryLog>>);
+
+    fn append_history(msg: &'static str) {
+        let current_section =
+            TestContext::with(|ctx| ctx.current_section.map(|id| ctx.desc.sections[&id].name));
+        HISTORY.with(|history| history.borrow_mut().push((msg, current_section)));
     }
 
     struct MockRegistry<'a>(&'a mut Option<Test>);
@@ -183,7 +191,7 @@ mod tests {
         }
     }
 
-    fn run_test(r: &dyn Registration) -> Vec<&'static str> {
+    fn run_test(r: &dyn Registration) -> Vec<HistoryLog> {
         let test = {
             let mut test = None;
             r.register(&mut MockRegistry(&mut test)).unwrap();
@@ -229,7 +237,7 @@ mod tests {
         #[test]
         fn test() {
             let history = run_test(&test_case::__REGISTRATION);
-            assert_eq!(history, vec!["test"]);
+            assert_eq!(history, vec![("test", None)]);
         }
     }
 
@@ -251,7 +259,14 @@ mod tests {
         #[test]
         fn test() {
             let history = run_test(&test_case::__REGISTRATION);
-            assert_eq!(history, vec!["setup", "section1", "teardown"]);
+            assert_eq!(
+                history,
+                vec![
+                    ("setup", None),
+                    ("section1", Some("section1")),
+                    ("teardown", None)
+                ]
+            );
         }
     }
 
@@ -261,7 +276,7 @@ mod tests {
         #[crate::test]
         #[rye(rye_path = "crate")]
         fn test_case() {
-            HISTORY.with(|history| history.borrow_mut().push("setup"));
+            append_history("setup");
 
             section!("section1", {
                 append_history("section1");
@@ -281,9 +296,13 @@ mod tests {
                 history,
                 vec![
                     // phase 1
-                    "setup", "section1", "teardown", //
+                    ("setup", None),
+                    ("section1", Some("section1")),
+                    ("teardown", None),
                     // phase 2
-                    "setup", "section2", "teardown",
+                    ("setup", None),
+                    ("section2", Some("section2")),
+                    ("teardown", None),
                 ]
             );
         }
@@ -327,24 +346,24 @@ mod tests {
                 history,
                 vec![
                     // phase 1
-                    "setup",
-                    "section1:setup",
-                    "section2",
-                    "section1:teardown",
-                    "test",
-                    "teardown",
+                    ("setup", None),
+                    ("section1:setup", Some("section1")),
+                    ("section2", Some("section2")),
+                    ("section1:teardown", Some("section1")),
+                    ("test", None),
+                    ("teardown", None),
                     // phase 2
-                    "setup",
-                    "section1:setup",
-                    "section3",
-                    "section1:teardown",
-                    "test",
-                    "teardown",
+                    ("setup", None),
+                    ("section1:setup", Some("section1")),
+                    ("section3", Some("section3")),
+                    ("section1:teardown", Some("section1")),
+                    ("test", None),
+                    ("teardown", None),
                     // phase 3
-                    "setup",
-                    "test",
-                    "section4",
-                    "teardown",
+                    ("setup", None),
+                    ("test", None),
+                    ("section4", Some("section4")),
+                    ("teardown", None),
                 ]
             );
         }
@@ -398,24 +417,24 @@ mod tests {
                 history,
                 vec![
                     // phase 1
-                    "setup",
-                    "section1:setup",
-                    "section2",
-                    "section1:teardown",
-                    "test",
-                    "teardown",
+                    ("setup", None),
+                    ("section1:setup", Some("section1")),
+                    ("section2", Some("section2")),
+                    ("section1:teardown", Some("section1")),
+                    ("test", None),
+                    ("teardown", None),
                     // phase 2
-                    "setup",
-                    "section1:setup",
-                    "section3",
-                    "section1:teardown",
-                    "test",
-                    "teardown",
+                    ("setup", None),
+                    ("section1:setup", Some("section1")),
+                    ("section3", Some("section3")),
+                    ("section1:teardown", Some("section1")),
+                    ("test", None),
+                    ("teardown", None),
                     // phase 3
-                    "setup",
-                    "test",
-                    "section4",
-                    "teardown",
+                    ("setup", None),
+                    ("test", None),
+                    ("section4", Some("section4")),
+                    ("teardown", None),
                 ]
             );
         }
