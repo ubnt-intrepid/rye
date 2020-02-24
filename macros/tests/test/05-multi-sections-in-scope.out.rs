@@ -70,7 +70,7 @@ pub(crate) mod multi_section_in_scope {
                     },
                     leaf_sections: ::rye::_internal::vec![ 0u64, 3u64, 4u64, 5u64 ],
                 },
-                test_fn: ::rye::_internal::TestFn::SyncTest {
+                test_fn: ::rye::_internal::TestFn::Blocking {
                     f: || ::rye::_internal::test_result(super::multi_section_in_scope()),
                 },
             })?;

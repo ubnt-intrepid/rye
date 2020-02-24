@@ -381,12 +381,12 @@ impl ToTokens for Generated<'_> {
             } else {
                 quote!(new)
             };
-            syn::parse_quote!(#rye_path::_internal::TestFn::AsyncTest {
+            syn::parse_quote!(#rye_path::_internal::TestFn::Async {
                 f: || #rye_path::_internal::TestFuture::#constructor(super::#ident()),
                 local: #local,
             })
         } else {
-            syn::parse_quote!(#rye_path::_internal::TestFn::SyncTest {
+            syn::parse_quote!(#rye_path::_internal::TestFn::Blocking {
                 f: || #rye_path::_internal::test_result(super::#ident()),
             })
         };

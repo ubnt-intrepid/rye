@@ -12,11 +12,14 @@ pub trait TestExecutor {
     /// The type of handle for awaiting the test completion.
     type Handle;
 
-    /// Execute a test body.
-    fn execute(&mut self, test: TestBody) -> Self::Handle;
+    /// Execute an asynchronous test function.
+    fn execute(&mut self, test: AsyncTest) -> Self::Handle;
 
-    /// Execute an asynchronous test body.
-    fn execute_async(&mut self, test: AsyncTestBody) -> Self::Handle;
+    /// Execute an asynchronous test function on the current thread.
+    fn execute_local(&mut self, test: LocalAsyncTest) -> Self::Handle;
+
+    /// Execute a blocking test function.
+    fn execute_blocking(&mut self, test: BlockingTest) -> Self::Handle;
 }
 
 impl Test {
@@ -27,28 +30,38 @@ impl Test {
     {
         let desc = self.desc.clone();
         match self.test_fn {
-            TestFn::SyncTest { f } => exec.execute(TestBody {
+            TestFn::Blocking { f } => exec.execute_blocking(BlockingTest {
                 desc,
                 f,
                 _marker: PhantomData,
             }),
-            TestFn::AsyncTest { f, local } => exec.execute_async(AsyncTestBody {
-                desc,
-                f,
-                local,
-                _marker: PhantomData,
-            }),
+            TestFn::Async { f, local } => {
+                let inner = AsyncTestInner { desc, f };
+                if local {
+                    exec.execute_local(LocalAsyncTest {
+                        inner,
+                        _marker: PhantomData,
+                    })
+                } else {
+                    exec.execute(AsyncTest {
+                        inner,
+                        _marker: PhantomData,
+                    })
+                }
+            }
         }
     }
 }
 
-pub struct TestBody {
+/// Blocking test function.
+pub struct BlockingTest {
     desc: TestDesc,
     f: fn() -> Box<dyn TestResult>,
     _marker: PhantomData<Cell<()>>,
 }
 
-impl TestBody {
+impl BlockingTest {
+    /// Run the test function until all sections are completed.
     pub fn run(&mut self) -> Box<dyn TestResult> {
         if self.desc.leaf_sections.is_empty() {
             TestContext {
@@ -74,15 +87,13 @@ impl TestBody {
     }
 }
 
-pub struct AsyncTestBody {
+struct AsyncTestInner {
     desc: TestDesc,
     f: fn() -> TestFuture,
-    local: bool,
-    _marker: PhantomData<Cell<()>>,
 }
 
-impl AsyncTestBody {
-    async fn run_inner<F, Fut>(&mut self, f: F) -> Box<dyn TestResult>
+impl AsyncTestInner {
+    async fn run<F, Fut>(&mut self, f: F) -> Box<dyn TestResult>
     where
         F: Fn(TestFuture) -> Fut,
         Fut: Future<Output = Box<dyn TestResult>>,
@@ -113,20 +124,36 @@ impl AsyncTestBody {
             Box::new(())
         }
     }
+}
 
+/// Asynchronous test function.
+pub struct AsyncTest {
+    inner: AsyncTestInner,
+    _marker: PhantomData<Cell<()>>,
+}
+
+impl AsyncTest {
+    /// Run the test function until all sections are completed.
     #[inline]
-    pub fn run(&mut self) -> impl Future<Output = Box<dyn TestResult>> + Send + '_ {
-        self.run_inner(TestFuture::into_future_obj)
+    pub async fn run(&mut self) -> Box<dyn TestResult> {
+        self.inner.run(TestFuture::into_future_obj).await
     }
+}
 
-    #[inline]
-    pub fn run_local(&mut self) -> impl Future<Output = Box<dyn TestResult>> + '_ {
-        self.run_inner(std::convert::identity)
-    }
+/// Asynchronous test function.
+///
+/// Unlike `AsyncTest`, this function must be executed
+/// on the current thread.
+pub struct LocalAsyncTest {
+    inner: AsyncTestInner,
+    _marker: PhantomData<std::rc::Rc<std::cell::Cell<()>>>,
+}
 
+impl LocalAsyncTest {
+    /// Run the test function until all sections are completed.
     #[inline]
-    pub fn is_local(&self) -> bool {
-        self.local
+    pub async fn run(&mut self) -> Box<dyn TestResult> {
+        self.inner.run(std::convert::identity).await
     }
 }
 
@@ -208,24 +235,19 @@ mod tests {
 
         let history = RefCell::new(vec![]);
         match test.test_fn {
-            TestFn::SyncTest { f } => HISTORY.set(&history, || {
-                TestBody {
+            TestFn::Blocking { f } => HISTORY.set(&history, || {
+                BlockingTest {
                     desc: test.desc,
                     f,
                     _marker: PhantomData,
                 }
                 .run();
             }),
-            TestFn::AsyncTest { f, local } => {
+            TestFn::Async { f, .. } => {
                 futures::executor::block_on(HISTORY.set_async(&history, async {
-                    AsyncTestBody {
-                        desc: test.desc,
-                        f,
-                        local,
-                        _marker: PhantomData,
-                    }
-                    .run()
-                    .await;
+                    AsyncTestInner { desc: test.desc, f }
+                        .run(std::convert::identity)
+                        .await;
                 }))
             }
         }

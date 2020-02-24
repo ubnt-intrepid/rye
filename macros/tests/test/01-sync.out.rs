@@ -32,7 +32,7 @@ pub(crate) mod case_sync {
                     },
                     leaf_sections: ::rye::_internal::vec![ 0u64 ],
                 },
-                test_fn: ::rye::_internal::TestFn::SyncTest {
+                test_fn: ::rye::_internal::TestFn::Blocking {
                     f: || ::rye::_internal::test_result(super::case_sync()),
                 },
             })?;

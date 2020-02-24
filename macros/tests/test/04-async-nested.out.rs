@@ -46,7 +46,7 @@ pub(crate) mod case_async_nested {
                     },
                     leaf_sections: ::rye::_internal::vec![ 1u64 ],
                 },
-                test_fn: ::rye::_internal::TestFn::AsyncTest {
+                test_fn: ::rye::_internal::TestFn::Async {
                     f: || ::rye::_internal::TestFuture::new(super::case_async_nested()),
                     local: false,
                 },

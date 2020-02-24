@@ -19,6 +19,10 @@ pub struct Test {
 }
 
 impl Test {
+    /// Return the name of test case.
+    ///
+    /// Test cases are uniquely named by their relative path from
+    /// the root module.
     #[inline]
     pub fn name(&self) -> &str {
         self.desc
@@ -28,10 +32,22 @@ impl Test {
             .unwrap_or("<unknown>")
     }
 
+    /// Return the test case is asynchronous or not.
+    #[inline]
     pub fn is_async(&self) -> bool {
         match self.test_fn {
-            TestFn::AsyncTest { .. } => true,
+            TestFn::Async { .. } => true,
             _ => false,
+        }
+    }
+
+    /// Return whether the future produced by the test case must
+    /// be executed onto the current thread or not.
+    #[inline]
+    pub fn is_local(&self) -> bool {
+        match self.test_fn {
+            TestFn::Async { local, .. } => local,
+            TestFn::Blocking { .. } => false,
         }
     }
 }
@@ -56,8 +72,8 @@ pub struct Section {
 #[doc(hidden)] // private API.
 #[derive(Debug)]
 pub enum TestFn {
-    SyncTest { f: fn() -> Box<dyn TestResult> },
-    AsyncTest { f: fn() -> TestFuture, local: bool },
+    Blocking { f: fn() -> Box<dyn TestResult> },
+    Async { f: fn() -> TestFuture, local: bool },
 }
 
 #[doc(hidden)] // private API.

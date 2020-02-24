@@ -7,7 +7,7 @@ use futures::{
 };
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use rye::{
-    executor::{AsyncTestBody, TestBody, TestExecutor},
+    executor::{AsyncTest, BlockingTest, LocalAsyncTest, TestExecutor},
     TestResult,
 };
 use std::{io, panic::AssertUnwindSafe};
@@ -29,7 +29,35 @@ impl DefaultTestExecutor {
 impl TestExecutor for DefaultTestExecutor {
     type Handle = BoxFuture<'static, Outcome>;
 
-    fn execute(&mut self, mut test: TestBody) -> Self::Handle {
+    fn execute(&mut self, mut test: AsyncTest) -> Self::Handle {
+        let handle = self
+            .pool
+            .spawn_with_handle(async move { run_test(test.run()).await });
+        Box::pin(async move {
+            match handle {
+                Ok(handle) => handle.await,
+                Err(spawn_err) => {
+                    Outcome::failed().error_message(format!("unknown error: {}", spawn_err))
+                }
+            }
+        })
+    }
+
+    fn execute_local(&mut self, mut test: LocalAsyncTest) -> Self::Handle {
+        let handle = self
+            .local_spawner
+            .spawn_local_with_handle(async move { run_test(test.run()).await });
+        Box::pin(async move {
+            match handle {
+                Ok(handle) => handle.await,
+                Err(spawn_err) => {
+                    Outcome::failed().error_message(format!("unknown error: {}", spawn_err))
+                }
+            }
+        })
+    }
+
+    fn execute_blocking(&mut self, mut test: BlockingTest) -> Self::Handle {
         let (tx, rx) = futures::channel::oneshot::channel();
         std::thread::spawn(move || {
             let res = expected(|| maybe_unwind(AssertUnwindSafe(|| test.run())));
@@ -41,32 +69,14 @@ impl TestExecutor for DefaultTestExecutor {
             })
         })
     }
+}
 
-    fn execute_async(&mut self, mut test: AsyncTestBody) -> Self::Handle {
-        async fn run_test<Fut>(fut: Fut) -> Outcome
-        where
-            Fut: Future<Output = Box<dyn TestResult>>,
-        {
-            let res = AssertUnwindSafe(fut).maybe_unwind().expected().await;
-            make_outcome(res)
-        }
-
-        let handle = if test.is_local() {
-            self.local_spawner
-                .spawn_local_with_handle(async move { run_test(test.run_local()).await })
-        } else {
-            self.pool
-                .spawn_with_handle(async move { run_test(test.run()).await })
-        };
-        Box::pin(async move {
-            match handle {
-                Ok(handle) => handle.await,
-                Err(spawn_err) => {
-                    Outcome::failed().error_message(format!("unknown error: {}", spawn_err))
-                }
-            }
-        })
-    }
+async fn run_test<Fut>(fut: Fut) -> Outcome
+where
+    Fut: Future<Output = Box<dyn TestResult>>,
+{
+    let res = AssertUnwindSafe(fut).maybe_unwind().expected().await;
+    make_outcome(res)
 }
 
 fn make_outcome(res: (Result<Box<dyn TestResult>, Unwind>, Option<Disappoints>)) -> Outcome {

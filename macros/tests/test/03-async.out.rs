@@ -32,7 +32,7 @@ pub(crate) mod case_async {
                     },
                     leaf_sections: ::rye::_internal::vec![ 0u64 ],
                 },
-                test_fn: ::rye::_internal::TestFn::AsyncTest {
+                test_fn: ::rye::_internal::TestFn::Async {
                     f: || ::rye::_internal::TestFuture::new(super::case_async()),
                     local: false,
                 },
