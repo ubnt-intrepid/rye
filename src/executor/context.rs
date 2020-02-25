@@ -1,4 +1,4 @@
-use crate::test::{SectionId, TestDesc};
+use crate::test::imp::{SectionId, TestDesc};
 use futures::{
     future::Future,
     task::{self, Poll},
@@ -121,7 +121,6 @@ impl<'a> Context<'a> {
     }
 }
 
-#[doc(hidden)]
 pub struct EnterSection {
     enabled: bool,
     last_section: Option<SectionId>,

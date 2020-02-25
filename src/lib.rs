@@ -209,10 +209,11 @@ mod sub {
 pub mod executor;
 pub mod test;
 
-#[doc(hidden)]
+#[doc(hidden)] // private API.
 pub mod _internal {
     pub use crate::test::{
-        Registration, Registry, RegistryError, Section, Test, TestDesc, TestFn, TestFuture,
+        imp::{Section, TestDesc, TestFn, TestFuture},
+        Registration, Registry, RegistryError, Test,
     };
     pub use lazy_static::lazy_static;
     pub use maplit::{hashmap, hashset};
@@ -220,7 +221,7 @@ pub mod _internal {
 
     use crate::{
         executor::context::{Context, EnterSection},
-        test::{SectionId, TestResult},
+        test::{imp::SectionId, TestResult},
     };
 
     #[inline]
@@ -233,7 +234,7 @@ pub mod _internal {
         Context::with(|ctx| ctx.enter_section(id))
     }
 
-    #[doc(hidden)]
+    #[doc(hidden)] // private API.
     #[cfg(not(feature = "frameworks"))]
     #[macro_export]
     macro_rules! __annotate_test_case {
@@ -242,7 +243,7 @@ pub mod _internal {
         };
     }
 
-    #[doc(hidden)]
+    #[doc(hidden)] // private API.
     #[cfg(feature = "frameworks")]
     #[macro_export]
     macro_rules! __annotate_test_case {

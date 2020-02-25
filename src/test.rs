@@ -1,14 +1,6 @@
 //! Registration of test cases.
 
-use futures::{
-    future::{Future, LocalFutureObj},
-    task::{self, FutureObj, Poll},
-};
-use pin_project::pin_project;
-use std::{
-    collections::{HashMap, HashSet},
-    pin::Pin,
-};
+use self::imp::{TestDesc, TestFn};
 use std::{error, fmt};
 
 /// Description about a single test case.
@@ -54,91 +46,8 @@ impl Test {
     }
 }
 
-#[doc(hidden)] // private API.
-#[derive(Debug)]
-pub struct TestDesc {
-    pub module_path: &'static str,
-    pub sections: HashMap<SectionId, Section>,
-    pub leaf_sections: Vec<SectionId>,
-}
-
-pub(crate) type SectionId = u64;
-
-#[doc(hidden)] // private API.
-#[derive(Debug)]
-pub struct Section {
-    pub name: &'static str,
-    pub ancestors: HashSet<SectionId>,
-}
-
-#[doc(hidden)] // private API.
-#[derive(Debug)]
-pub enum TestFn {
-    Blocking { f: fn() -> Box<dyn TestResult> },
-    Async { f: fn() -> TestFuture, local: bool },
-}
-
-#[doc(hidden)] // private API.
-#[pin_project]
-pub struct TestFuture {
-    #[pin]
-    inner: LocalFutureObj<'static, Box<dyn TestResult>>,
-    local: bool,
-}
-
-impl TestFuture {
-    #[doc(hidden)] // private API.
-    #[inline]
-    pub fn new<Fut>(fut: Fut) -> Self
-    where
-        Fut: Future + Send + 'static,
-        Fut::Output: TestResult,
-    {
-        Self {
-            inner: LocalFutureObj::new(Box::pin(async move {
-                Box::new(fut.await) as Box<dyn TestResult>
-            })),
-            local: false,
-        }
-    }
-
-    #[doc(hidden)] // private API.
-    #[inline]
-    pub fn new_local<Fut>(fut: Fut) -> Self
-    where
-        Fut: Future + 'static,
-        Fut::Output: TestResult,
-    {
-        Self {
-            inner: LocalFutureObj::new(Box::pin(async move {
-                Box::new(fut.await) as Box<dyn TestResult>
-            })),
-            local: true,
-        }
-    }
-
-    #[inline]
-    pub(crate) fn into_future_obj(self) -> FutureObj<'static, Box<dyn TestResult>> {
-        assert!(
-            !self.local,
-            "the test future cannot be converted into FutureObj when it is not Send"
-        );
-        unsafe { self.inner.into_future_obj() }
-    }
-}
-
-impl Future for TestFuture {
-    type Output = Box<dyn TestResult>;
-
-    #[inline]
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        let me = self.project();
-        me.inner.poll(cx)
-    }
-}
-
 /// The result values returned from test functions.
-pub trait TestResult: test_result::Sealed + 'static {
+pub trait TestResult: imp::IsTestResult + 'static {
     /// Return `true` if the test function was successfully completed.
     fn is_success(&self) -> bool;
 
@@ -167,16 +76,6 @@ where
             .err()
             .map(|e| e as &(dyn fmt::Debug + 'static))
     }
-}
-
-mod test_result {
-    use super::*;
-
-    pub trait Sealed {}
-
-    impl Sealed for () {}
-
-    impl<E> Sealed for Result<(), E> where E: fmt::Debug + 'static {}
 }
 
 /// The registration of one or more test cases.
@@ -249,5 +148,100 @@ impl fmt::Display for RegistryError {
 impl error::Error for RegistryError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         Some(&*self.0)
+    }
+}
+
+pub(crate) mod imp {
+    use super::TestResult;
+    use futures::{
+        future::{Future, LocalFutureObj},
+        task::{self, FutureObj, Poll},
+    };
+    use pin_project::pin_project;
+    use std::{
+        collections::{HashMap, HashSet},
+        fmt,
+        pin::Pin,
+    };
+
+    pub trait IsTestResult {}
+    impl IsTestResult for () {}
+    impl<E> IsTestResult for Result<(), E> where E: fmt::Debug + 'static {}
+
+    #[derive(Debug)]
+    pub struct TestDesc {
+        pub module_path: &'static str,
+        pub sections: HashMap<SectionId, Section>,
+        pub leaf_sections: Vec<SectionId>,
+    }
+
+    pub(crate) type SectionId = u64;
+
+    #[derive(Debug)]
+    pub struct Section {
+        pub name: &'static str,
+        pub ancestors: HashSet<SectionId>,
+    }
+
+    #[derive(Debug)]
+    pub enum TestFn {
+        Blocking { f: fn() -> Box<dyn TestResult> },
+        Async { f: fn() -> TestFuture, local: bool },
+    }
+
+    #[pin_project]
+    pub struct TestFuture {
+        #[pin]
+        inner: LocalFutureObj<'static, Box<dyn TestResult>>,
+        local: bool,
+    }
+
+    impl TestFuture {
+        #[inline]
+        pub fn new<Fut>(fut: Fut) -> Self
+        where
+            Fut: Future + Send + 'static,
+            Fut::Output: TestResult,
+        {
+            Self {
+                inner: LocalFutureObj::new(Box::pin(async move {
+                    Box::new(fut.await) as Box<dyn TestResult>
+                })),
+                local: false,
+            }
+        }
+
+        #[inline]
+        pub fn new_local<Fut>(fut: Fut) -> Self
+        where
+            Fut: Future + 'static,
+            Fut::Output: TestResult,
+        {
+            Self {
+                inner: LocalFutureObj::new(Box::pin(async move {
+                    Box::new(fut.await) as Box<dyn TestResult>
+                })),
+                local: true,
+            }
+        }
+
+        #[inline]
+        pub(crate) fn into_future_obj(self) -> FutureObj<'static, Box<dyn TestResult>> {
+            assert!(
+                !self.local,
+                "the test future cannot be converted into FutureObj when it is not Send"
+            );
+            unsafe { self.inner.into_future_obj() }
+        }
+    }
+
+    impl Future for TestFuture {
+        type Output = Box<dyn TestResult>;
+
+        #[inline]
+        fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+            let me = self.project();
+            me.inner.poll(cx)
+        }
     }
 }

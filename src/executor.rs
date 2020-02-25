@@ -2,7 +2,10 @@
 
 pub(crate) mod context;
 
-use crate::test::{Test, TestDesc, TestFn, TestFuture, TestResult};
+use crate::test::{
+    imp::{TestDesc, TestFn, TestFuture},
+    Test, TestResult,
+};
 use futures::future::Future;
 use std::{cell::Cell, marker::PhantomData};
 
@@ -209,10 +212,7 @@ impl LocalAsyncTest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        test::{Registration, Registry, RegistryError},
-        test::{Test, TestFn},
-    };
+    use crate::test::{imp::TestFn, Registration, Registry, RegistryError, Test};
     use futures::task::{self, Poll};
     use scoped_tls::{scoped_thread_local, ScopedKey};
     use std::{cell::RefCell, marker::PhantomData, pin::Pin};
