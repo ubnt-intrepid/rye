@@ -1,10 +1,10 @@
 /*!
-A custom unit testing framework inspired by Catch2.
+A custom unit testing framework for Rust.
 
 The concept is heavily influenced by the section mechanism in [`Catch2`](https://github.com/catchorg/Catch2),
 a C++ unit testing framework library.
 
-# Getting Started
+# Writing Test Cases
 
 Like the built-in test framework, a test case is simply written as a free functions.
 The test case can be registered as a test target by applying the attribute-style macro
@@ -20,7 +20,9 @@ fn case1() {
 # }
 ```
 
-WIP
+The type that implements `TestResult` can be specified as the output type of the
+test function. Currently, the implementors of this trait are only `()` and
+`Result<(), E: Debug>`.
 
 ```
 #[rye::test]
@@ -38,22 +40,7 @@ fn return_int() -> i32 {
 # fn main() {}
 ```
 
-
-WIP
-
-```
-# fn main() {}
-# mod inner {
-# #[rye::test] fn case1() {}
-rye::test_group! {
-    case1,
-}
-rye::test_runner!(path::to::runner);
-# mod path { pub mod to { pub fn runner(_: &[&dyn rye::registration::Registration]) {} } }
-# }
-```
-
-# Asynchronous test cases
+## Asynchronous Test Cases
 
 The asynchronous functions could be used in test cases.
 
@@ -93,55 +80,7 @@ async fn case_async_nosend() {
 }
 ```
 
-# Organization of multiple test cases
-
-WIP
-
-```
-# fn main() {}
-# mod inner {
-#[rye::test]
-fn case1() {
-    // ...
-}
-
-mod sub1 {
-    #[rye::test]
-    fn case2() {
-        // ...
-    }
-
-    #[rye::test]
-    fn case3() {
-        // ...
-    }
-
-    mod sub2 {
-        #[rye::test]
-        fn case4() {
-            // ...
-        }
-
-        rye::test_group! { case4 }
-    }
-
-    rye::test_group! {
-        case2,
-        case3,
-        sub2,
-    }
-}
-
-rye::test_group! {
-    case1,
-    sub1,
-}
-rye::test_runner!(path::to::runner);
-# mod path { pub mod to { pub fn runner(_: &[&dyn rye::registration::Registration]) {} } }
-# }
-```
-
-# Section
+## Section
 
 `rye` supports the scope-based code sharing mechanism inspired by Catch2.
 Test cases could distinguish specific code blocks during test execution by
@@ -211,6 +150,60 @@ startup
 section 2
 teardown
 ```
+
+# Running Test Application
+
+On the current stable compiler, test cases annotated by `#[rye::test]` attribute are not
+implicitly registered for the execution.
+Therefore, the test applications must explicitly specify the test cases to be executed
+and call the test runner to running them by disabling the default test harness.
+
+```toml
+[[test]]
+name = "tests"
+harness = false
+```
+
+```
+# fn main() {}
+# mod inner {
+#[rye::test]
+fn case1() {
+    // ...
+}
+
+rye::test_group! {
+    case1,
+}
+
+rye::test_runner!(path::to::runner);
+# mod path { pub mod to { pub fn runner(_: &[&dyn rye::registration::Registration]) {} } }
+# }
+```
+
+## (Advanced) Using `custom_test_frameworks` Feature
+
+If you are a nightly pioneer, the unstable feature `custom_test_frameworks` can be used
+to automate the registration of test cases.
+
+```toml
+[dev-dependencies]
+rye = { ..., features = [ "frameworks" ] }
+```
+
+```ignore
+#![feature(custom_test_frameworks)]
+#![test_runner(path::to::runner)]
+
+#[rye::test]
+fn case1() { ... }
+
+mod sub {
+    #[rye::test]
+    fn case2() { ... }
+}
+```
+
 !*/
 
 pub mod executor;
@@ -271,7 +264,50 @@ pub use crate::{
 /// Generate a single test case.
 pub use rye_macros::test;
 
-/// Re-export the registration of test cases.
+/// Re-export the collection of test cases from the current module.
+///
+/// # Example
+///
+/// ```ignore
+/// // tests.rs
+///
+/// #[rye::test]
+/// fn case1() {
+///     // ...
+/// }
+///
+/// mod sub1 {
+///     #[rye::test]
+///     fn case2() {
+///         // ...
+///     }
+///
+///     #[rye::test]
+///     fn case3() {
+///         // ...
+///     }
+///
+///     #[path = "sub2.rs"]
+///     mod sub2;
+///
+///     rye::test_group! {
+///         case2,
+///         case3,
+///         sub2,
+///     }
+/// }
+/// ```
+///
+/// ```ignore
+/// // sub2.rs
+///
+/// #[rye::test]
+/// fn case4() {
+///     // ...
+/// }
+///
+/// rye::test_group! { case4 }
+/// ```
 pub use rye_macros::test_group;
 
 /// Generate the main function for running the test cases.
