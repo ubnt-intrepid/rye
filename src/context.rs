@@ -67,6 +67,12 @@ impl<'a> TestContext<'a> {
         ScopeAsync { fut, ctx: self }.await
     }
 
+    /// Return whether the test context is available or not.
+    #[inline]
+    pub fn is_set() -> bool {
+        TLS_CTX.with(|tls| tls.get().is_some())
+    }
+
     /// Attempt to get a reference to the test context and invoke the provided closure.
     ///
     /// This function returns an `AccessError` if the test context is not available.
