@@ -214,6 +214,7 @@ pub mod _internal {
     pub use crate::test::{
         Registration, Registry, RegistryError, Section, Test, TestDesc, TestFn, TestFuture,
     };
+    pub use lazy_static::lazy_static;
     pub use maplit::{hashmap, hashset};
     pub use std::{module_path, result::Result, vec};
 

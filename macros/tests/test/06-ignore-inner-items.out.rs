@@ -9,16 +9,20 @@ fn ignore_inner_items() {
 pub(crate) mod ignore_inner_items {
     use super::*;
 
+    ::rye::_internal::lazy_static! {
+        static ref DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
+            module_path: ::rye::_internal::module_path!(),
+            sections: ::rye::_internal::hashmap! {},
+            leaf_sections: ::rye::_internal::vec![],
+        };
+    }
+
     struct __registration(());
 
     impl ::rye::_internal::Registration for __registration {
         fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
             __registry.add_test(::rye::_internal::Test {
-                desc: ::rye::_internal::TestDesc {
-                    module_path: ::rye::_internal::module_path!(),
-                    sections: ::rye::_internal::hashmap! {},
-                    leaf_sections: ::rye::_internal::vec![],
-                },
+                desc: &*DESC,
                 test_fn: ::rye::_internal::TestFn::Blocking {
                     f: || ::rye::_internal::test_result(super::ignore_inner_items()),
                 },

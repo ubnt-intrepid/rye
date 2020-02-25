@@ -16,6 +16,7 @@ frameworks = []
 [dependencies]
 rye-macros = { version = "=0.1.0-dev", path = "./macros" }
 futures = "0.3"
+lazy_static = "1.4"
 maplit = "1"
 pin-project = "0.4"
 thiserror = "1"

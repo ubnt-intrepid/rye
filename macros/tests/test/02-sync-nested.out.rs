@@ -27,25 +27,29 @@ fn case_sync_nested() {
 pub(crate) mod case_sync_nested {
     use super::*;
 
+    ::rye::_internal::lazy_static! {
+        static ref DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
+            module_path: ::rye::_internal::module_path!(),
+            sections: ::rye::_internal::hashmap! {
+                0u64 => ::rye::_internal::Section {
+                    name: "resizing bigger changes size and capacity",
+                    ancestors: ::rye::_internal::hashset!(),
+                },
+                1u64 => ::rye::_internal::Section {
+                    name: "shrinking smaller does not changes capacity",
+                    ancestors: ::rye::_internal::hashset!(0u64),
+                },
+            },
+            leaf_sections: ::rye::_internal::vec![ 1u64 ],
+        };
+    }
+
     struct __registration(());
 
     impl ::rye::_internal::Registration for __registration {
         fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
             __registry.add_test(::rye::_internal::Test {
-                desc: ::rye::_internal::TestDesc {
-                    module_path: ::rye::_internal::module_path!(),
-                    sections: ::rye::_internal::hashmap! {
-                        0u64 => ::rye::_internal::Section {
-                            name: "resizing bigger changes size and capacity",
-                            ancestors: ::rye::_internal::hashset!(),
-                        },
-                        1u64 => ::rye::_internal::Section {
-                            name: "shrinking smaller does not changes capacity",
-                            ancestors: ::rye::_internal::hashset!(0u64),
-                        },
-                    },
-                    leaf_sections: ::rye::_internal::vec![ 1u64 ],
-                },
+                desc: &*DESC,
                 test_fn: ::rye::_internal::TestFn::Blocking {
                     f: || ::rye::_internal::test_result(super::case_sync_nested()),
                 },

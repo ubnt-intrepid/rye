@@ -73,7 +73,7 @@ impl Test {
     where
         E: TestExecutor,
     {
-        let desc = self.desc.clone();
+        let desc = self.desc;
         match self.test_fn {
             TestFn::Blocking { f } => exec.execute_blocking(BlockingTest {
                 desc,
@@ -100,7 +100,7 @@ impl Test {
 
 /// Blocking test function.
 pub struct BlockingTest {
-    desc: TestDesc,
+    desc: &'static TestDesc,
     f: fn() -> Box<dyn TestResult>,
     _marker: PhantomData<Cell<()>>,
 }
@@ -135,7 +135,7 @@ impl BlockingTest {
 }
 
 struct AsyncTestInner {
-    desc: TestDesc,
+    desc: &'static TestDesc,
     f: fn() -> TestFuture,
 }
 

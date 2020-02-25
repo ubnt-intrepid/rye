@@ -395,16 +395,20 @@ impl ToTokens for Generated<'_> {
             pub(crate) mod #ident {
                 use super::*;
 
+                #rye_path::_internal::lazy_static! {
+                    static ref DESC: #rye_path::_internal::TestDesc = #rye_path::_internal::TestDesc {
+                        module_path: #rye_path::_internal::module_path!(),
+                        sections: #rye_path::_internal::hashmap! { #( #section_map_entries, )* },
+                        leaf_sections: #rye_path::_internal::vec![ #( #leaf_section_ids ),* ],
+                    };
+                }
+
                 struct __registration(());
 
                 impl #rye_path::_internal::Registration for __registration {
                     fn register(&self, __registry: &mut dyn #rye_path::_internal::Registry) -> #rye_path::_internal::Result<(), #rye_path::_internal::RegistryError> {
                         __registry.add_test(#rye_path::_internal::Test {
-                            desc: #rye_path::_internal::TestDesc {
-                                module_path: #rye_path::_internal::module_path!(),
-                                sections: #rye_path::_internal::hashmap! { #( #section_map_entries, )* },
-                                leaf_sections: #rye_path::_internal::vec![ #( #leaf_section_ids ),* ],
-                            },
+                            desc: &*DESC,
                             test_fn: #test_fn,
                         })?;
                         #rye_path::_internal::Result::Ok(())

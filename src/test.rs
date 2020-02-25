@@ -15,7 +15,7 @@ use std::{error, fmt};
 #[derive(Debug)]
 pub struct Test {
     #[doc(hidden)] // private API.
-    pub desc: TestDesc,
+    pub desc: &'static TestDesc,
     #[doc(hidden)] // private API.
     pub test_fn: TestFn,
 }
@@ -55,7 +55,7 @@ impl Test {
 }
 
 #[doc(hidden)] // private API.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestDesc {
     pub module_path: &'static str,
     pub sections: HashMap<SectionId, Section>,
@@ -65,7 +65,7 @@ pub struct TestDesc {
 pub(crate) type SectionId = u64;
 
 #[doc(hidden)] // private API.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Section {
     pub name: &'static str,
     pub ancestors: HashSet<SectionId>,
