@@ -7,7 +7,7 @@ use pin_project::pin_project;
 use std::{cell::Cell, marker::PhantomData, mem, pin::Pin, ptr::NonNull};
 
 /// Context values while running the test case.
-pub struct TestContext<'a> {
+pub struct Context<'a> {
     pub(crate) desc: &'a TestDesc,
     pub(crate) target_section: Option<SectionId>,
     pub(crate) current_section: Option<SectionId>,
@@ -15,10 +15,10 @@ pub struct TestContext<'a> {
 }
 
 thread_local! {
-    static TLS_CTX: Cell<Option<NonNull<TestContext<'static>>>> = Cell::new(None);
+    static TLS_CTX: Cell<Option<NonNull<Context<'static>>>> = Cell::new(None);
 }
 
-struct Guard(Option<NonNull<TestContext<'static>>>);
+struct Guard(Option<NonNull<Context<'static>>>);
 
 impl Drop for Guard {
     fn drop(&mut self) {
@@ -26,13 +26,13 @@ impl Drop for Guard {
     }
 }
 
-impl<'a> TestContext<'a> {
+impl<'a> Context<'a> {
     pub(crate) fn scope<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce() -> R,
     {
         let prev = TLS_CTX.with(|tls| unsafe {
-            let ctx_ptr = mem::transmute::<&mut Self, &mut TestContext<'static>>(self);
+            let ctx_ptr = mem::transmute::<&mut Self, &mut Context<'static>>(self);
             tls.replace(Some(NonNull::from(ctx_ptr)))
         });
         let _guard = Guard(prev);
@@ -48,7 +48,7 @@ impl<'a> TestContext<'a> {
         struct ScopeAsync<'a, 'ctx, Fut> {
             #[pin]
             fut: Fut,
-            ctx: &'a mut TestContext<'ctx>,
+            ctx: &'a mut Context<'ctx>,
         }
 
         impl<Fut> Future for ScopeAsync<'_, '_, Fut>
@@ -78,7 +78,7 @@ impl<'a> TestContext<'a> {
     /// This function returns an `AccessError` if the test context is not available.
     pub fn try_with<F, R>(f: F) -> Result<R, AccessError>
     where
-        F: FnOnce(&mut TestContext<'_>) -> R,
+        F: FnOnce(&mut Context<'_>) -> R,
     {
         let ctx_ptr = TLS_CTX.with(|tls| tls.take());
         let _guard = Guard(ctx_ptr);
@@ -93,7 +93,7 @@ impl<'a> TestContext<'a> {
     #[inline]
     pub fn with<F, R>(f: F) -> R
     where
-        F: FnOnce(&mut TestContext<'_>) -> R,
+        F: FnOnce(&mut Context<'_>) -> R,
     {
         Self::try_with(f).expect("cannot acquire the test context")
     }
@@ -135,7 +135,7 @@ impl EnterSection {
 
     #[inline]
     pub fn leave(self) {
-        TestContext::with(|ctx| {
+        Context::with(|ctx| {
             ctx.current_section = self.last_section;
         })
     }

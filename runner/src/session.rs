@@ -4,10 +4,7 @@ use crate::{
     report::{Outcome, OutcomeKind, Printer, Report},
 };
 use futures::stream::StreamExt as _;
-use rye::{
-    registration::{Registration, Registry, RegistryError},
-    Test,
-};
+use rye::test::{Registration, Registry, RegistryError, Test};
 use std::collections::HashSet;
 
 pub(crate) struct Session {

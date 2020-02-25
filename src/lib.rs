@@ -177,7 +177,7 @@ rye::test_group! {
 }
 
 rye::test_runner!(path::to::runner);
-# mod path { pub mod to { pub fn runner(_: &[&dyn rye::registration::Registration]) {} } }
+# mod path { pub mod to { pub fn runner(_: &[&dyn rye::test::Registration]) {} } }
 # }
 ```
 
@@ -207,22 +207,18 @@ mod sub {
 !*/
 
 pub mod executor;
-pub mod registration;
-
-mod context;
-mod test;
+pub mod test;
 
 #[doc(hidden)]
 pub mod _internal {
-    pub use crate::{
-        registration::{Registration, Registry, RegistryError},
-        test::{Section, Test, TestDesc, TestFn, TestFuture},
+    pub use crate::test::{
+        Registration, Registry, RegistryError, Section, Test, TestDesc, TestFn, TestFuture,
     };
     pub use maplit::{hashmap, hashset};
     pub use std::{module_path, result::Result, vec};
 
     use crate::{
-        context::{EnterSection, TestContext},
+        executor::context::{Context, EnterSection},
         test::{SectionId, TestResult},
     };
 
@@ -233,7 +229,7 @@ pub mod _internal {
 
     #[inline]
     pub fn enter_section(id: SectionId) -> EnterSection {
-        TestContext::with(|ctx| ctx.enter_section(id))
+        Context::with(|ctx| ctx.enter_section(id))
     }
 
     #[doc(hidden)]
@@ -255,11 +251,6 @@ pub mod _internal {
         };
     }
 }
-
-pub use crate::{
-    context::{AccessError, TestContext},
-    test::{Test, TestResult},
-};
 
 /// Generate a single test case.
 pub use rye_macros::test;

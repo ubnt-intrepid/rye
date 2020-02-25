@@ -7,7 +7,7 @@ use futures::{
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use rye::{
     executor::{AsyncTest, BlockingTest, LocalAsyncTest, TestExecutor},
-    TestResult,
+    test::TestResult,
 };
 use std::{io, panic::AssertUnwindSafe};
 

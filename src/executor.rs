@@ -1,11 +1,12 @@
 //! Abstraction of test execution in the rye.
 
-use crate::{
-    context::TestContext,
-    test::{Test, TestDesc, TestFn, TestFuture, TestResult},
-};
+pub(crate) mod context;
+
+use crate::test::{Test, TestDesc, TestFn, TestFuture, TestResult};
 use futures::future::Future;
 use std::{cell::Cell, marker::PhantomData};
+
+pub use self::context::{AccessError, Context};
 
 /// Test executor.
 pub trait TestExecutor {
@@ -108,7 +109,7 @@ impl BlockingTest {
     /// Run the test function until all sections are completed.
     pub fn run(&mut self) -> Box<dyn TestResult> {
         if self.desc.leaf_sections.is_empty() {
-            TestContext {
+            Context {
                 desc: &self.desc,
                 target_section: None,
                 current_section: None,
@@ -117,7 +118,7 @@ impl BlockingTest {
             .scope(&self.f)
         } else {
             for &section in &self.desc.leaf_sections {
-                let term = TestContext {
+                let term = Context {
                     desc: &self.desc,
                     target_section: Some(section),
                     current_section: None,
@@ -146,7 +147,7 @@ impl AsyncTestInner {
     {
         if self.desc.leaf_sections.is_empty() {
             let fut = f((self.f)());
-            TestContext {
+            Context {
                 desc: &self.desc,
                 target_section: None,
                 current_section: None,
@@ -157,7 +158,7 @@ impl AsyncTestInner {
         } else {
             for &section in &self.desc.leaf_sections {
                 let fut = f((self.f)());
-                let term = TestContext {
+                let term = Context {
                     desc: &self.desc,
                     target_section: Some(section),
                     current_section: None,
@@ -209,7 +210,7 @@ impl LocalAsyncTest {
 mod tests {
     use super::*;
     use crate::{
-        registration::{Registration, Registry, RegistryError},
+        test::{Registration, Registry, RegistryError},
         test::{Test, TestFn},
     };
     use futures::task::{self, Poll};
@@ -262,7 +263,7 @@ mod tests {
 
     fn append_history(msg: &'static str) {
         let current_section =
-            TestContext::with(|ctx| ctx.current_section.map(|id| ctx.desc.sections[&id].name));
+            Context::with(|ctx| ctx.current_section.map(|id| ctx.desc.sections[&id].name));
         HISTORY.with(|history| history.borrow_mut().push((msg, current_section)));
     }
 
