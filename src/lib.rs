@@ -206,6 +206,10 @@ mod sub {
 
 !*/
 
+#![doc(html_root_url = "https://docs.rs/rye/0.1.0-dev")]
+#![deny(missing_docs)]
+#![forbid(clippy::unimplemented, clippy::todo)]
+
 pub mod executor;
 pub mod test;
 

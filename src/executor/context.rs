@@ -140,7 +140,7 @@ impl EnterSection {
     }
 }
 
-/// The error value returned from `TestContext::try_with`.
+/// The error value returned from `Context::try_with`.
 #[derive(Debug, thiserror::Error)]
 #[error("cannot access the test context outside of the test body")]
 pub struct AccessError {

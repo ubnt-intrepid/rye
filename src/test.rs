@@ -130,27 +130,20 @@ where
     }
 }
 
-#[derive(Debug)]
-pub struct RegistryError(Box<dyn error::Error + Send + Sync>);
+/// The error value occurred during registration test cases.
+#[derive(Debug, thiserror::Error)]
+#[error("{}", _0)]
+pub struct RegistryError(#[source] Box<dyn error::Error + Send + Sync>);
 
 impl RegistryError {
+    /// Create a new `RegistryError`.
+    #[inline]
     pub fn new(cause: impl Into<Box<dyn error::Error + Send + Sync>>) -> Self {
         Self(cause.into())
     }
 }
 
-impl fmt::Display for RegistryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&*self.0, f)
-    }
-}
-
-impl error::Error for RegistryError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        Some(&*self.0)
-    }
-}
-
+#[allow(missing_docs)]
 pub(crate) mod imp {
     use super::TestResult;
     use futures::{
