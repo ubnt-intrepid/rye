@@ -111,6 +111,31 @@ mod sub {
 
 #[rye::test]
 fn return_result() -> anyhow::Result<()> {
+    macro_rules! require {
+        ($e:expr) => {
+            anyhow::ensure!(
+                $e,
+                "[{}:{}:{}] assertion failed: {}",
+                file!(),
+                line!(),
+                column!(),
+                stringify!($e)
+            )
+        };
+    }
+
+    let mut vec = vec![0usize; 5];
+
+    require!(vec.len() == 5);
+    require!(vec.capacity() >= 5);
+
+    section!("resizing bigger changes size and capacity", {
+        vec.resize(10, 0);
+
+        require!(vec.len() == 10);
+        require!(vec.capacity() >= 10);
+    });
+
     Ok(())
 }
 
