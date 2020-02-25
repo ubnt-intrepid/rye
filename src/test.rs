@@ -135,9 +135,12 @@ impl Future for TestFuture {
     }
 }
 
-pub trait TestResult: 'static {
+/// The result values returned from test functions.
+pub trait TestResult: test_result::Sealed + 'static {
+    /// Return `true` if the test function was successfully completed.
     fn is_success(&self) -> bool;
 
+    /// Return a reference to the object for writing the error message.
     fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)> {
         None
     }
@@ -162,4 +165,14 @@ where
             .err()
             .map(|e| e as &(dyn fmt::Debug + 'static))
     }
+}
+
+mod test_result {
+    use super::*;
+
+    pub trait Sealed {}
+
+    impl Sealed for () {}
+
+    impl<E> Sealed for Result<(), E> where E: fmt::Debug + 'static {}
 }

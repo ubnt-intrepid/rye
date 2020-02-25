@@ -22,6 +22,50 @@ pub trait TestExecutor {
     fn execute_blocking(&mut self, test: BlockingTest) -> Self::Handle;
 }
 
+impl<E: ?Sized> TestExecutor for &mut E
+where
+    E: TestExecutor,
+{
+    type Handle = E::Handle;
+
+    #[inline]
+    fn execute(&mut self, test: AsyncTest) -> Self::Handle {
+        (**self).execute(test)
+    }
+
+    #[inline]
+    fn execute_local(&mut self, test: LocalAsyncTest) -> Self::Handle {
+        (**self).execute_local(test)
+    }
+
+    #[inline]
+    fn execute_blocking(&mut self, test: BlockingTest) -> Self::Handle {
+        (**self).execute_blocking(test)
+    }
+}
+
+impl<E: ?Sized> TestExecutor for Box<E>
+where
+    E: TestExecutor,
+{
+    type Handle = E::Handle;
+
+    #[inline]
+    fn execute(&mut self, test: AsyncTest) -> Self::Handle {
+        (**self).execute(test)
+    }
+
+    #[inline]
+    fn execute_local(&mut self, test: LocalAsyncTest) -> Self::Handle {
+        (**self).execute_local(test)
+    }
+
+    #[inline]
+    fn execute_blocking(&mut self, test: BlockingTest) -> Self::Handle {
+        (**self).execute_blocking(test)
+    }
+}
+
 impl Test {
     /// Execute the test function using the specified test executor.
     pub fn execute<E: ?Sized>(&self, exec: &mut E) -> E::Handle
