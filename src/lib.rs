@@ -220,7 +220,7 @@ pub mod _internal {
         Registration, Registry, RegistryError, Test,
     };
     pub use lazy_static::lazy_static;
-    pub use maplit::{hashmap, hashset};
+    pub use maplit::hashset;
     pub use std::{module_path, result::Result, vec};
 
     use crate::{
@@ -236,6 +236,86 @@ pub mod _internal {
     #[inline]
     pub fn enter_section(id: SectionId) -> EnterSection {
         Context::with(|ctx| ctx.enter_section(id))
+    }
+
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __enter_section {
+        ($id:expr, $block:block) => {{
+            let section = $crate::_internal::enter_section($id);
+            if section.enabled() {
+                $block
+            }
+            section.leave();
+        }};
+    }
+
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __declare_section {
+        (@single $($x:tt)*) => (());
+        (@count $($rest:expr),*) => {
+            <[()]>::len(&[$($crate::__declare_section!(@single $rest)),*])
+        };
+
+        ($( $key:expr => ($name:expr, { $($ancestors:tt)* }); )*) => {
+            {
+                let _cap = $crate::__declare_section!(@count $($key),*);
+                #[allow(clippy::let_and_return)]
+                let mut _map = ::std::collections::HashMap::with_capacity(_cap);
+                $(
+                    let _ = _map.insert($key, $crate::_internal::Section {
+                        name: $name,
+                        ancestors: $crate::_internal::hashset!($($ancestors)*),
+                    });
+                )*
+                _map
+            }
+        };
+    }
+
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __declare_test_module {
+        (
+            name = $name:ident;
+            sections = { $($sections:tt)* };
+            leaf_sections = { $($leaf_sections:tt)* };
+            $( [async(local = false)] test_fn = $async_test_fn:ident; )?
+            $( [async(local = true)]  test_fn = $async_local_test_fn:ident; )?
+            $( [blocking]             test_fn = $blocking_test_fn:ident; )?
+        ) => {
+            pub(crate) mod $name {
+                use super::*;
+
+                $crate::_internal::lazy_static! {
+                    static ref DESC: $crate::_internal::TestDesc = $crate::_internal::TestDesc {
+                        module_path: $crate::_internal::module_path!(),
+                        sections: $crate::__declare_section!($($sections)*),
+                        leaf_sections: $crate::_internal::vec![ $($leaf_sections)* ],
+                    };
+                }
+
+                #[allow(non_camel_case_types)]
+                struct __registration(());
+
+                impl $crate::_internal::Registration for __registration {
+                    fn register(&self, __registry: &mut dyn $crate::_internal::Registry) -> $crate::_internal::Result<(), $crate::_internal::RegistryError> {
+                        __registry.add_test($crate::_internal::Test {
+                            desc: &*DESC,
+                            $( test_fn: $crate::_internal::TestFn::Async { f: || $crate::_internal::TestFuture::new($async_test_fn()), local: false }, )?
+                            $( test_fn: $crate::_internal::TestFn::Async { f: || $crate::_internal::TestFuture::new_local($async_local_test_fn()), local: true }, )?
+                            $( test_fn: $crate::_internal::TestFn::Blocking { f: || $crate::_internal::test_result($blocking_test_fn()) }, )?
+                        })?;
+                        $crate::_internal::Result::Ok(())
+                    }
+                }
+
+                $crate::__annotate_test_case! {
+                    pub(crate) const __REGISTRATION: &dyn $crate::_internal::Registration = &__registration(());
+                }
+            }
+        };
     }
 
     #[doc(hidden)] // private API.

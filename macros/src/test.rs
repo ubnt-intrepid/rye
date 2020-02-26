@@ -188,7 +188,7 @@ struct ExpandBlock<'a> {
 }
 
 impl ExpandBlock<'_> {
-    fn expand_section_macro(&mut self, mac: &Macro) -> Result<(Stmt, SectionId)> {
+    fn expand_section_macro(&mut self, mac: &Macro) -> Result<Stmt> {
         if self.in_loop {
             return Err(Error::new_spanned(
                 mac,
@@ -208,10 +208,9 @@ impl ExpandBlock<'_> {
             ));
         }
 
-        let body: SectionBody = mac.parse_body()?;
-
-        let name = &body.name;
-        let block = &body.block;
+        let SectionBody {
+            name, mut block, ..
+        } = mac.parse_body()?;
 
         let section_id = self.next_section_id;
         let ancestors = if let Some(parent) = self.parent {
@@ -227,22 +226,33 @@ impl ExpandBlock<'_> {
             section_id,
             Section {
                 id: section_id,
-                name: name.clone(),
+                name,
                 ancestors,
                 children: vec![],
             },
         );
         self.next_section_id += 1;
 
+        self.enter_section(section_id, |me| {
+            me.visit_block_mut(&mut *block);
+        });
+
+        let block = &*block;
+
         let rye_path = &self.params.rye_path;
-        Ok((
-            syn::parse_quote! {{
-                let __section = #rye_path::_internal::enter_section(#section_id);
-                if __section.enabled() #block
-                __section.leave();
-            }},
-            section_id,
-        ))
+        Ok(syn::parse_quote! {
+            #rye_path::__enter_section!(#section_id, #block);
+        })
+    }
+
+    fn enter_section<F, R>(&mut self, section_id: SectionId, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let prev = self.parent.replace(section_id);
+        let res = f(self);
+        self.parent = prev;
+        res
     }
 
     fn mark_in_loop<F, R>(&mut self, f: F) -> R
@@ -278,31 +288,24 @@ impl ExpandBlock<'_> {
 
 impl VisitMut for ExpandBlock<'_> {
     fn visit_stmt_mut(&mut self, item: &mut Stmt) {
-        let section_id = match item {
+        match item {
             Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _) => {
                 if expr_macro.mac.path.is_ident("section") {
-                    let (stmt, section_id) = match self.expand_section_macro(&expr_macro.mac) {
-                        Ok((expanded, section_id)) => (expanded, Some(section_id)),
+                    let stmt = match self.expand_section_macro(&expr_macro.mac) {
+                        Ok(expanded) => expanded,
                         Err(err) => {
                             let err = err.to_compile_error();
-                            (syn::parse_quote!(#err), None)
+                            syn::parse_quote!(#err)
                         }
                     };
                     mem::replace(item, stmt);
-                    section_id
-                } else {
-                    None
+                    return;
                 }
             }
-            _ => None,
-        };
-        if let Some(section_id) = section_id {
-            let prev = self.parent.replace(section_id);
-            visit_mut::visit_stmt_mut(self, item);
-            self.parent = prev;
-        } else {
-            visit_mut::visit_stmt_mut(self, item);
+            _ => (),
         }
+
+        visit_mut::visit_stmt_mut(self, item)
     }
 
     fn visit_expr_for_loop_mut(&mut self, node: &mut ExprForLoop) {
@@ -341,7 +344,6 @@ impl ToTokens for Generated<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         struct SectionMapEntry<'a> {
             section: &'a Section,
-            rye_path: &'a syn::Path,
         }
 
         impl ToTokens for SectionMapEntry<'_> {
@@ -349,20 +351,16 @@ impl ToTokens for Generated<'_> {
                 let id = &self.section.id;
                 let name = &self.section.name;
                 let ancestors = &self.section.ancestors;
-                let rye_path = &self.rye_path;
                 tokens.append_all(&[quote! {
-                    #id => #rye_path::_internal::Section {
-                        name: #name,
-                        ancestors: #rye_path::_internal::hashset!(#( #ancestors ),*),
-                    }
+                    #id => (#name, { #( #ancestors ),* });
                 }]);
             }
         }
 
-        let section_map_entries = self.sections.iter().map(|section| SectionMapEntry {
-            section,
-            rye_path: &self.params.rye_path,
-        });
+        let section_map_entries = self
+            .sections
+            .iter()
+            .map(|section| SectionMapEntry { section });
         let leaf_section_ids = self.sections.iter().filter_map(|section| {
             if section.children.is_empty() {
                 Some(section.id)
@@ -374,50 +372,19 @@ impl ToTokens for Generated<'_> {
         let ident = &self.item.sig.ident;
         let rye_path = &self.params.rye_path;
 
-        let test_fn: syn::Expr = if self.item.sig.asyncness.is_some() {
+        let test_fn = if self.item.sig.asyncness.is_some() {
             let local = self.args.local;
-            let constructor = if local {
-                quote!(new_local)
-            } else {
-                quote!(new)
-            };
-            syn::parse_quote!(#rye_path::_internal::TestFn::Async {
-                f: || #rye_path::_internal::TestFuture::#constructor(super::#ident()),
-                local: #local,
-            })
+            quote!( [async(local = #local)] test_fn = #ident; )
         } else {
-            syn::parse_quote!(#rye_path::_internal::TestFn::Blocking {
-                f: || #rye_path::_internal::test_result(super::#ident()),
-            })
+            quote!( [blocking] test_fn = #ident; )
         };
 
         tokens.append_all(vec![quote! {
-            pub(crate) mod #ident {
-                use super::*;
-
-                #rye_path::_internal::lazy_static! {
-                    static ref DESC: #rye_path::_internal::TestDesc = #rye_path::_internal::TestDesc {
-                        module_path: #rye_path::_internal::module_path!(),
-                        sections: #rye_path::_internal::hashmap! { #( #section_map_entries, )* },
-                        leaf_sections: #rye_path::_internal::vec![ #( #leaf_section_ids ),* ],
-                    };
-                }
-
-                struct __registration(());
-
-                impl #rye_path::_internal::Registration for __registration {
-                    fn register(&self, __registry: &mut dyn #rye_path::_internal::Registry) -> #rye_path::_internal::Result<(), #rye_path::_internal::RegistryError> {
-                        __registry.add_test(#rye_path::_internal::Test {
-                            desc: &*DESC,
-                            test_fn: #test_fn,
-                        })?;
-                        #rye_path::_internal::Result::Ok(())
-                    }
-                }
-
-                #rye_path::__annotate_test_case! {
-                    pub(crate) const __REGISTRATION: &dyn #rye_path::_internal::Registration = &__registration(());
-                }
+            #rye_path::__declare_test_module! {
+                name = #ident;
+                sections = { #( #section_map_entries )* };
+                leaf_sections = { #( #leaf_section_ids ),* };
+                #test_fn
             }
         }]);
     }

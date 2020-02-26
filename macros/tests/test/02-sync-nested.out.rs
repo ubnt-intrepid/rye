@@ -3,62 +3,25 @@ fn case_sync_nested() {
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
 
-    {
-        let __section = ::rye::_internal::enter_section(0u64);
-        if __section.enabled() {
-            vec.resize(10, 0);
-            assert_eq!(vec.len(), 10);
-            assert!(vec.capacity() >= 10);
+    ::rye::__enter_section!(0u64, {
+        vec.resize(10, 0);
+        assert_eq!(vec.len(), 10);
+        assert!(vec.capacity() >= 10);
 
-            {
-                let __section = ::rye::_internal::enter_section(1u64);
-                if __section.enabled() {
-                    vec.resize(0, 0);
-                    assert_eq!(vec.len(), 0);
-                    assert!(vec.capacity() >= 10);
-                }
-                __section.leave();
-            }
-        }
-        __section.leave();
-    }
+        ::rye::__enter_section!(1u64, {
+            vec.resize(0, 0);
+            assert_eq!(vec.len(), 0);
+            assert!(vec.capacity() >= 10);
+        });
+    });
 }
 
-pub(crate) mod case_sync_nested {
-    use super::*;
-
-    ::rye::_internal::lazy_static! {
-        static ref DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
-            module_path: ::rye::_internal::module_path!(),
-            sections: ::rye::_internal::hashmap! {
-                0u64 => ::rye::_internal::Section {
-                    name: "resizing bigger changes size and capacity",
-                    ancestors: ::rye::_internal::hashset!(),
-                },
-                1u64 => ::rye::_internal::Section {
-                    name: "shrinking smaller does not changes capacity",
-                    ancestors: ::rye::_internal::hashset!(0u64),
-                },
-            },
-            leaf_sections: ::rye::_internal::vec![ 1u64 ],
-        };
-    }
-
-    struct __registration(());
-
-    impl ::rye::_internal::Registration for __registration {
-        fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
-            __registry.add_test(::rye::_internal::Test {
-                desc: &*DESC,
-                test_fn: ::rye::_internal::TestFn::Blocking {
-                    f: || ::rye::_internal::test_result(super::case_sync_nested()),
-                },
-            })?;
-            ::rye::_internal::Result::Ok(())
-        }
-    }
-
-    ::rye::__annotate_test_case! {
-        pub(crate) const __REGISTRATION: &dyn ::rye::_internal::Registration = &__registration(());
-    }
+::rye::__declare_test_module! {
+    name = case_sync_nested;
+    sections = {
+        0u64 => ("resizing bigger changes size and capacity", {});
+        1u64 => ("shrinking smaller does not changes capacity", { 0u64 });
+    };
+    leaf_sections = { 1u64 };
+    [blocking] test_fn = case_sync_nested;
 }

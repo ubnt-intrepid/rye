@@ -4,32 +4,9 @@ fn no_sections() {
     assert!(vec.capacity() >= 5);
 }
 
-pub(crate) mod no_sections {
-    use super::*;
-
-    ::rye::_internal::lazy_static! {
-        static ref DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
-            module_path: ::rye::_internal::module_path!(),
-            sections: ::rye::_internal::hashmap! {},
-            leaf_sections: ::rye::_internal::vec![],
-        };
-    }
-
-    struct __registration(());
-
-    impl ::rye::_internal::Registration for __registration {
-        fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
-            __registry.add_test(::rye::_internal::Test {
-                desc: &*DESC,
-                test_fn: ::rye::_internal::TestFn::Blocking {
-                    f: || ::rye::_internal::test_result(super::no_sections()),
-                },
-            })?;
-            ::rye::_internal::Result::Ok(())
-        }
-    }
-
-    ::rye::__annotate_test_case! {
-        pub(crate) const __REGISTRATION: &dyn ::rye::_internal::Registration = &__registration(());
-    }
+::rye::__declare_test_module! {
+    name = no_sections;
+    sections = {};
+    leaf_sections = {};
+    [blocking] test_fn = no_sections;
 }
