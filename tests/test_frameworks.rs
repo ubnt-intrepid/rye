@@ -1,5 +1,7 @@
 #![feature(custom_test_frameworks)]
-#![test_runner(rye_runner::runner)]
+#![test_runner(crate::runner::run_tests)]
+
+mod runner;
 
 #[rye::test]
 fn case_sync() {
