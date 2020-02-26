@@ -280,9 +280,9 @@ checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "maybe-unwind"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76051bcd055f865ae7968737cc69642e5404a8b97464fdea555eb85701034dfb"
+checksum = "ac36f48fae48318ddc7353f8d68c952cbe92ee1371744e9146c97af1ba79897e"
 dependencies = [
  "cfg-if",
  "futures-core",
@@ -391,13 +391,16 @@ version = "0.1.0-dev"
 dependencies = [
  "anyhow",
  "cargo-husky",
+ "console",
  "futures",
  "futures-test",
+ "getopts",
+ "globset",
  "lazy_static",
  "maplit",
+ "maybe-unwind",
  "pin-project",
  "rye-macros",
- "rye-runner",
  "scoped-tls",
  "thiserror",
  "trybuild",
@@ -411,19 +414,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "rye-runner"
-version = "0.1.0-dev"
-dependencies = [
- "console",
- "futures",
- "getopts",
- "globset",
- "maybe-unwind",
- "pin-project",
- "rye",
 ]
 
 [[package]]

@@ -1,3 +1,5 @@
+mod runner;
+
 #[rye::test]
 fn case_sync() {
     let mut vec = vec![0usize; 5];
@@ -148,4 +150,4 @@ rye::test_group! {
     return_result,
 }
 
-rye::test_runner!(rye_runner::runner);
+rye::test_runner!(crate::runner::run_tests);

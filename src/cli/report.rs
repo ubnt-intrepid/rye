@@ -1,6 +1,11 @@
-use crate::cli::{Args, ColorConfig, ExitStatus};
+use crate::{
+    cli::{
+        args::{Args, ColorConfig},
+        exit_status::ExitStatus,
+    },
+    test::Test,
+};
 use console::{Style, StyledObject, Term};
-use rye::test::Test;
 use std::{
     borrow::Cow,
     io::{self, Write},

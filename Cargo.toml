@@ -15,18 +15,22 @@ frameworks = []
 
 [dependencies]
 rye-macros = { version = "=0.1.0-dev", path = "./macros" }
+console = "0.9"
 futures = "0.3"
+getopts = "0.2"
+globset = "0.4"
 lazy_static = "1.4"
 maplit = "1"
 pin-project = "0.4"
 thiserror = "1"
 
 [dev-dependencies]
-rye-runner = { path = "runner" }
 anyhow = "1"
+futures = { version = "0.3", features = [ "thread-pool" ] }
 futures-test = "0.3"
 scoped-tls = "1"
 trybuild = "1"
+maybe-unwind = { version = "0.2", features = [ "futures" ] }
 
 [dev-dependencies.cargo-husky]
 version = "1.5"
@@ -47,5 +51,4 @@ required-features = [ "frameworks" ]
 members = [
   ".",
   "macros",
-  "runner",
 ]

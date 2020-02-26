@@ -1,21 +1,29 @@
 use crate::{
-    cli::{Args, ExitStatus},
-    executor::DefaultTestExecutor,
-    report::{Outcome, OutcomeKind, Printer, Report},
+    cli::{
+        args::Args,
+        exit_status::ExitStatus,
+        report::{Outcome, OutcomeKind, Printer, Report},
+    },
+    executor::TestExecutor,
+    test::{Registration, Registry, RegistryError, Test},
 };
-use futures::stream::StreamExt as _;
-use rye::test::{Registration, Registry, RegistryError, Test};
-use std::collections::HashSet;
+use futures::{
+    future::{TryFuture, TryFutureExt as _},
+    stream::StreamExt as _,
+};
+use std::{collections::HashSet, fmt, marker::PhantomData};
 
-pub(crate) struct Session {
+pub struct Session<'a> {
     pub(crate) args: Args,
     pub(crate) printer: Printer,
     pub(crate) pending_tests: Vec<Test>,
     pub(crate) filtered_out_tests: Vec<Test>,
     pub(crate) completed_tests: Vec<(Test, Outcome)>,
+    #[allow(clippy::type_complexity)]
+    _marker: PhantomData<(fn(&'a ()) -> &'a (), std::rc::Rc<std::cell::Cell<()>>)>,
 }
 
-impl Session {
+impl Session<'_> {
     pub(crate) fn from_env() -> Result<Self, ExitStatus> {
         let args = Args::from_env()?;
         let printer = Printer::new(&args);
@@ -25,6 +33,7 @@ impl Session {
             pending_tests: vec![],
             filtered_out_tests: vec![],
             completed_tests: vec![],
+            _marker: PhantomData,
         })
     }
 
@@ -41,7 +50,13 @@ impl Session {
         Ok(())
     }
 
-    pub(crate) async fn run_tests_concurrent(&mut self, executor: &mut DefaultTestExecutor) {
+    /// Execute test case onto the specified executor.
+    pub async fn execute_tests<'a, E: ?Sized>(&'a mut self, executor: &'a mut E)
+    where
+        E: TestExecutor,
+        E::Handle: TryFuture<Ok = ()>,
+        <E::Handle as TryFuture>::Error: fmt::Debug,
+    {
         let name_length = self
             .pending_tests
             .iter()
@@ -55,7 +70,10 @@ impl Session {
             .for_each_concurrent(None, |test| {
                 let handle = test.execute(&mut *executor);
                 async {
-                    let outcome = handle.await;
+                    let outcome = match handle.into_future().await {
+                        Ok(()) => Outcome::passed(),
+                        Err(err) => Outcome::failed().error_message(format!("{:?}", err)),
+                    };
                     let _ = printer.print_result(&test, name_length, &outcome);
                     completed_tests.lock().await.push((test, outcome));
                 }

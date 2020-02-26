@@ -210,6 +210,7 @@ mod sub {
 #![deny(missing_docs)]
 #![forbid(clippy::unimplemented, clippy::todo)]
 
+pub mod cli;
 pub mod executor;
 pub mod test;
 
