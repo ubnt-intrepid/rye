@@ -12,7 +12,7 @@ where
     run_tests_inner(tests, f).exit();
 }
 
-fn run_tests_inner<F>(tests: &[&dyn Registration], f: F) -> ExitStatus
+fn run_tests_inner<F>(registrations: &[&dyn Registration], f: F) -> ExitStatus
 where
     F: FnOnce(&mut Session),
 {
@@ -21,11 +21,16 @@ where
         Err(st) => return st,
     };
 
-    if let Err(st) = session.register(tests) {
-        return st;
-    };
+    for &registration in registrations {
+        if let Err(err) = session.register(registration) {
+            eprintln!("registry error: {}", err);
+            return ExitStatus::FAILED;
+        }
+    }
 
-    if session.args.list_tests() {
+    session.sort_tests_by_names();
+
+    if session.args.list_tests {
         let _ = session.printer.print_list(session.pending_tests.iter());
         return ExitStatus::OK;
     }

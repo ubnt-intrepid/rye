@@ -2,22 +2,24 @@
 
 use crate::cli::exit_status::ExitStatus;
 use getopts::Options;
-use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::{path::Path, str::FromStr};
 
 /// Command line arguments.
 #[derive(Debug)]
 pub struct Args {
-    list: bool,
-    color: ColorConfig,
-    globs: Option<GlobSet>,
+    pub list_tests: bool,
+    pub filter_pattern: Option<String>,
+    pub filter_exact: bool,
+    pub color: ColorConfig,
+    pub skip_patterns: Vec<String>,
 }
 
 impl Args {
     /// Parse command line arguments.
     pub fn from_env() -> Result<Self, ExitStatus> {
-        let parser = Parser::new();
-        match parser.parse_args() {
+        let args: Vec<_> = std::env::args().collect();
+        let parser = Parser::new(&args[..]);
+        match parser.parse() {
             Ok(Some(args)) => Ok(args),
             Ok(None) => {
                 parser.print_usage();
@@ -30,18 +32,28 @@ impl Args {
         }
     }
 
-    pub(crate) fn list_tests(&self) -> bool {
-        self.list
-    }
+    pub(crate) fn is_filtered_out(&self, test_name: &str) -> bool {
+        let matches_filter = |pat: &str| {
+            if self.filter_exact {
+                test_name == pat
+            } else {
+                test_name.contains(pat)
+            }
+        };
 
-    pub(crate) fn color(&self) -> &ColorConfig {
-        &self.color
-    }
-
-    pub(crate) fn is_match(&self, name: &str) -> bool {
-        self.globs
+        if self
+            .filter_pattern
             .as_ref()
-            .map_or(true, |globs| globs.is_match(name))
+            .map_or(false, |pat| !matches_filter(pat))
+        {
+            return true;
+        }
+
+        if self.skip_patterns.iter().any(|pat| matches_filter(pat)) {
+            return true;
+        }
+
+        false
     }
 }
 
@@ -71,16 +83,21 @@ impl FromStr for ColorConfig {
     }
 }
 
-struct Parser {
-    args: Vec<String>,
+struct Parser<'a> {
+    args: &'a [String],
     opts: Options,
 }
 
-impl Parser {
-    fn new() -> Self {
+impl<'a> Parser<'a> {
+    fn new(args: &'a [String]) -> Self {
         let mut opts = Options::new();
         opts.optflag("h", "help", "Display this message (longer with --help)");
         opts.optflag("", "list", "List all tests and benchmarks");
+        opts.optflag(
+            "",
+            "exact",
+            "Exactly match filters rather than by substring",
+        );
         opts.optopt(
             "",
             "color",
@@ -90,6 +107,12 @@ impl Parser {
                 never  = never colorize output;",
             "auto|always|never",
         );
+        opts.optmulti(
+            "",
+            "skip",
+            "Skip tests whose names contain FILTER (this flag can be used multiple times)",
+            "FILTER",
+        );
 
         // The following options and flags are reserved for keeping the compatibility with
         // the built-in test harness.
@@ -98,17 +121,12 @@ impl Parser {
         opts.optflag("", "bench", "");
         opts.optflag("", "nocapture", "");
         opts.optflag("q", "quiet", "");
-        opts.optflag("", "exact", "");
         opts.optopt("", "logfile", "", "PATH");
         opts.optopt("", "test-threads", "", "n_threads");
-        opts.optopt("", "skip", "", "FILTER");
         opts.optopt("", "format", "", "");
         opts.optopt("Z", "", "", "unstable-options");
 
-        Self {
-            args: std::env::args().collect(),
-            opts,
-        }
+        Self { args, opts }
     }
 
     fn print_usage(&self) {
@@ -118,16 +136,16 @@ impl Parser {
             .and_then(|s| s.to_str())
             .unwrap_or(binary);
 
-        let message = format!("Usage: {} [OPTIONS] [PATTERN]..", progname);
+        let message = format!("Usage: {} [OPTIONS] [FILTER]", progname);
         eprintln!(
             r#"{usage}
-If the PATTERN strings are specified, the test cases with the matching name are executed,
-otherwise all test cases are executed."#,
+The FILTER string is tested against the name of all tests, and only those
+tests whose names contain the filter are run."#,
             usage = self.opts.usage(&message)
         );
     }
 
-    fn parse_args(&self) -> Result<Option<Args>, Box<dyn std::error::Error>> {
+    fn parse(&self) -> Result<Option<Args>, Box<dyn std::error::Error>> {
         let args = &self.args[..];
 
         let matches = self.opts.parse(args.get(1..).unwrap_or(args))?;
@@ -135,20 +153,18 @@ otherwise all test cases are executed."#,
             return Ok(None);
         }
 
-        let list = matches.opt_present("list");
+        let list_tests = matches.opt_present("list");
+        let filter_exact = matches.opt_present("exact");
         let color = matches.opt_get("color")?.unwrap_or(ColorConfig::Auto);
+        let skip_patterns = matches.opt_strs("skip");
+        let filter_pattern = matches.free.get(0).cloned();
 
-        let globs = match &matches.free[..] {
-            patterns if !patterns.is_empty() => {
-                let mut globs = GlobSetBuilder::new();
-                for pattern in patterns {
-                    globs.add(Glob::new(pattern)?);
-                }
-                Some(globs.build()?)
-            }
-            _ => None,
-        };
-
-        Ok(Some(Args { list, color, globs }))
+        Ok(Some(Args {
+            list_tests,
+            filter_pattern,
+            filter_exact,
+            color,
+            skip_patterns,
+        }))
     }
 }

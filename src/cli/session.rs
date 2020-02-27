@@ -19,6 +19,7 @@ pub struct Session<'a> {
     pub(crate) pending_tests: Vec<Test>,
     pub(crate) filtered_out_tests: Vec<Test>,
     pub(crate) completed_tests: Vec<(Test, Outcome)>,
+    unique_test_names: HashSet<String>,
     #[allow(clippy::type_complexity)]
     _marker: PhantomData<(fn(&'a ()) -> &'a (), std::rc::Rc<std::cell::Cell<()>>)>,
 }
@@ -33,21 +34,21 @@ impl Session<'_> {
             pending_tests: vec![],
             filtered_out_tests: vec![],
             completed_tests: vec![],
+            unique_test_names: HashSet::new(),
             _marker: PhantomData,
         })
     }
 
-    pub(crate) fn register(&mut self, tests: &[&dyn Registration]) -> Result<(), ExitStatus> {
-        let (pending_tests, filtered_out_tests) = match register_all(tests, &self.args) {
-            Ok(tests) => tests,
-            Err(err) => {
-                eprintln!("registry error: {}", err);
-                return Err(ExitStatus::FAILED);
-            }
-        };
-        self.pending_tests = pending_tests;
-        self.filtered_out_tests = filtered_out_tests;
-        Ok(())
+    pub(crate) fn register(
+        &mut self,
+        registration: &dyn Registration,
+    ) -> Result<(), RegistryError> {
+        registration.register(&mut MainRegistry { session: self })
+    }
+
+    pub(crate) fn sort_tests_by_names(&mut self) {
+        self.pending_tests
+            .sort_by(|t1, t2| t1.name().cmp(t2.name()));
     }
 
     /// Execute test case onto the specified executor.
@@ -100,47 +101,27 @@ impl Session<'_> {
     }
 }
 
-struct MainRegistry<'a> {
-    args: &'a Args,
-    inner: &'a mut MainRegistryInner,
+struct MainRegistry<'a, 'sess> {
+    session: &'a mut Session<'sess>,
 }
 
-#[derive(Default)]
-struct MainRegistryInner {
-    pending_tests: Vec<Test>,
-    filtered_out_tests: Vec<Test>,
-    unique_test_names: HashSet<String>,
-}
-
-impl Registry for MainRegistry<'_> {
+impl Registry for MainRegistry<'_, '_> {
     fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
-        if !self.inner.unique_test_names.insert(test.name().into()) {
+        let session = &mut *self.session;
+
+        if !session.unique_test_names.insert(test.name().into()) {
             return Err(RegistryError::new(format!(
                 "the test name '{}' is conflicted",
                 test.name()
             )));
         }
 
-        if self.args.is_match(test.name()) {
-            self.inner.pending_tests.push(test);
+        if session.args.is_filtered_out(test.name()) {
+            session.filtered_out_tests.push(test);
         } else {
-            self.inner.filtered_out_tests.push(test);
+            session.pending_tests.push(test);
         }
 
         Ok(())
     }
-}
-
-fn register_all(
-    registrations: &[&dyn Registration],
-    args: &Args,
-) -> Result<(Vec<Test>, Vec<Test>), RegistryError> {
-    let mut inner = MainRegistryInner::default();
-    for registration in registrations {
-        registration.register(&mut MainRegistry {
-            args,
-            inner: &mut inner,
-        })?;
-    }
-    Ok((inner.pending_tests, inner.filtered_out_tests))
 }
