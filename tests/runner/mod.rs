@@ -8,12 +8,21 @@ use rye::{
     executor::{AsyncTest, BlockingTest, LocalAsyncTest, TestExecutor},
     test::{Registration, TestResult},
 };
-use std::{error, fmt, panic::AssertUnwindSafe, sync::Once, thread};
+use std::{
+    error, fmt,
+    panic::{self, AssertUnwindSafe, PanicInfo},
+    sync::Once,
+    thread,
+};
+
+fn panic_hook(info: &PanicInfo) {
+    maybe_unwind::capture_panic_info(info);
+}
 
 pub(crate) fn run_tests(tests: &[&dyn Registration]) {
     static SET_HOOK: Once = Once::new();
     SET_HOOK.call_once(|| {
-        maybe_unwind::set_hook();
+        panic::set_hook(Box::new(panic_hook));
     });
 
     rye::cli::run_tests(tests, |session| {

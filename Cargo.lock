@@ -234,9 +234,9 @@ checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "maybe-unwind"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac36f48fae48318ddc7353f8d68c952cbe92ee1371744e9146c97af1ba79897e"
+checksum = "edd5cac666b39e49a5809c5ffa679329370191db2ef9c9d20d41a5b2b174f0bd"
 dependencies = [
  "cfg-if",
  "futures-core",

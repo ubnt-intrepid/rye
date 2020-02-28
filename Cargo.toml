@@ -29,7 +29,7 @@ futures = { version = "0.3", features = [ "thread-pool" ] }
 futures-test = "0.3"
 scoped-tls = "1"
 trybuild = "1"
-maybe-unwind = { version = "0.2", features = [ "futures" ] }
+maybe-unwind = { version = "0.2.1", features = [ "futures" ] }
 
 [dev-dependencies.cargo-husky]
 version = "1.5"
