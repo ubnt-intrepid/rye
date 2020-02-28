@@ -5,6 +5,7 @@ use futures::{
 };
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use rye::{
+    cli::Session,
     executor::{AsyncTest, BlockingTest, LocalAsyncTest, TestExecutor},
     test::{Registration, TestResult},
 };
@@ -20,19 +21,22 @@ fn panic_hook(info: &PanicInfo) {
 }
 
 pub(crate) fn run_tests(tests: &[&dyn Registration]) {
+    let mut session = Session::from_env(tests);
+
     static SET_HOOK: Once = Once::new();
     SET_HOOK.call_once(|| {
         panic::set_hook(Box::new(panic_hook));
     });
 
-    rye::cli::run_tests(tests, |session| {
-        let mut local_pool = LocalPool::new();
-        let mut executor = FuturesExecutor {
-            pool: ThreadPool::new().unwrap(),
-            local_spawner: local_pool.spawner(),
-        };
-        local_pool.run_until(session.execute_tests(&mut executor));
-    });
+    let mut local_pool = LocalPool::new();
+    let mut executor = FuturesExecutor {
+        pool: ThreadPool::new().unwrap(),
+        local_spawner: local_pool.spawner(),
+    };
+
+    let st = local_pool.run_until(session.run(&mut executor));
+
+    st.exit();
 }
 
 struct FuturesExecutor {

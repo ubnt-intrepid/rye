@@ -11,53 +11,64 @@ use futures::{
     future::{TryFuture, TryFutureExt as _},
     stream::StreamExt as _,
 };
-use std::{collections::HashSet, fmt, marker::PhantomData};
+use std::{collections::HashSet, fmt, io::Write as _};
 
-pub struct Session<'a> {
-    pub(crate) args: Args,
-    pub(crate) printer: Printer,
-    pub(crate) pending_tests: Vec<Test>,
-    pub(crate) filtered_out_tests: Vec<Test>,
-    pub(crate) completed_tests: Vec<(Test, Outcome)>,
+pub struct Session {
+    args: Args,
+    printer: Printer,
+    pending_tests: Vec<Test>,
+    filtered_out_tests: Vec<Test>,
+    completed_tests: Vec<(Test, Outcome)>,
     unique_test_names: HashSet<String>,
-    #[allow(clippy::type_complexity)]
-    _marker: PhantomData<(fn(&'a ()) -> &'a (), std::rc::Rc<std::cell::Cell<()>>)>,
 }
 
-impl Session<'_> {
-    pub(crate) fn from_env() -> Result<Self, ExitStatus> {
-        let args = Args::from_env()?;
+impl Session {
+    #[inline]
+    pub fn from_env(tests: &[&dyn Registration]) -> Self {
+        let args = Args::from_env().unwrap_or_else(|st| st.exit());
         let printer = Printer::new(&args);
-        Ok(Self {
+        let mut sess = Self {
             args,
             printer,
             pending_tests: vec![],
             filtered_out_tests: vec![],
             completed_tests: vec![],
             unique_test_names: HashSet::new(),
-            _marker: PhantomData,
-        })
-    }
+        };
 
-    pub(crate) fn register(
-        &mut self,
-        registration: &dyn Registration,
-    ) -> Result<(), RegistryError> {
-        registration.register(&mut MainRegistry { session: self })
-    }
+        for &test in tests {
+            let res = test.register(&mut MainRegistry { session: &mut sess });
+            if let Err(err) = res {
+                eprintln!("registry error: {}", err);
+                ExitStatus::FAILED.exit();
+            }
+        }
 
-    pub(crate) fn sort_tests_by_names(&mut self) {
-        self.pending_tests
+        // sort test cases by name.
+        sess.pending_tests
             .sort_by(|t1, t2| t1.name().cmp(t2.name()));
+
+        sess
     }
 
-    /// Execute test case onto the specified executor.
-    pub async fn execute_tests<'a, E: ?Sized>(&'a mut self, executor: &'a mut E)
+    #[inline]
+    pub async fn run<'a, E: ?Sized>(&'a mut self, executor: &'a mut E) -> ExitStatus
     where
         E: TestExecutor,
         E::Handle: TryFuture<Ok = ()>,
         <E::Handle as TryFuture>::Error: fmt::Debug,
     {
+        if self.args.list_tests {
+            let _ = self.printer.print_list(self.pending_tests.iter());
+            return ExitStatus::OK;
+        }
+
+        let _ = writeln!(
+            self.printer.term(),
+            "running {} tests",
+            self.pending_tests.len()
+        );
+
         let name_length = self
             .pending_tests
             .iter()
@@ -82,9 +93,14 @@ impl Session<'_> {
             .await;
 
         self.completed_tests = completed_tests.into_inner();
+
+        let report = self.make_report();
+        let _ = self.printer.print_report(&report);
+
+        report.status()
     }
 
-    pub(crate) fn make_report(&mut self) -> Report {
+    fn make_report(&mut self) -> Report {
         let mut passed = vec![];
         let mut failed = vec![];
         for (test, outcome) in self.completed_tests.drain(..) {
@@ -101,11 +117,11 @@ impl Session<'_> {
     }
 }
 
-struct MainRegistry<'a, 'sess> {
-    session: &'a mut Session<'sess>,
+struct MainRegistry<'a> {
+    session: &'a mut Session,
 }
 
-impl Registry for MainRegistry<'_, '_> {
+impl Registry for MainRegistry<'_> {
     fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
         let session = &mut *self.session;
 
