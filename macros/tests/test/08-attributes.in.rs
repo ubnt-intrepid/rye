@@ -1,4 +1,4 @@
-#[rye(rye_path = "path::to::rye")]
+#[rye(crate = "path::to::rye")]
 #[allow(missing_docs)]
 fn attributes() {
     let mut vec = vec![0usize; 5];

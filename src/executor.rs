@@ -308,7 +308,7 @@ mod tests {
         use super::*;
 
         #[crate::test]
-        #[rye(rye_path = "crate")]
+        #[rye(crate = "crate")]
         fn test_case() {
             append_history("test");
         }
@@ -324,7 +324,7 @@ mod tests {
         use super::*;
 
         #[crate::test]
-        #[rye(rye_path = "crate")]
+        #[rye(crate = "crate")]
         fn test_case() {
             append_history("setup");
 
@@ -353,7 +353,7 @@ mod tests {
         use super::*;
 
         #[crate::test]
-        #[rye(rye_path = "crate")]
+        #[rye(crate = "crate")]
         fn test_case() {
             append_history("setup");
 
@@ -391,7 +391,7 @@ mod tests {
         use super::*;
 
         #[crate::test]
-        #[rye(rye_path = "crate")]
+        #[rye(crate = "crate")]
         fn test_case() {
             append_history("setup");
 
@@ -452,7 +452,7 @@ mod tests {
         use super::*;
 
         #[crate::test]
-        #[rye(rye_path = "crate")]
+        #[rye(crate = "crate")]
         async fn test_case() {
             use futures_test::future::FutureTestExt as _;
 

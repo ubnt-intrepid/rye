@@ -1,12 +1,12 @@
 fn main() {}
 
 #[rye::test]
-#[rye(rye_path = 10)]
+#[rye(crate = 10)]
 fn invalid_path_type() {}
 
 #[rye::test]
-#[rye(rye_path = "rye")]
-#[rye(rye_path = "rye")]
+#[rye(crate = "rye")]
+#[rye(crate = "rye")]
 fn duplicated() {}
 
 #[rye::test]

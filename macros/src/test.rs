@@ -102,12 +102,12 @@ impl Parse for Args {
 }
 
 struct Params {
-    rye_path: syn::Path,
+    crate_path: syn::Path,
 }
 
 impl Params {
     fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
-        let mut rye_path = None;
+        let mut crate_path = None;
         let mut errors: Option<Error> = None;
 
         attrs.retain(|attr| {
@@ -117,10 +117,10 @@ impl Params {
 
             if let Err(error) = (|| -> Result<()> {
                 let param: MetaNameValue = attr.parse_args()?;
-                if param.path.is_ident("rye_path") {
+                if param.path.is_ident("crate") {
                     match param.lit {
-                        syn::Lit::Str(ref lit) if rye_path.is_none() => {
-                            rye_path.replace(lit.parse()?);
+                        syn::Lit::Str(ref lit) if crate_path.is_none() => {
+                            crate_path.replace(lit.parse()?);
                             Ok(())
                         }
                         syn::Lit::Str(..) => {
@@ -147,7 +147,7 @@ impl Params {
         }
 
         Ok(Self {
-            rye_path: rye_path.unwrap_or_else(|| syn::parse_quote!(::rye)),
+            crate_path: crate_path.unwrap_or_else(|| syn::parse_quote!(::rye)),
         })
     }
 }
@@ -239,9 +239,9 @@ impl ExpandBlock<'_> {
 
         let block = &*block;
 
-        let rye_path = &self.params.rye_path;
+        let crate_path = &self.params.crate_path;
         Ok(syn::parse_quote! {
-            #rye_path::__enter_section!(#section_id, #block);
+            #crate_path::__enter_section!(#section_id, #block);
         })
     }
 
@@ -370,7 +370,7 @@ impl ToTokens for Generated<'_> {
         });
 
         let ident = &self.item.sig.ident;
-        let rye_path = &self.params.rye_path;
+        let crate_path = &self.params.crate_path;
 
         let test_fn = if self.item.sig.asyncness.is_some() {
             let local = self.args.local;
@@ -380,7 +380,7 @@ impl ToTokens for Generated<'_> {
         };
 
         tokens.append_all(vec![quote! {
-            #rye_path::__declare_test_module! {
+            #crate_path::__declare_test_module! {
                 name = #ident;
                 sections = { #( #section_map_entries )* };
                 leaf_sections = { #( #leaf_section_ids ),* };

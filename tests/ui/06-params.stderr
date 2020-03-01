@@ -1,14 +1,14 @@
 error: required a string literal
- --> $DIR/06-params.rs:4:18
+ --> $DIR/06-params.rs:4:15
   |
-4 | #[rye(rye_path = 10)]
-  |                  ^^
+4 | #[rye(crate = 10)]
+  |               ^^
 
 error: duplicated parameter
  --> $DIR/06-params.rs:9:7
   |
-9 | #[rye(rye_path = "rye")]
-  |       ^^^^^^^^^^^^^^^^
+9 | #[rye(crate = "rye")]
+  |       ^^^^^^^^^^^^^
 
 error: unknown parameter name
   --> $DIR/06-params.rs:13:7
