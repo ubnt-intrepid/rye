@@ -212,7 +212,10 @@ mod sub {
 
 pub mod cli;
 pub mod executor;
+pub mod reporter;
 pub mod test;
+
+mod global;
 
 #[doc(hidden)] // private API.
 pub mod _internal {

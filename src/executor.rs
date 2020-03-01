@@ -2,48 +2,55 @@
 
 pub(crate) mod context;
 
-use crate::test::{
-    imp::{TestDesc, TestFn, TestFuture},
-    Test, TestResult,
+pub use context::{AccessError, Context};
+
+use crate::{
+    reporter::TestCaseReporter,
+    test::{
+        imp::{TestDesc, TestFn, TestFuture},
+        Test, TestResult,
+    },
 };
 use futures::future::Future;
-use std::{cell::Cell, marker::PhantomData};
+use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _};
+use std::{cell::Cell, marker::PhantomData, panic::AssertUnwindSafe};
 
-pub use self::context::{AccessError, Context};
+trait FutureAssertUnwindSafeExt: Future + Sized {
+    fn assert_unwind_safe(self) -> AssertUnwindSafe<Self> {
+        AssertUnwindSafe(self)
+    }
+}
+
+impl<F: Future> FutureAssertUnwindSafeExt for F {}
 
 /// Test executor.
 pub trait TestExecutor {
-    /// The type of handle for awaiting the test completion.
-    type Handle;
-
     /// Execute an asynchronous test function.
-    fn execute(&mut self, test: AsyncTest) -> Self::Handle;
+    fn execute(&mut self, test: AsyncTest);
 
     /// Execute an asynchronous test function on the current thread.
-    fn execute_local(&mut self, test: LocalAsyncTest) -> Self::Handle;
+    fn execute_local(&mut self, test: LocalAsyncTest);
 
     /// Execute a blocking test function.
-    fn execute_blocking(&mut self, test: BlockingTest) -> Self::Handle;
+    fn execute_blocking(&mut self, test: BlockingTest);
 }
 
 impl<E: ?Sized> TestExecutor for &mut E
 where
     E: TestExecutor,
 {
-    type Handle = E::Handle;
-
     #[inline]
-    fn execute(&mut self, test: AsyncTest) -> Self::Handle {
+    fn execute(&mut self, test: AsyncTest) {
         (**self).execute(test)
     }
 
     #[inline]
-    fn execute_local(&mut self, test: LocalAsyncTest) -> Self::Handle {
+    fn execute_local(&mut self, test: LocalAsyncTest) {
         (**self).execute_local(test)
     }
 
     #[inline]
-    fn execute_blocking(&mut self, test: BlockingTest) -> Self::Handle {
+    fn execute_blocking(&mut self, test: BlockingTest) {
         (**self).execute_blocking(test)
     }
 }
@@ -52,39 +59,40 @@ impl<E: ?Sized> TestExecutor for Box<E>
 where
     E: TestExecutor,
 {
-    type Handle = E::Handle;
-
     #[inline]
-    fn execute(&mut self, test: AsyncTest) -> Self::Handle {
+    fn execute(&mut self, test: AsyncTest) {
         (**self).execute(test)
     }
 
     #[inline]
-    fn execute_local(&mut self, test: LocalAsyncTest) -> Self::Handle {
+    fn execute_local(&mut self, test: LocalAsyncTest) {
         (**self).execute_local(test)
     }
 
     #[inline]
-    fn execute_blocking(&mut self, test: BlockingTest) -> Self::Handle {
+    fn execute_blocking(&mut self, test: BlockingTest) {
         (**self).execute_blocking(test)
     }
 }
 
 impl Test {
     /// Execute the test function using the specified test executor.
-    pub fn execute<E: ?Sized>(&self, exec: &mut E) -> E::Handle
+    pub fn execute<E: ?Sized, R>(&self, exec: &mut E, reporter: R)
     where
         E: TestExecutor,
+        R: TestCaseReporter + Send + 'static,
     {
         let desc = self.desc;
+        let reporter = Box::new(reporter);
         match self.test_fn {
             TestFn::Blocking { f } => exec.execute_blocking(BlockingTest {
                 desc,
+                reporter,
                 f,
                 _marker: PhantomData,
             }),
             TestFn::Async { f, local } => {
-                let inner = AsyncTestInner { desc, f };
+                let inner = AsyncTestInner { desc, reporter, f };
                 if local {
                     exec.execute_local(LocalAsyncTest {
                         inner,
@@ -105,76 +113,115 @@ impl Test {
 pub struct BlockingTest {
     desc: &'static TestDesc,
     f: fn() -> Box<dyn TestResult>,
+    reporter: Box<dyn TestCaseReporter + Send + 'static>,
     _marker: PhantomData<Cell<()>>,
 }
 
 impl BlockingTest {
     /// Run the test function until all sections are completed.
-    pub fn run(&mut self) -> Box<dyn TestResult> {
+    pub fn run(&mut self) {
+        self.reporter.test_case_starting();
+
         if self.desc.leaf_sections.is_empty() {
-            Context {
-                desc: &self.desc,
-                target_section: None,
-                current_section: None,
-                _marker: PhantomData,
-            }
-            .scope(&self.f)
-        } else {
-            for &section in &self.desc.leaf_sections {
-                let term = Context {
+            self.reporter.section_starting(None);
+            let result = maybe_unwind(AssertUnwindSafe(|| {
+                Context {
                     desc: &self.desc,
-                    target_section: Some(section),
+                    target_section: None,
                     current_section: None,
+                    event_handler: &mut self.reporter,
                     _marker: PhantomData,
                 }
-                .scope(&self.f);
-                if !term.is_success() {
-                    return term;
+                .scope(&self.f)
+            }));
+            match result {
+                Ok(result) => self.reporter.section_ended(None, &*result),
+                Err(unwind) => self.reporter.section_terminated(None, &unwind),
+            }
+        } else {
+            for &section in &self.desc.leaf_sections {
+                let name = self.desc.sections[&section].name;
+                self.reporter.section_starting(Some(name));
+                let result = maybe_unwind(AssertUnwindSafe(|| {
+                    Context {
+                        desc: &self.desc,
+                        target_section: Some(section),
+                        current_section: None,
+                        event_handler: &mut self.reporter,
+                        _marker: PhantomData,
+                    }
+                    .scope(&self.f)
+                }));
+                match result {
+                    Ok(result) => self.reporter.section_ended(Some(name), &*result),
+                    Err(unwind) => self.reporter.section_terminated(Some(name), &unwind),
                 }
             }
-            Box::new(())
         }
+
+        self.reporter.test_case_ended();
     }
 }
 
 struct AsyncTestInner {
     desc: &'static TestDesc,
     f: fn() -> TestFuture,
+    reporter: Box<dyn TestCaseReporter + Send + 'static>,
 }
 
 impl AsyncTestInner {
-    async fn run<F, Fut>(&mut self, f: F) -> Box<dyn TestResult>
+    async fn run<F, Fut>(&mut self, f: F)
     where
         F: Fn(TestFuture) -> Fut,
         Fut: Future<Output = Box<dyn TestResult>>,
     {
+        self.reporter.test_case_starting();
+
         if self.desc.leaf_sections.is_empty() {
+            self.reporter.section_starting(None);
             let fut = f((self.f)());
-            Context {
+            let result = Context {
                 desc: &self.desc,
                 target_section: None,
                 current_section: None,
+                event_handler: &mut self.reporter,
                 _marker: PhantomData,
             }
             .scope_async(fut)
-            .await
+            .assert_unwind_safe()
+            .maybe_unwind()
+            .await;
+            match result {
+                Ok(result) => self.reporter.section_ended(None, &*result),
+                Err(unwind) => self.reporter.section_terminated(None, &unwind),
+            }
         } else {
             for &section in &self.desc.leaf_sections {
+                let name = self.desc.sections[&section].name;
+
+                self.reporter.section_starting(Some(name));
+
                 let fut = f((self.f)());
-                let term = Context {
+                let result = Context {
                     desc: &self.desc,
                     target_section: Some(section),
                     current_section: None,
+                    event_handler: &mut self.reporter,
                     _marker: PhantomData,
                 }
                 .scope_async(fut)
+                .assert_unwind_safe()
+                .maybe_unwind()
                 .await;
-                if !term.is_success() {
-                    return term;
+
+                match result {
+                    Ok(result) => self.reporter.section_ended(Some(name), &*result),
+                    Err(unwind) => self.reporter.section_terminated(Some(name), &unwind),
                 }
             }
-            Box::new(())
         }
+
+        self.reporter.test_case_ended();
     }
 }
 
@@ -187,7 +234,7 @@ pub struct AsyncTest {
 impl AsyncTest {
     /// Run the test function until all sections are completed.
     #[inline]
-    pub async fn run(&mut self) -> Box<dyn TestResult> {
+    pub async fn run(&mut self) {
         self.inner.run(TestFuture::into_future_obj).await
     }
 }
@@ -204,7 +251,7 @@ pub struct LocalAsyncTest {
 impl LocalAsyncTest {
     /// Run the test function until all sections are completed.
     #[inline]
-    pub async fn run(&mut self) -> Box<dyn TestResult> {
+    pub async fn run(&mut self) {
         self.inner.run(std::convert::identity).await
     }
 }
@@ -214,6 +261,7 @@ mod tests {
     use super::*;
     use crate::test::{imp::TestFn, Registration, Registry, RegistryError, Test};
     use futures::task::{self, Poll};
+    use maybe_unwind::Unwind;
     use scoped_tls::{scoped_thread_local, ScopedKey};
     use std::{cell::RefCell, marker::PhantomData, pin::Pin};
 
@@ -275,6 +323,20 @@ mod tests {
         }
     }
 
+    struct NullReporter;
+
+    impl TestCaseReporter for NullReporter {
+        fn test_case_starting(&mut self) {}
+
+        fn test_case_ended(&mut self) {}
+
+        fn section_starting(&mut self, _: Option<&str>) {}
+
+        fn section_ended(&mut self, _: Option<&str>, _: &dyn TestResult) {}
+
+        fn section_terminated(&mut self, _: Option<&str>, _: &Unwind) {}
+    }
+
     fn run_test(r: &dyn Registration) -> Vec<HistoryLog> {
         let test = {
             let mut test = None;
@@ -287,6 +349,7 @@ mod tests {
             TestFn::Blocking { f } => HISTORY.set(&history, || {
                 BlockingTest {
                     desc: test.desc,
+                    reporter: Box::new(NullReporter),
                     f,
                     _marker: PhantomData,
                 }
@@ -294,9 +357,13 @@ mod tests {
             }),
             TestFn::Async { f, .. } => {
                 futures::executor::block_on(HISTORY.set_async(&history, async {
-                    AsyncTestInner { desc: test.desc, f }
-                        .run(std::convert::identity)
-                        .await;
+                    AsyncTestInner {
+                        desc: test.desc,
+                        reporter: Box::new(NullReporter),
+                        f,
+                    }
+                    .run(std::convert::identity)
+                    .await;
                 }))
             }
         }

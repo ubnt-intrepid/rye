@@ -6,3 +6,7 @@ mod report;
 mod session;
 
 pub use self::{exit_status::ExitStatus, session::Session};
+
+pub fn install() {
+    crate::global::install();
+}

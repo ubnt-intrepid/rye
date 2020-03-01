@@ -1,3 +1,4 @@
+use super::TestCaseReporter;
 use crate::test::imp::{SectionId, TestDesc};
 use futures::{
     future::Future,
@@ -11,6 +12,8 @@ pub struct Context<'a> {
     pub(crate) desc: &'a TestDesc,
     pub(crate) target_section: Option<SectionId>,
     pub(crate) current_section: Option<SectionId>,
+    #[allow(dead_code)]
+    pub(crate) event_handler: &'a mut (dyn TestCaseReporter + Send),
     pub(crate) _marker: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 

@@ -1,3 +1,5 @@
+use crate::reporter::TestCaseReporter;
+use crate::test::TestResult;
 use crate::{
     cli::{
         args::Args,
@@ -7,10 +9,11 @@ use crate::{
     executor::TestExecutor,
     test::{Registration, Registry, RegistryError, Test},
 };
-use futures::{
-    future::{TryFuture, TryFutureExt as _},
-    stream::StreamExt as _,
-};
+use futures::channel::oneshot;
+use futures::stream::StreamExt as _;
+use maybe_unwind::Unwind;
+use std::collections::HashMap;
+use std::error;
 use std::{collections::HashSet, fmt, io::Write as _};
 
 pub struct Session {
@@ -55,8 +58,6 @@ impl Session {
     pub async fn run<'a, E: ?Sized>(&'a mut self, executor: &'a mut E) -> ExitStatus
     where
         E: TestExecutor,
-        E::Handle: TryFuture<Ok = ()>,
-        <E::Handle as TryFuture>::Error: fmt::Debug,
     {
         if self.args.list_tests {
             let _ = self.printer.print_list(self.pending_tests.iter());
@@ -80,10 +81,13 @@ impl Session {
         let printer = &self.printer;
         futures::stream::iter(self.pending_tests.drain(..))
             .for_each_concurrent(None, |test| {
-                let handle = test.execute(&mut *executor);
+                let (tx, rx) = oneshot::channel();
+                let reporter = SessionTestCaseReporter::new(tx);
+                test.execute(&mut *executor, reporter);
                 async {
-                    let outcome = match handle.into_future().await {
-                        Ok(()) => Outcome::passed(),
+                    let outcome = match rx.await {
+                        Ok(Ok(())) => Outcome::passed(),
+                        Ok(Err(msg)) => Outcome::failed().error_message(format!("{:?}", msg)),
                         Err(err) => Outcome::failed().error_message(format!("{:?}", err)),
                     };
                     let _ = printer.print_result(&test, name_length, &outcome);
@@ -139,5 +143,69 @@ impl Registry for MainRegistry<'_> {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct SessionTestCaseReporter {
+    tx: Option<oneshot::Sender<Result<(), ErrorMessage>>>,
+    failures: HashMap<String, String>,
+}
+
+impl SessionTestCaseReporter {
+    fn new(tx: futures::channel::oneshot::Sender<Result<(), ErrorMessage>>) -> Self {
+        Self {
+            tx: Some(tx),
+            failures: HashMap::new(),
+        }
+    }
+
+    fn make_outcome(&mut self) -> Result<(), ErrorMessage> {
+        if self.failures.is_empty() {
+            Ok(())
+        } else {
+            Err(ErrorMessage(format!("{:?}", self).into()))
+        }
+    }
+}
+
+impl TestCaseReporter for SessionTestCaseReporter {
+    fn test_case_starting(&mut self) {}
+
+    fn test_case_ended(&mut self) {
+        if let Some(tx) = self.tx.take() {
+            let _ = tx.send(self.make_outcome());
+        }
+    }
+
+    fn section_starting(&mut self, _: Option<&str>) {}
+
+    fn section_ended(&mut self, name: Option<&str>, result: &dyn TestResult) {
+        if !result.is_success() {
+            let name = name.unwrap_or("__root__");
+            self.failures.insert(
+                name.into(),
+                result
+                    .error_message()
+                    .map_or("<unknown>".into(), |msg| format!("{:?}", msg)),
+            );
+        }
+    }
+
+    fn section_terminated(&mut self, name: Option<&str>, unwind: &Unwind) {
+        let name = name.unwrap_or("__root__");
+        self.failures.insert(name.into(), unwind.to_string());
+    }
+}
+
+struct ErrorMessage(Box<dyn error::Error + Send + Sync>);
+
+impl fmt::Debug for ErrorMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            fmt::Debug::fmt(&*self.0, f)
+        } else {
+            fmt::Display::fmt(&*self.0, f)
+        }
     }
 }
