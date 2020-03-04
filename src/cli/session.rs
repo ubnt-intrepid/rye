@@ -49,7 +49,7 @@ impl Session {
 
         // sort test cases by name.
         sess.pending_tests
-            .sort_by(|t1, t2| t1.name().cmp(t2.name()));
+            .sort_by(|t1, t2| t1.desc().name().cmp(t2.desc().name()));
 
         sess
     }
@@ -60,7 +60,9 @@ impl Session {
         E: TestExecutor,
     {
         if self.args.list_tests {
-            let _ = self.printer.print_list(self.pending_tests.iter());
+            let _ = self
+                .printer
+                .print_list(self.pending_tests.iter().map(|test| test.desc()));
             return ExitStatus::OK;
         }
 
@@ -73,7 +75,7 @@ impl Session {
         let name_length = self
             .pending_tests
             .iter()
-            .map(|test| test.name().len())
+            .map(|test| test.desc().name().len())
             .max()
             .unwrap_or(0);
 
@@ -90,7 +92,7 @@ impl Session {
                         Ok(Err(msg)) => Outcome::failed().error_message(format!("{:?}", msg)),
                         Err(err) => Outcome::failed().error_message(format!("{:?}", err)),
                     };
-                    let _ = printer.print_result(&test, name_length, &outcome);
+                    let _ = printer.print_result(test.desc(), name_length, &outcome);
                     completed_tests.lock().await.push((test, outcome));
                 }
             })
@@ -109,14 +111,18 @@ impl Session {
         let mut failed = vec![];
         for (test, outcome) in self.completed_tests.drain(..) {
             match outcome.kind() {
-                OutcomeKind::Passed => passed.push(test),
-                OutcomeKind::Failed => failed.push((test, outcome.err_msg())),
+                OutcomeKind::Passed => passed.push(test.desc()),
+                OutcomeKind::Failed => failed.push((test.desc(), outcome.err_msg())),
             }
         }
         Report {
             passed,
             failed,
-            filtered_out: self.filtered_out_tests.drain(..).collect(),
+            filtered_out: self
+                .filtered_out_tests
+                .drain(..)
+                .map(|test| test.desc())
+                .collect(),
         }
     }
 }
@@ -129,14 +135,14 @@ impl Registry for MainRegistry<'_> {
     fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
         let session = &mut *self.session;
 
-        if !session.unique_test_names.insert(test.name().into()) {
+        if !session.unique_test_names.insert(test.desc().name().into()) {
             return Err(RegistryError::new(format!(
                 "the test name '{}' is conflicted",
-                test.name()
+                test.desc().name()
             )));
         }
 
-        if session.args.is_filtered_out(test.name()) {
+        if session.args.is_filtered_out(test.desc().name()) {
             session.filtered_out_tests.push(test);
         } else {
             session.pending_tests.push(test);

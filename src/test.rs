@@ -1,7 +1,7 @@
 //! Registration of test cases.
 
-use self::imp::{TestDesc, TestFn};
-use std::{error, fmt};
+use self::imp::{Section, SectionId, TestFn};
+use std::{collections::HashMap, error, fmt};
 
 /// Description about a single test case.
 #[derive(Debug)]
@@ -13,17 +13,10 @@ pub struct Test {
 }
 
 impl Test {
-    /// Return the name of test case.
-    ///
-    /// Test cases are uniquely named by their relative path from
-    /// the root module.
+    /// Return the reference to the test description.
     #[inline]
-    pub fn name(&self) -> &str {
+    pub fn desc(&self) -> &'static TestDesc {
         self.desc
-            .module_path
-            .splitn(2, "::")
-            .nth(1)
-            .unwrap_or("<unknown>")
     }
 
     /// Return the test case is asynchronous or not.
@@ -43,6 +36,31 @@ impl Test {
             TestFn::Async { local, .. } => local,
             TestFn::Blocking { .. } => false,
         }
+    }
+}
+
+/// Metadata about a test case.
+#[derive(Debug)]
+pub struct TestDesc {
+    #[doc(hidden)]
+    pub module_path: &'static str,
+    #[doc(hidden)]
+    pub sections: HashMap<SectionId, Section>,
+    #[doc(hidden)]
+    pub leaf_sections: Vec<SectionId>,
+}
+
+impl TestDesc {
+    /// Return the name of test case.
+    ///
+    /// Test cases are uniquely named by their relative path from
+    /// the root module.
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.module_path
+            .splitn(2, "::")
+            .nth(1)
+            .unwrap_or("<unknown>")
     }
 }
 
@@ -151,22 +169,11 @@ pub(crate) mod imp {
         task::{self, FutureObj, Poll},
     };
     use pin_project::pin_project;
-    use std::{
-        collections::{HashMap, HashSet},
-        fmt,
-        pin::Pin,
-    };
+    use std::{collections::HashSet, fmt, pin::Pin};
 
     pub trait IsTestResult {}
     impl IsTestResult for () {}
     impl<E> IsTestResult for Result<(), E> where E: fmt::Debug + 'static {}
-
-    #[derive(Debug)]
-    pub struct TestDesc {
-        pub module_path: &'static str,
-        pub sections: HashMap<SectionId, Section>,
-        pub leaf_sections: Vec<SectionId>,
-    }
 
     pub(crate) type SectionId = u64;
 

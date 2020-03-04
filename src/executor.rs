@@ -7,8 +7,8 @@ pub use context::{AccessError, Context};
 use crate::{
     reporter::TestCaseReporter,
     test::{
-        imp::{TestDesc, TestFn, TestFuture},
-        Test, TestResult,
+        imp::{TestFn, TestFuture},
+        Test, TestDesc, TestResult,
     },
 };
 use futures::future::Future;
@@ -118,6 +118,12 @@ pub struct BlockingTest {
 }
 
 impl BlockingTest {
+    #[allow(missing_docs)]
+    #[inline]
+    pub fn desc(&self) -> &'static TestDesc {
+        self.desc
+    }
+
     /// Run the test function until all sections are completed.
     pub fn run(&mut self) {
         self.reporter.test_case_starting();
@@ -232,6 +238,12 @@ pub struct AsyncTest {
 }
 
 impl AsyncTest {
+    #[allow(missing_docs)]
+    #[inline]
+    pub fn desc(&self) -> &'static TestDesc {
+        self.inner.desc
+    }
+
     /// Run the test function until all sections are completed.
     #[inline]
     pub async fn run(&mut self) {
@@ -249,6 +261,12 @@ pub struct LocalAsyncTest {
 }
 
 impl LocalAsyncTest {
+    #[allow(missing_docs)]
+    #[inline]
+    pub fn desc(&self) -> &'static TestDesc {
+        self.inner.desc
+    }
+
     /// Run the test function until all sections are completed.
     #[inline]
     pub async fn run(&mut self) {

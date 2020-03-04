@@ -220,8 +220,8 @@ mod global;
 #[doc(hidden)] // private API.
 pub mod _internal {
     pub use crate::test::{
-        imp::{Section, TestDesc, TestFn, TestFuture},
-        Registration, Registry, RegistryError, Test,
+        imp::{Section, TestFn, TestFuture},
+        Registration, Registry, RegistryError, Test, TestDesc,
     };
     pub use lazy_static::lazy_static;
     pub use maplit::hashset;

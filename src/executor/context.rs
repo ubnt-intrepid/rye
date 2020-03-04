@@ -1,5 +1,5 @@
 use super::TestCaseReporter;
-use crate::test::imp::{SectionId, TestDesc};
+use crate::test::{imp::SectionId, TestDesc};
 use futures::{
     future::Future,
     task::{self, Poll},
