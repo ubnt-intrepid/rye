@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+pub mod console;
+
 use crate::test::TestResult;
 use maybe_unwind::Unwind;
 

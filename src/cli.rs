@@ -1,11 +1,10 @@
 #![allow(missing_docs)]
 
-mod args;
-mod exit_status;
-mod report;
-mod session;
+pub(crate) mod args;
+pub(crate) mod exit_status;
+pub(crate) mod session;
 
-pub use self::{exit_status::ExitStatus, session::Session};
+pub use self::{args::Args, exit_status::ExitStatus, session::Session};
 
 pub fn install() {
     crate::global::install();

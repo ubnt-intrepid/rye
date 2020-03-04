@@ -3,8 +3,9 @@ use futures::{
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
 use rye::{
-    cli::Session,
+    cli::{Args, Session},
     executor::{AsyncTest, BlockingTest, LocalAsyncTest, TestExecutor},
+    reporter::console::ConsoleReporter,
     test::Registration,
 };
 use std::thread;
@@ -12,7 +13,13 @@ use std::thread;
 pub(crate) fn run_tests(tests: &[&dyn Registration]) {
     rye::cli::install();
 
-    let mut session = Session::from_env(tests);
+    let args = Args::from_env().unwrap_or_else(|st| st.exit());
+    let mut session = Session::new(&args);
+
+    if let Err(err) = session.register_tests(tests) {
+        eprintln!("registry error: {}", err);
+        std::process::exit(101);
+    }
 
     let mut local_pool = LocalPool::new();
     let mut executor = FuturesExecutor {
@@ -20,7 +27,9 @@ pub(crate) fn run_tests(tests: &[&dyn Registration]) {
         local_spawner: local_pool.spawner(),
     };
 
-    let st = local_pool.run_until(session.run(&mut executor));
+    let mut printer = ConsoleReporter::new(&args);
+
+    let st = local_pool.run_until(session.run(&mut executor, &mut printer));
 
     st.exit();
 }

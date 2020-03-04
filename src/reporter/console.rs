@@ -1,20 +1,25 @@
+use super::TestCaseReporter;
 use crate::{
     cli::{
         args::{Args, ColorConfig},
         exit_status::ExitStatus,
     },
-    test::TestDesc,
+    test::{TestDesc, TestResult},
 };
 use console::{Style, StyledObject, Term};
+use futures::channel::oneshot;
+use maybe_unwind::Unwind;
 use std::{
     borrow::Cow,
+    collections::HashMap,
+    error, fmt,
     io::{self, Write},
     sync::Arc,
 };
 
 /// The outcome of performing a test.
 #[derive(Debug)]
-pub struct Outcome {
+pub(crate) struct Outcome {
     kind: OutcomeKind,
     err_msg: Option<Arc<Cow<'static, str>>>,
 }
@@ -64,8 +69,7 @@ pub(crate) enum OutcomeKind {
 
 /// A report on test suite execution.
 #[derive(Debug)]
-#[non_exhaustive]
-pub struct Report {
+pub(crate) struct Report {
     /// Passed test cases.
     pub passed: Vec<&'static TestDesc>,
 
@@ -87,13 +91,13 @@ impl Report {
     }
 }
 
-pub(crate) struct Printer {
+pub struct ConsoleReporter {
     term: Term,
     style: Style,
 }
 
-impl Printer {
-    pub(crate) fn new(args: &Args) -> Self {
+impl ConsoleReporter {
+    pub fn new(args: &Args) -> Self {
         Self {
             term: Term::buffered_stdout(),
             style: {
@@ -120,11 +124,14 @@ impl Printer {
         &self,
         tests: impl IntoIterator<Item = &'static TestDesc>,
     ) -> io::Result<()> {
+        let term = io::stdout();
+        let mut term = term.lock();
         let mut num_tests = 0;
 
         for test in tests {
+            let test = &*test;
             num_tests += 1;
-            writeln!(&self.term, "{}: test", test.name())?;
+            writeln!(term, "{}: test", test.name())?;
         }
 
         fn plural_suffix(n: usize) -> &'static str {
@@ -135,10 +142,11 @@ impl Printer {
         }
 
         if num_tests != 0 {
-            writeln!(&self.term)?;
+            writeln!(term)?;
         }
-        writeln!(&self.term, "{} test{}", num_tests, plural_suffix(num_tests),)?;
+        writeln!(term, "{} test{}", num_tests, plural_suffix(num_tests),)?;
 
+        term.flush()?;
         Ok(())
     }
 
@@ -197,5 +205,69 @@ impl Printer {
         )?;
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ConsoleTestCaseReporter {
+    tx: Option<oneshot::Sender<Result<(), ErrorMessage>>>,
+    failures: HashMap<String, String>,
+}
+
+impl ConsoleTestCaseReporter {
+    pub(crate) fn new(tx: futures::channel::oneshot::Sender<Result<(), ErrorMessage>>) -> Self {
+        Self {
+            tx: Some(tx),
+            failures: HashMap::new(),
+        }
+    }
+
+    fn make_outcome(&mut self) -> Result<(), ErrorMessage> {
+        if self.failures.is_empty() {
+            Ok(())
+        } else {
+            Err(ErrorMessage(format!("{:?}", self).into()))
+        }
+    }
+}
+
+impl TestCaseReporter for ConsoleTestCaseReporter {
+    fn test_case_starting(&mut self) {}
+
+    fn test_case_ended(&mut self) {
+        if let Some(tx) = self.tx.take() {
+            let _ = tx.send(self.make_outcome());
+        }
+    }
+
+    fn section_starting(&mut self, _: Option<&str>) {}
+
+    fn section_ended(&mut self, name: Option<&str>, result: &dyn TestResult) {
+        if !result.is_success() {
+            let name = name.unwrap_or("__root__");
+            self.failures.insert(
+                name.into(),
+                result
+                    .error_message()
+                    .map_or("<unknown>".into(), |msg| format!("{:?}", msg)),
+            );
+        }
+    }
+
+    fn section_terminated(&mut self, name: Option<&str>, unwind: &Unwind) {
+        let name = name.unwrap_or("__root__");
+        self.failures.insert(name.into(), unwind.to_string());
+    }
+}
+
+pub(crate) struct ErrorMessage(Box<dyn error::Error + Send + Sync>);
+
+impl fmt::Debug for ErrorMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            fmt::Debug::fmt(&*self.0, f)
+        } else {
+            fmt::Display::fmt(&*self.0, f)
+        }
     }
 }
