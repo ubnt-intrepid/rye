@@ -1,19 +1,19 @@
 use crate::{
     cli::{args::Args, exit_status::ExitStatus},
     executor::TestExecutor,
-    reporter::console::{ConsoleReporter, ConsoleTestCaseReporter, Outcome, OutcomeKind, Report},
+    reporter::Reporter,
     test::{Registration, Registry, RegistryError, Test},
 };
-use futures::channel::oneshot;
-use futures::stream::StreamExt as _;
 use std::error;
-use std::{collections::HashSet, io::Write as _};
+use std::{
+    collections::HashSet,
+    io::{self, Write as _},
+};
 
 pub struct Session<'sess> {
     args: &'sess Args,
     pending_tests: Vec<Test>,
     filtered_out_tests: Vec<Test>,
-    completed_tests: Vec<(Test, Outcome)>,
     unique_test_names: HashSet<String>,
 }
 
@@ -24,7 +24,6 @@ impl<'sess> Session<'sess> {
             args,
             pending_tests: vec![],
             filtered_out_tests: vec![],
-            completed_tests: vec![],
             unique_test_names: HashSet::new(),
         }
     }
@@ -47,73 +46,64 @@ impl<'sess> Session<'sess> {
         Ok(())
     }
 
+    fn print_list(&self) -> io::Result<()> {
+        let term = io::stdout();
+        let mut term = term.lock();
+        let mut num_tests = 0;
+
+        for test in &self.pending_tests {
+            num_tests += 1;
+            writeln!(term, "{}: test", test.desc().name())?;
+        }
+
+        fn plural_suffix(n: usize) -> &'static str {
+            match n {
+                1 => "",
+                _ => "s",
+            }
+        }
+
+        if num_tests != 0 {
+            writeln!(term)?;
+        }
+        writeln!(term, "{} test{}", num_tests, plural_suffix(num_tests),)?;
+
+        term.flush()?;
+        Ok(())
+    }
+
     #[inline]
-    pub async fn run<'a, E: ?Sized>(
-        &'a mut self,
-        executor: &'a mut E,
-        printer: &mut ConsoleReporter,
-    ) -> ExitStatus
+    pub fn run<E: ?Sized, R: ?Sized>(&mut self, executor: &mut E, reporter: &mut R) -> ExitStatus
     where
         E: TestExecutor,
+        R: Reporter,
+        R::TestCaseReporter: Send + 'static,
     {
         if self.args.list_tests {
-            let _ = printer.print_list(self.pending_tests.iter().map(|test| test.desc()));
+            let _ = self.print_list();
             return ExitStatus::OK;
         }
 
-        let _ = writeln!(printer.term(), "running {} tests", self.pending_tests.len());
+        reporter.test_run_starting(&self.pending_tests);
 
-        let name_length = self
-            .pending_tests
-            .iter()
-            .map(|test| test.desc().name().len())
-            .max()
-            .unwrap_or(0);
-
-        let completed_tests = futures::lock::Mutex::new(vec![]);
-        let printer = &*printer;
-        futures::stream::iter(self.pending_tests.drain(..))
-            .for_each_concurrent(None, |test| {
-                let (tx, rx) = oneshot::channel();
-                let reporter = ConsoleTestCaseReporter::new(tx);
-                test.execute(&mut *executor, reporter);
-                async {
-                    let outcome = match rx.await {
-                        Ok(Ok(())) => Outcome::passed(),
-                        Ok(Err(msg)) => Outcome::failed().error_message(format!("{:?}", msg)),
-                        Err(err) => Outcome::failed().error_message(format!("{:?}", err)),
-                    };
-                    let _ = printer.print_result(test.desc(), name_length, &outcome);
-                    completed_tests.lock().await.push((test, outcome));
-                }
-            })
-            .await;
-
-        self.completed_tests = completed_tests.into_inner();
-
-        let report = self.make_report();
-        let _ = printer.print_report(&report);
-
-        report.status()
-    }
-
-    fn make_report(&mut self) -> Report {
-        let mut passed = vec![];
-        let mut failed = vec![];
-        for (test, outcome) in self.completed_tests.drain(..) {
-            match outcome.kind() {
-                OutcomeKind::Passed => passed.push(test.desc()),
-                OutcomeKind::Failed => failed.push((test.desc(), outcome.err_msg())),
-            }
+        for test in self.pending_tests.drain(..) {
+            let reporter = reporter.test_case_reporter();
+            test.execute(&mut *executor, reporter);
         }
-        Report {
-            passed,
-            failed,
-            filtered_out: self
-                .filtered_out_tests
-                .drain(..)
-                .map(|test| test.desc())
-                .collect(),
+
+        let mut summary = executor.run();
+        summary.filtered_out = self
+            .filtered_out_tests
+            .iter()
+            .map(|test| test.desc())
+            .collect();
+
+        reporter.test_run_ended(&summary);
+
+        if summary.is_success() {
+            ExitStatus::OK
+        } else {
+            ExitStatus::FAILED
         }
     }
 }

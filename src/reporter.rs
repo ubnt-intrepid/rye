@@ -2,74 +2,86 @@
 
 pub mod console;
 
-use maybe_unwind::Unwind;
-use std::fmt;
+use crate::{
+    executor::result::{Summary, TestCaseResult},
+    test::Test,
+};
+
+pub trait Reporter {
+    type TestCaseReporter: TestCaseReporter;
+
+    fn test_run_starting(&mut self, tests: &[Test]);
+    fn test_run_ended(&mut self, summary: &Summary);
+
+    fn test_case_reporter(&mut self) -> Self::TestCaseReporter;
+}
+
+impl<R: ?Sized> Reporter for &mut R
+where
+    R: Reporter,
+{
+    type TestCaseReporter = R::TestCaseReporter;
+
+    fn test_run_starting(&mut self, tests: &[Test]) {
+        (**self).test_run_starting(tests)
+    }
+
+    fn test_run_ended(&mut self, summary: &Summary) {
+        (**self).test_run_ended(summary)
+    }
+
+    fn test_case_reporter(&mut self) -> Self::TestCaseReporter {
+        (**self).test_case_reporter()
+    }
+}
+
+impl<R: ?Sized> Reporter for Box<R>
+where
+    R: Reporter,
+{
+    type TestCaseReporter = R::TestCaseReporter;
+
+    fn test_run_starting(&mut self, tests: &[Test]) {
+        (**self).test_run_starting(tests)
+    }
+
+    fn test_run_ended(&mut self, summary: &Summary) {
+        (**self).test_run_ended(summary)
+    }
+
+    fn test_case_reporter(&mut self) -> Self::TestCaseReporter {
+        (**self).test_case_reporter()
+    }
+}
 
 /// The handler for events that occur during the execution of a test case.
 pub trait TestCaseReporter {
     fn test_case_starting(&mut self);
-    fn test_case_ended(&mut self);
-
-    fn section_starting(&mut self, name: Option<&str>);
-    fn section_passed(&mut self, name: Option<&str>);
-    fn section_failed(&mut self, name: Option<&str>, msg: &(dyn fmt::Debug + 'static));
-    fn section_terminated(&mut self, name: Option<&str>, unwind: &Unwind);
+    fn test_case_ended(&mut self, result: &TestCaseResult);
 }
 
-impl<E: ?Sized> TestCaseReporter for &mut E
+impl<T: ?Sized> TestCaseReporter for &mut T
 where
-    E: TestCaseReporter,
+    T: TestCaseReporter,
 {
     fn test_case_starting(&mut self) {
         (**self).test_case_starting()
     }
 
-    fn test_case_ended(&mut self) {
-        (**self).test_case_ended()
-    }
-
-    fn section_starting(&mut self, name: Option<&str>) {
-        (**self).section_starting(name)
-    }
-
-    fn section_passed(&mut self, name: Option<&str>) {
-        (**self).section_passed(name)
-    }
-
-    fn section_failed(&mut self, name: Option<&str>, msg: &(dyn fmt::Debug + 'static)) {
-        (**self).section_failed(name, msg)
-    }
-
-    fn section_terminated(&mut self, name: Option<&str>, unwind: &Unwind) {
-        (**self).section_terminated(name, unwind)
+    fn test_case_ended(&mut self, result: &TestCaseResult) {
+        (**self).test_case_ended(result)
     }
 }
 
-impl<E: ?Sized> TestCaseReporter for Box<E>
+impl<T: ?Sized> TestCaseReporter for Box<T>
 where
-    E: TestCaseReporter,
+    T: TestCaseReporter,
 {
     fn test_case_starting(&mut self) {
         (**self).test_case_starting()
     }
 
-    fn test_case_ended(&mut self) {
-        (**self).test_case_ended()
-    }
-
-    fn section_starting(&mut self, name: Option<&str>) {
-        (**self).section_starting(name)
-    }
-
-    fn section_passed(&mut self, name: Option<&str>) {
-        (**self).section_passed(name)
-    }
-
-    fn section_failed(&mut self, name: Option<&str>, msg: &(dyn fmt::Debug + 'static)) {
-        (**self).section_failed(name, msg)
-    }
-
-    fn section_terminated(&mut self, name: Option<&str>, unwind: &Unwind) {
-        (**self).section_terminated(name, unwind)
+    fn test_case_ended(&mut self, result: &TestCaseResult) {
+        (**self).test_case_ended(result)
     }
 }
