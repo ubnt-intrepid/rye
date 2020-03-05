@@ -1,87 +1,66 @@
 #![allow(missing_docs)]
 
-pub mod console;
+mod console;
+
+pub use self::console::ConsoleReporter;
 
 use crate::{
     executor::result::{Summary, TestCaseResult},
-    test::Test,
+    test::{Test, TestDesc},
 };
 
 pub trait Reporter {
-    type TestCaseReporter: TestCaseReporter;
+    fn test_run_starting(&self, tests: &[Test]);
+    fn test_run_ended(&self, summary: &Summary);
 
-    fn test_run_starting(&mut self, tests: &[Test]);
-    fn test_run_ended(&mut self, summary: &Summary);
-
-    fn test_case_reporter(&mut self) -> Self::TestCaseReporter;
+    fn test_case_starting(&self, desc: &TestDesc);
+    fn test_case_ended(&self, result: &TestCaseResult);
 }
 
-impl<R: ?Sized> Reporter for &mut R
+macro_rules! impl_reporter_body {
+    () => {
+        fn test_run_starting(&self, tests: &[Test]) {
+            (**self).test_run_starting(tests)
+        }
+
+        fn test_run_ended(&self, summary: &Summary) {
+            (**self).test_run_ended(summary)
+        }
+
+        fn test_case_starting(&self, desc: &TestDesc) {
+            (**self).test_case_starting(desc)
+        }
+
+        fn test_case_ended(&self, result: &TestCaseResult) {
+            (**self).test_case_ended(result)
+        }
+    };
+}
+
+impl<R: ?Sized> Reporter for &R
 where
     R: Reporter,
 {
-    type TestCaseReporter = R::TestCaseReporter;
-
-    fn test_run_starting(&mut self, tests: &[Test]) {
-        (**self).test_run_starting(tests)
-    }
-
-    fn test_run_ended(&mut self, summary: &Summary) {
-        (**self).test_run_ended(summary)
-    }
-
-    fn test_case_reporter(&mut self) -> Self::TestCaseReporter {
-        (**self).test_case_reporter()
-    }
+    impl_reporter_body!();
 }
 
 impl<R: ?Sized> Reporter for Box<R>
 where
     R: Reporter,
 {
-    type TestCaseReporter = R::TestCaseReporter;
-
-    fn test_run_starting(&mut self, tests: &[Test]) {
-        (**self).test_run_starting(tests)
-    }
-
-    fn test_run_ended(&mut self, summary: &Summary) {
-        (**self).test_run_ended(summary)
-    }
-
-    fn test_case_reporter(&mut self) -> Self::TestCaseReporter {
-        (**self).test_case_reporter()
-    }
+    impl_reporter_body!();
 }
 
-/// The handler for events that occur during the execution of a test case.
-pub trait TestCaseReporter {
-    fn test_case_starting(&mut self);
-    fn test_case_ended(&mut self, result: &TestCaseResult);
-}
-
-impl<T: ?Sized> TestCaseReporter for &mut T
+impl<R: ?Sized> Reporter for std::rc::Rc<R>
 where
-    T: TestCaseReporter,
+    R: Reporter,
 {
-    fn test_case_starting(&mut self) {
-        (**self).test_case_starting()
-    }
-
-    fn test_case_ended(&mut self, result: &TestCaseResult) {
-        (**self).test_case_ended(result)
-    }
+    impl_reporter_body!();
 }
 
-impl<T: ?Sized> TestCaseReporter for Box<T>
+impl<R: ?Sized> Reporter for std::sync::Arc<R>
 where
-    T: TestCaseReporter,
+    R: Reporter,
 {
-    fn test_case_starting(&mut self) {
-        (**self).test_case_starting()
-    }
-
-    fn test_case_ended(&mut self, result: &TestCaseResult) {
-        (**self).test_case_ended(result)
-    }
+    impl_reporter_body!();
 }

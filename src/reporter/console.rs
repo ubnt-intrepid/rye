@@ -1,8 +1,8 @@
-use super::{Reporter, TestCaseReporter};
+use super::Reporter;
 use crate::{
     cli::args::{Args, ColorConfig},
     executor::{Summary, TestCaseResult},
-    test::Test,
+    test::{Test, TestDesc},
 };
 use console::{Style, StyledObject, Term};
 use std::{
@@ -10,6 +10,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+#[derive(Clone)]
 pub struct ConsoleReporter {
     inner: Arc<Mutex<Inner>>,
 }
@@ -99,9 +100,7 @@ impl ConsoleReporter {
 }
 
 impl Reporter for ConsoleReporter {
-    type TestCaseReporter = ConsoleTestCaseReporter;
-
-    fn test_run_starting(&mut self, tests: &[Test]) {
+    fn test_run_starting(&self, tests: &[Test]) {
         let mut inner = self.inner.lock().unwrap();
         let _ = writeln!(&inner.term, "running {} tests", tests.len());
         inner.name_length = tests
@@ -111,25 +110,13 @@ impl Reporter for ConsoleReporter {
             .unwrap_or(0);
     }
 
-    fn test_run_ended(&mut self, summary: &Summary) {
+    fn test_run_ended(&self, summary: &Summary) {
         let _ = self.inner.lock().unwrap().print_summary(summary);
     }
 
-    fn test_case_reporter(&mut self) -> ConsoleTestCaseReporter {
-        ConsoleTestCaseReporter {
-            inner: self.inner.clone(),
-        }
-    }
-}
+    fn test_case_starting(&self, _: &TestDesc) {}
 
-pub struct ConsoleTestCaseReporter {
-    inner: Arc<Mutex<Inner>>,
-}
-
-impl TestCaseReporter for ConsoleTestCaseReporter {
-    fn test_case_starting(&mut self) {}
-
-    fn test_case_ended(&mut self, result: &TestCaseResult) {
+    fn test_case_ended(&self, result: &TestCaseResult) {
         let _ = self.inner.lock().unwrap().print_result(&result);
     }
 }

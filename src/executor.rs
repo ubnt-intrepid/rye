@@ -7,7 +7,7 @@ pub use context::{AccessError, Context};
 pub use result::{Summary, TestCaseResult};
 
 use crate::{
-    reporter::TestCaseReporter,
+    reporter::Reporter,
     test::{
         imp::{TestFn, TestFuture},
         Fallible, Test, TestDesc,
@@ -87,7 +87,7 @@ impl Test {
     pub fn execute<E: ?Sized, R>(&self, exec: &mut E, reporter: R)
     where
         E: TestExecutor,
-        R: TestCaseReporter + Send + 'static,
+        R: Reporter + Send + 'static,
     {
         let desc = self.desc;
         let reporter = Box::new(reporter);
@@ -120,7 +120,7 @@ impl Test {
 pub struct BlockingTest {
     desc: &'static TestDesc,
     f: fn() -> Box<dyn Fallible>,
-    reporter: Box<dyn TestCaseReporter + Send + 'static>,
+    reporter: Box<dyn Reporter + Send + 'static>,
     _marker: PhantomData<Cell<()>>,
 }
 
@@ -133,7 +133,7 @@ impl BlockingTest {
 
     /// Run the test function until all sections are completed.
     pub fn run(&mut self) -> TestCaseResult {
-        self.reporter.test_case_starting();
+        self.reporter.test_case_starting(self.desc);
 
         let mut error_message = None::<String>;
 
@@ -203,7 +203,7 @@ impl BlockingTest {
 struct AsyncTestInner {
     desc: &'static TestDesc,
     f: fn() -> TestFuture,
-    reporter: Box<dyn TestCaseReporter + Send + 'static>,
+    reporter: Box<dyn Reporter + Send + 'static>,
 }
 
 impl AsyncTestInner {
@@ -220,7 +220,7 @@ impl AsyncTestInner {
 
         impl<F: Future> FutureAssertUnwindSafeExt for F {}
 
-        self.reporter.test_case_starting();
+        self.reporter.test_case_starting(self.desc);
 
         let mut error_message = None::<String>;
 
@@ -403,9 +403,11 @@ mod tests {
 
     struct NullReporter;
 
-    impl TestCaseReporter for NullReporter {
-        fn test_case_starting(&mut self) {}
-        fn test_case_ended(&mut self, _: &TestCaseResult) {}
+    impl Reporter for NullReporter {
+        fn test_run_starting(&self, _: &[Test]) {}
+        fn test_run_ended(&self, _: &Summary) {}
+        fn test_case_starting(&self, _: &TestDesc) {}
+        fn test_case_ended(&self, _: &TestCaseResult) {}
     }
 
     fn run_test(r: &dyn Registration) -> Vec<HistoryLog> {

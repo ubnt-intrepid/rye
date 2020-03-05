@@ -76,8 +76,7 @@ impl<'sess> Session<'sess> {
     pub fn run<E: ?Sized, R: ?Sized>(&mut self, executor: &mut E, reporter: &mut R) -> ExitStatus
     where
         E: TestExecutor,
-        R: Reporter,
-        R::TestCaseReporter: Send + 'static,
+        R: Reporter + Send + Clone + 'static,
     {
         if self.args.list_tests {
             let _ = self.print_list();
@@ -87,7 +86,7 @@ impl<'sess> Session<'sess> {
         reporter.test_run_starting(&self.pending_tests);
 
         for test in self.pending_tests.drain(..) {
-            let reporter = reporter.test_case_reporter();
+            let reporter = reporter.clone();
             test.execute(&mut *executor, reporter);
         }
 

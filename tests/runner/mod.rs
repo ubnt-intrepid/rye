@@ -7,7 +7,7 @@ use futures::{
 use rye::{
     cli::{Args, Session},
     executor::{AsyncTest, BlockingTest, LocalAsyncTest, Summary, TestCaseResult, TestExecutor},
-    reporter::console::ConsoleReporter,
+    reporter::ConsoleReporter,
     test::Registration,
 };
 use std::{pin::Pin, thread};

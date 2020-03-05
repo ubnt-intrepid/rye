@@ -1,5 +1,7 @@
-use super::TestCaseReporter;
-use crate::test::{imp::SectionId, TestDesc};
+use crate::{
+    reporter::Reporter,
+    test::{imp::SectionId, TestDesc},
+};
 use futures::{
     future::Future,
     task::{self, Poll},
@@ -13,7 +15,7 @@ pub struct Context<'a> {
     pub(crate) target_section: Option<SectionId>,
     pub(crate) current_section: Option<SectionId>,
     #[allow(dead_code)]
-    pub(crate) event_handler: &'a mut (dyn TestCaseReporter + Send),
+    pub(crate) event_handler: &'a mut (dyn Reporter + Send),
     pub(crate) _marker: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
