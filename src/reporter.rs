@@ -2,8 +2,8 @@
 
 pub mod console;
 
-use crate::test::TestResult;
 use maybe_unwind::Unwind;
+use std::fmt;
 
 /// The handler for events that occur during the execution of a test case.
 pub trait TestCaseReporter {
@@ -11,7 +11,8 @@ pub trait TestCaseReporter {
     fn test_case_ended(&mut self);
 
     fn section_starting(&mut self, name: Option<&str>);
-    fn section_ended(&mut self, name: Option<&str>, result: &dyn TestResult);
+    fn section_passed(&mut self, name: Option<&str>);
+    fn section_failed(&mut self, name: Option<&str>, msg: &(dyn fmt::Debug + 'static));
     fn section_terminated(&mut self, name: Option<&str>, unwind: &Unwind);
 }
 
@@ -31,8 +32,12 @@ where
         (**self).section_starting(name)
     }
 
-    fn section_ended(&mut self, name: Option<&str>, result: &dyn TestResult) {
-        (**self).section_ended(name, result)
+    fn section_passed(&mut self, name: Option<&str>) {
+        (**self).section_passed(name)
+    }
+
+    fn section_failed(&mut self, name: Option<&str>, msg: &(dyn fmt::Debug + 'static)) {
+        (**self).section_failed(name, msg)
     }
 
     fn section_terminated(&mut self, name: Option<&str>, unwind: &Unwind) {
@@ -56,8 +61,12 @@ where
         (**self).section_starting(name)
     }
 
-    fn section_ended(&mut self, name: Option<&str>, result: &dyn TestResult) {
-        (**self).section_ended(name, result)
+    fn section_passed(&mut self, name: Option<&str>) {
+        (**self).section_passed(name)
+    }
+
+    fn section_failed(&mut self, name: Option<&str>, msg: &(dyn fmt::Debug + 'static)) {
+        (**self).section_failed(name, msg)
     }
 
     fn section_terminated(&mut self, name: Option<&str>, unwind: &Unwind) {

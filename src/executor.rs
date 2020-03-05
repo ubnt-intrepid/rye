@@ -8,7 +8,7 @@ use crate::{
     reporter::TestCaseReporter,
     test::{
         imp::{TestFn, TestFuture},
-        Test, TestDesc, TestResult,
+        Fallible, Test, TestDesc,
     },
 };
 use futures::future::Future;
@@ -112,7 +112,7 @@ impl Test {
 /// Blocking test function.
 pub struct BlockingTest {
     desc: &'static TestDesc,
-    f: fn() -> Box<dyn TestResult>,
+    f: fn() -> Box<dyn Fallible>,
     reporter: Box<dyn TestCaseReporter + Send + 'static>,
     _marker: PhantomData<Cell<()>>,
 }
@@ -141,7 +141,13 @@ impl BlockingTest {
                 .scope(&self.f)
             }));
             match result {
-                Ok(result) => self.reporter.section_ended(None, &*result),
+                Ok(fallible) => {
+                    if let Some(msg) = fallible.error_message() {
+                        self.reporter.section_failed(None, msg);
+                    } else {
+                        self.reporter.section_passed(None);
+                    }
+                }
                 Err(unwind) => self.reporter.section_terminated(None, &unwind),
             }
         } else {
@@ -159,7 +165,13 @@ impl BlockingTest {
                     .scope(&self.f)
                 }));
                 match result {
-                    Ok(result) => self.reporter.section_ended(Some(name), &*result),
+                    Ok(fallible) => {
+                        if let Some(msg) = fallible.error_message() {
+                            self.reporter.section_failed(Some(name), msg);
+                        } else {
+                            self.reporter.section_passed(Some(name));
+                        }
+                    }
                     Err(unwind) => self.reporter.section_terminated(Some(name), &unwind),
                 }
             }
@@ -179,7 +191,7 @@ impl AsyncTestInner {
     async fn run<F, Fut>(&mut self, f: F)
     where
         F: Fn(TestFuture) -> Fut,
-        Fut: Future<Output = Box<dyn TestResult>>,
+        Fut: Future<Output = Box<dyn Fallible>>,
     {
         self.reporter.test_case_starting();
 
@@ -198,7 +210,13 @@ impl AsyncTestInner {
             .maybe_unwind()
             .await;
             match result {
-                Ok(result) => self.reporter.section_ended(None, &*result),
+                Ok(fallible) => {
+                    if let Some(msg) = fallible.error_message() {
+                        self.reporter.section_failed(None, msg);
+                    } else {
+                        self.reporter.section_passed(None);
+                    }
+                }
                 Err(unwind) => self.reporter.section_terminated(None, &unwind),
             }
         } else {
@@ -221,7 +239,13 @@ impl AsyncTestInner {
                 .await;
 
                 match result {
-                    Ok(result) => self.reporter.section_ended(Some(name), &*result),
+                    Ok(fallible) => {
+                        if let Some(msg) = fallible.error_message() {
+                            self.reporter.section_failed(Some(name), msg);
+                        } else {
+                            self.reporter.section_passed(Some(name));
+                        }
+                    }
                     Err(unwind) => self.reporter.section_terminated(Some(name), &unwind),
                 }
             }
@@ -345,13 +369,10 @@ mod tests {
 
     impl TestCaseReporter for NullReporter {
         fn test_case_starting(&mut self) {}
-
         fn test_case_ended(&mut self) {}
-
         fn section_starting(&mut self, _: Option<&str>) {}
-
-        fn section_ended(&mut self, _: Option<&str>, _: &dyn TestResult) {}
-
+        fn section_passed(&mut self, _: Option<&str>) {}
+        fn section_failed(&mut self, _: Option<&str>, _: &(dyn std::fmt::Debug + 'static)) {}
         fn section_terminated(&mut self, _: Option<&str>, _: &Unwind) {}
     }
 

@@ -4,7 +4,7 @@ use crate::{
         args::{Args, ColorConfig},
         exit_status::ExitStatus,
     },
-    test::{TestDesc, TestResult},
+    test::TestDesc,
 };
 use console::{Style, StyledObject, Term};
 use futures::channel::oneshot;
@@ -242,16 +242,11 @@ impl TestCaseReporter for ConsoleTestCaseReporter {
 
     fn section_starting(&mut self, _: Option<&str>) {}
 
-    fn section_ended(&mut self, name: Option<&str>, result: &dyn TestResult) {
-        if !result.is_success() {
-            let name = name.unwrap_or("__root__");
-            self.failures.insert(
-                name.into(),
-                result
-                    .error_message()
-                    .map_or("<unknown>".into(), |msg| format!("{:?}", msg)),
-            );
-        }
+    fn section_passed(&mut self, _: Option<&str>) {}
+
+    fn section_failed(&mut self, name: Option<&str>, msg: &(dyn fmt::Debug + 'static)) {
+        let name = name.unwrap_or("__root__");
+        self.failures.insert(name.into(), format!("{:?}", msg));
     }
 
     fn section_terminated(&mut self, name: Option<&str>, unwind: &Unwind) {

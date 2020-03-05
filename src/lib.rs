@@ -229,11 +229,11 @@ pub mod _internal {
 
     use crate::{
         executor::context::{Context, EnterSection},
-        test::{imp::SectionId, TestResult},
+        test::{imp::SectionId, Fallible},
     };
 
     #[inline]
-    pub fn test_result<T: TestResult>(res: T) -> Box<dyn TestResult> {
+    pub fn test_result<T: Fallible>(res: T) -> Box<dyn Fallible> {
         Box::new(res)
     }
 

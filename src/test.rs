@@ -65,36 +65,11 @@ impl TestDesc {
 }
 
 /// The result values returned from test functions.
-pub trait TestResult: imp::IsTestResult + 'static {
-    /// Return `true` if the test function was successfully completed.
-    fn is_success(&self) -> bool;
+pub trait Fallible: imp::FallibleImp + 'static {}
 
-    /// Return a reference to the object for writing the error message.
-    fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)> {
-        None
-    }
-}
+impl Fallible for () {}
 
-impl TestResult for () {
-    fn is_success(&self) -> bool {
-        true
-    }
-}
-
-impl<E> TestResult for Result<(), E>
-where
-    E: fmt::Debug + 'static,
-{
-    fn is_success(&self) -> bool {
-        self.is_ok()
-    }
-
-    fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)> {
-        self.as_ref()
-            .err()
-            .map(|e| e as &(dyn fmt::Debug + 'static))
-    }
-}
+impl<E> Fallible for Result<(), E> where E: fmt::Debug + 'static {}
 
 /// The registration of one or more test cases.
 pub trait Registration {
@@ -163,7 +138,7 @@ impl RegistryError {
 
 #[allow(missing_docs)]
 pub(crate) mod imp {
-    use super::TestResult;
+    use super::Fallible;
     use futures::{
         future::{Future, LocalFutureObj},
         task::{self, FutureObj, Poll},
@@ -171,9 +146,36 @@ pub(crate) mod imp {
     use pin_project::pin_project;
     use std::{collections::HashSet, fmt, pin::Pin};
 
-    pub trait IsTestResult {}
-    impl IsTestResult for () {}
-    impl<E> IsTestResult for Result<(), E> where E: fmt::Debug + 'static {}
+    pub trait FallibleImp {
+        fn is_success(&self) -> bool;
+
+        fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)>;
+    }
+
+    impl FallibleImp for () {
+        fn is_success(&self) -> bool {
+            true
+        }
+
+        fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)> {
+            None
+        }
+    }
+
+    impl<E> FallibleImp for Result<(), E>
+    where
+        E: fmt::Debug + 'static,
+    {
+        fn is_success(&self) -> bool {
+            self.is_ok()
+        }
+
+        fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)> {
+            self.as_ref()
+                .err()
+                .map(|e| e as &(dyn fmt::Debug + 'static))
+        }
+    }
 
     pub(crate) type SectionId = u64;
 
@@ -185,14 +187,14 @@ pub(crate) mod imp {
 
     #[derive(Debug)]
     pub enum TestFn {
-        Blocking { f: fn() -> Box<dyn TestResult> },
+        Blocking { f: fn() -> Box<dyn Fallible> },
         Async { f: fn() -> TestFuture, local: bool },
     }
 
     #[pin_project]
     pub struct TestFuture {
         #[pin]
-        inner: LocalFutureObj<'static, Box<dyn TestResult>>,
+        inner: LocalFutureObj<'static, Box<dyn Fallible>>,
         local: bool,
     }
 
@@ -201,11 +203,11 @@ pub(crate) mod imp {
         pub fn new<Fut>(fut: Fut) -> Self
         where
             Fut: Future + Send + 'static,
-            Fut::Output: TestResult,
+            Fut::Output: Fallible,
         {
             Self {
                 inner: LocalFutureObj::new(Box::pin(async move {
-                    Box::new(fut.await) as Box<dyn TestResult>
+                    Box::new(fut.await) as Box<dyn Fallible>
                 })),
                 local: false,
             }
@@ -215,18 +217,18 @@ pub(crate) mod imp {
         pub fn new_local<Fut>(fut: Fut) -> Self
         where
             Fut: Future + 'static,
-            Fut::Output: TestResult,
+            Fut::Output: Fallible,
         {
             Self {
                 inner: LocalFutureObj::new(Box::pin(async move {
-                    Box::new(fut.await) as Box<dyn TestResult>
+                    Box::new(fut.await) as Box<dyn Fallible>
                 })),
                 local: true,
             }
         }
 
         #[inline]
-        pub(crate) fn into_future_obj(self) -> FutureObj<'static, Box<dyn TestResult>> {
+        pub(crate) fn into_future_obj(self) -> FutureObj<'static, Box<dyn Fallible>> {
             assert!(
                 !self.local,
                 "the test future cannot be converted into FutureObj when it is not Send"
@@ -236,7 +238,7 @@ pub(crate) mod imp {
     }
 
     impl Future for TestFuture {
-        type Output = Box<dyn TestResult>;
+        type Output = Box<dyn Fallible>;
 
         #[inline]
         fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
