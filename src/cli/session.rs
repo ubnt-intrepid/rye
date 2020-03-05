@@ -4,7 +4,6 @@ use crate::{
     reporter::Reporter,
     test::{Registration, Registry, RegistryError, Test},
 };
-use std::error;
 use std::{
     collections::HashSet,
     io::{self, Write as _},
@@ -26,24 +25,6 @@ impl<'sess> Session<'sess> {
             filtered_out_tests: vec![],
             unique_test_names: HashSet::new(),
         }
-    }
-
-    pub fn register_tests(
-        &mut self,
-        tests: &[&dyn Registration],
-    ) -> Result<(), impl error::Error + Send + Sync + 'static> {
-        for &test in tests {
-            let res = test.register(&mut MainRegistry { session: self });
-            if let Err(err) = res {
-                return Err(err);
-            }
-        }
-
-        // sort test cases by name.
-        self.pending_tests
-            .sort_by(|t1, t2| t1.desc().name().cmp(t2.desc().name()));
-
-        Ok(())
     }
 
     fn print_list(&self) -> io::Result<()> {
@@ -73,11 +54,28 @@ impl<'sess> Session<'sess> {
     }
 
     #[inline]
-    pub fn run<E: ?Sized, R: ?Sized>(&mut self, executor: &mut E, reporter: &mut R) -> ExitStatus
+    pub fn run<E: ?Sized, R: ?Sized>(
+        &mut self,
+        tests: &[&dyn Registration],
+        executor: &mut E,
+        reporter: &mut R,
+    ) -> ExitStatus
     where
         E: TestExecutor,
         R: Reporter + Send + Clone + 'static,
     {
+        for &test in tests {
+            let res = test.register(&mut MainRegistry { session: self });
+            if let Err(err) = res {
+                eprintln!("registry error: {}", err);
+                return ExitStatus::FAILED;
+            }
+        }
+
+        // sort test cases by name.
+        self.pending_tests
+            .sort_by(|t1, t2| t1.desc().name().cmp(t2.desc().name()));
+
         if self.args.list_tests {
             let _ = self.print_list();
             return ExitStatus::OK;

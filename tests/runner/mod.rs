@@ -10,30 +10,19 @@ use rye::{
     reporter::ConsoleReporter,
     test::Registration,
 };
-use std::{pin::Pin, thread};
+use std::{io, pin::Pin, thread};
 
 pub(crate) fn run_tests(tests: &[&dyn Registration]) {
     rye::cli::install();
 
     let args = Args::from_env().unwrap_or_else(|st| st.exit());
+
+    let mut reporter = ConsoleReporter::new(&args);
+    let mut executor = FuturesExecutor::new().unwrap();
+
     let mut session = Session::new(&args);
+    let st = session.run(tests, &mut executor, &mut reporter);
 
-    if let Err(err) = session.register_tests(tests) {
-        eprintln!("registry error: {}", err);
-        std::process::exit(101);
-    }
-
-    let local_pool = LocalPool::new();
-    let local_spawner = local_pool.spawner();
-    let mut executor = FuturesExecutor {
-        pool: ThreadPool::new().unwrap(),
-        local_pool,
-        local_spawner,
-        in_flights: vec![],
-    };
-
-    let mut printer = ConsoleReporter::new(&args);
-    let st = session.run(&mut executor, &mut printer);
     st.exit();
 }
 
@@ -55,16 +44,29 @@ impl Future for InFlight {
 }
 
 struct FuturesExecutor {
-    pool: ThreadPool,
+    thread_pool: ThreadPool,
     local_pool: LocalPool,
     local_spawner: LocalSpawner,
     in_flights: Vec<InFlight>,
 }
 
+impl FuturesExecutor {
+    fn new() -> io::Result<Self> {
+        let local_pool = LocalPool::new();
+        let local_spawner = local_pool.spawner();
+        Ok(FuturesExecutor {
+            thread_pool: ThreadPool::new()?,
+            local_pool,
+            local_spawner,
+            in_flights: vec![],
+        })
+    }
+}
+
 impl TestExecutor for FuturesExecutor {
     fn execute(&mut self, mut test: AsyncTest) {
         let handle = self
-            .pool
+            .thread_pool
             .spawn_with_handle(async move { test.run().await })
             .unwrap();
         self.in_flights.push(InFlight {
