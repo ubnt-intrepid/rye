@@ -1,7 +1,7 @@
 use super::Reporter;
 use crate::{
     cli::args::{Args, ColorConfig},
-    executor::{Summary, TestCaseResult},
+    runner::{Summary, TestCaseResult},
     test::{Test, TestDesc},
 };
 use console::{Style, StyledObject, Term};
@@ -28,8 +28,8 @@ impl Inner {
 
     fn print_result(&self, result: &TestCaseResult) -> io::Result<()> {
         let status = match result.result {
-            crate::executor::result::TestResult::Passed => self.styled("ok").green(),
-            crate::executor::result::TestResult::Failed => self.styled("FAILED").red(),
+            crate::runner::result::TestResult::Passed => self.styled("ok").green(),
+            crate::runner::result::TestResult::Failed => self.styled("FAILED").red(),
         };
         writeln!(
             &self.term,

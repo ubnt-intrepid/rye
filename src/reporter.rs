@@ -5,7 +5,7 @@ mod console;
 pub use self::console::ConsoleReporter;
 
 use crate::{
-    executor::result::{Summary, TestCaseResult},
+    runner::result::{Summary, TestCaseResult},
     test::{Test, TestDesc},
 };
 

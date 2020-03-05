@@ -211,8 +211,8 @@ mod sub {
 #![forbid(clippy::unimplemented, clippy::todo)]
 
 pub mod cli;
-pub mod executor;
 pub mod reporter;
+pub mod runner;
 pub mod test;
 
 mod global;
@@ -228,7 +228,7 @@ pub mod _internal {
     pub use std::{module_path, result::Result, vec};
 
     use crate::{
-        executor::context::{Context, EnterSection},
+        runner::context::{Context, EnterSection},
         test::{imp::SectionId, Fallible},
     };
 

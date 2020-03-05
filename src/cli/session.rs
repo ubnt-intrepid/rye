@@ -1,7 +1,7 @@
 use crate::{
     cli::{args::Args, exit_status::ExitStatus},
-    executor::TestExecutor,
     reporter::Reporter,
+    runner::{TestRunner, TestRunnerExt as _},
     test::{Registration, Registry, RegistryError, Test},
 };
 use std::{
@@ -54,14 +54,14 @@ impl<'sess> Session<'sess> {
     }
 
     #[inline]
-    pub fn run<E: ?Sized, R: ?Sized>(
+    pub fn run<T: ?Sized, R: ?Sized>(
         &mut self,
         tests: &[&dyn Registration],
-        executor: &mut E,
+        runner: &mut T,
         reporter: &mut R,
     ) -> ExitStatus
     where
-        E: TestExecutor,
+        T: TestRunner,
         R: Reporter + Send + Clone + 'static,
     {
         for &test in tests {
@@ -85,10 +85,10 @@ impl<'sess> Session<'sess> {
 
         for test in self.pending_tests.drain(..) {
             let reporter = reporter.clone();
-            test.execute(&mut *executor, reporter);
+            runner.spawn_test(&test, reporter);
         }
 
-        let mut summary = executor.run();
+        let mut summary = runner.run();
         summary.filtered_out = self
             .filtered_out_tests
             .iter()

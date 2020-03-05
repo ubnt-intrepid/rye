@@ -17,38 +17,38 @@ use futures::future::Future;
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _};
 use std::{cell::Cell, marker::PhantomData, panic::AssertUnwindSafe};
 
-/// Test executor.
-pub trait TestExecutor {
-    /// Execute an asynchronous test function.
-    fn execute(&mut self, test: AsyncTest);
+/// The runner of test cases.
+pub trait TestRunner {
+    /// Spawn a task to execute the specified test function.
+    fn spawn(&mut self, test: AsyncTest);
 
-    /// Execute an asynchronous test function on the current thread.
-    fn execute_local(&mut self, test: LocalAsyncTest);
+    /// Spawn a task to execute the specified test function onto the current thread.
+    fn spawn_local(&mut self, test: LocalAsyncTest);
 
-    /// Execute a blocking test function.
-    fn execute_blocking(&mut self, test: BlockingTest);
+    /// Spawn a taek to execute the specified test function that may block the running thread.
+    fn spawn_blocking(&mut self, test: BlockingTest);
 
-    #[allow(missing_docs)]
+    /// Run all test cases and collect their results.
     fn run(&mut self) -> Summary;
 }
 
-impl<E: ?Sized> TestExecutor for &mut E
+impl<T: ?Sized> TestRunner for &mut T
 where
-    E: TestExecutor,
+    T: TestRunner,
 {
     #[inline]
-    fn execute(&mut self, test: AsyncTest) {
-        (**self).execute(test)
+    fn spawn(&mut self, test: AsyncTest) {
+        (**self).spawn(test)
     }
 
     #[inline]
-    fn execute_local(&mut self, test: LocalAsyncTest) {
-        (**self).execute_local(test)
+    fn spawn_local(&mut self, test: LocalAsyncTest) {
+        (**self).spawn_local(test)
     }
 
     #[inline]
-    fn execute_blocking(&mut self, test: BlockingTest) {
-        (**self).execute_blocking(test)
+    fn spawn_blocking(&mut self, test: BlockingTest) {
+        (**self).spawn_blocking(test)
     }
 
     #[inline]
@@ -57,23 +57,23 @@ where
     }
 }
 
-impl<E: ?Sized> TestExecutor for Box<E>
+impl<T: ?Sized> TestRunner for Box<T>
 where
-    E: TestExecutor,
+    T: TestRunner,
 {
     #[inline]
-    fn execute(&mut self, test: AsyncTest) {
-        (**self).execute(test)
+    fn spawn(&mut self, test: AsyncTest) {
+        (**self).spawn(test)
     }
 
     #[inline]
-    fn execute_local(&mut self, test: LocalAsyncTest) {
-        (**self).execute_local(test)
+    fn spawn_local(&mut self, test: LocalAsyncTest) {
+        (**self).spawn_local(test)
     }
 
     #[inline]
-    fn execute_blocking(&mut self, test: BlockingTest) {
-        (**self).execute_blocking(test)
+    fn spawn_blocking(&mut self, test: BlockingTest) {
+        (**self).spawn_blocking(test)
     }
 
     #[inline]
@@ -82,17 +82,15 @@ where
     }
 }
 
-impl Test {
-    /// Execute the test function using the specified test executor.
-    pub fn execute<E: ?Sized, R>(&self, exec: &mut E, reporter: R)
+pub(crate) trait TestRunnerExt: TestRunner {
+    fn spawn_test<R>(&mut self, test: &Test, reporter: R)
     where
-        E: TestExecutor,
         R: Reporter + Send + 'static,
     {
-        let desc = self.desc;
+        let desc = test.desc;
         let reporter = Box::new(reporter);
-        match self.test_fn {
-            TestFn::Blocking { f } => exec.execute_blocking(BlockingTest {
+        match test.test_fn {
+            TestFn::Blocking { f } => self.spawn_blocking(BlockingTest {
                 desc,
                 reporter,
                 f,
@@ -101,12 +99,12 @@ impl Test {
             TestFn::Async { f, local } => {
                 let inner = AsyncTestInner { desc, reporter, f };
                 if local {
-                    exec.execute_local(LocalAsyncTest {
+                    self.spawn_local(LocalAsyncTest {
                         inner,
                         _marker: PhantomData,
                     })
                 } else {
-                    exec.execute(AsyncTest {
+                    self.spawn(AsyncTest {
                         inner,
                         _marker: PhantomData,
                     })
@@ -115,6 +113,8 @@ impl Test {
         }
     }
 }
+
+impl<E: TestRunner + ?Sized> TestRunnerExt for E {}
 
 /// Blocking test function.
 pub struct BlockingTest {
