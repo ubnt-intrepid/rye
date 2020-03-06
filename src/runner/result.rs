@@ -15,6 +15,15 @@ pub struct TestCaseResult {
     pub(crate) error_message: Option<String>,
 }
 
+impl TestCaseResult {
+    pub(crate) fn is_success(&self) -> bool {
+        match self.result {
+            TestResult::Passed => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Summary {
     pub(crate) passed: Vec<TestCaseResult>,

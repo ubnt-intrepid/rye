@@ -1,8 +1,9 @@
 #![allow(missing_docs)]
 
 mod console;
+mod log;
 
-pub use self::console::ConsoleReporter;
+pub use self::{console::ConsoleReporter, log::LogReporter};
 
 use crate::{
     runner::result::{Summary, TestCaseResult},
