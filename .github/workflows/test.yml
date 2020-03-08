@@ -9,6 +9,7 @@ on:
 env:
   CARGO_HUSKY_DONT_INSTALL_HOOKS: true
   CARGO_TERM_VERBOSE: true
+  CARGO_NET_OFFLINE: true
   RUST_BACKTRACE: full
 
 jobs:
@@ -49,6 +50,13 @@ jobs:
     #   with:
     #     path: target
     #     key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Fetch cargo dependencies
+      uses: actions-rs/cargo@v1
+      with:
+        command: fetch
+      env:
+        CARGO_NET_OFFLINE: false
 
     - name: Run format check
       uses: actions-rs/cargo@v1
