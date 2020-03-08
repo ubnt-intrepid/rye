@@ -97,7 +97,7 @@ impl<'sess> Session<'sess> {
 
         reporter.test_run_ended(&summary);
 
-        if summary.is_success() {
+        if summary.is_passed() {
             ExitStatus::OK
         } else {
             ExitStatus::FAILED

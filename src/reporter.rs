@@ -5,17 +5,64 @@ mod log;
 
 pub use self::{console::ConsoleReporter, log::LogReporter};
 
-use crate::{
-    runner::result::{Summary, TestCaseResult},
-    test::{Test, TestDesc},
-};
+use crate::test::{Test, TestDesc};
+
+#[derive(Debug)]
+pub(crate) enum TestResult {
+    Passed,
+    Failed,
+}
+
+#[allow(missing_docs)]
+#[derive(Debug)]
+pub struct TestCaseSummary {
+    pub(crate) desc: &'static TestDesc,
+    pub(crate) result: TestResult,
+    pub(crate) error_message: Option<String>,
+}
+
+impl TestCaseSummary {
+    pub(crate) fn is_passed(&self) -> bool {
+        match self.result {
+            TestResult::Passed => true,
+            _ => false,
+        }
+    }
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, Default)]
+pub struct Summary {
+    pub(crate) passed: Vec<TestCaseSummary>,
+    pub(crate) failed: Vec<TestCaseSummary>,
+    pub(crate) filtered_out: Vec<&'static TestDesc>,
+}
+
+impl Summary {
+    #[allow(missing_docs)]
+    pub fn is_passed(&self) -> bool {
+        self.failed.is_empty()
+    }
+
+    #[allow(missing_docs)]
+    pub fn append(&mut self, result: TestCaseSummary) {
+        match result.result {
+            TestResult::Passed => {
+                self.passed.push(result);
+            }
+            TestResult::Failed => {
+                self.failed.push(result);
+            }
+        }
+    }
+}
 
 pub trait Reporter {
     fn test_run_starting(&self, tests: &[Test]);
     fn test_run_ended(&self, summary: &Summary);
 
     fn test_case_starting(&self, desc: &TestDesc);
-    fn test_case_ended(&self, result: &TestCaseResult);
+    fn test_case_ended(&self, summary: &TestCaseSummary);
 }
 
 macro_rules! impl_reporter_body {
@@ -32,8 +79,8 @@ macro_rules! impl_reporter_body {
             (**self).test_case_starting(desc)
         }
 
-        fn test_case_ended(&self, result: &TestCaseResult) {
-            (**self).test_case_ended(result)
+        fn test_case_ended(&self, summary: &TestCaseSummary) {
+            (**self).test_case_ended(summary)
         }
     };
 }

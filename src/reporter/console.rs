@@ -1,7 +1,6 @@
-use super::Reporter;
+use super::{Reporter, Summary, TestCaseSummary, TestResult};
 use crate::{
     cli::args::{Args, ColorConfig},
-    runner::{Summary, TestCaseResult},
     test::{Test, TestDesc},
 };
 use console::{Style, StyledObject, Term};
@@ -26,15 +25,15 @@ impl Inner {
         self.style.apply_to(val)
     }
 
-    fn print_result(&self, result: &TestCaseResult) -> io::Result<()> {
-        let status = match result.result {
-            crate::runner::result::TestResult::Passed => self.styled("ok").green(),
-            crate::runner::result::TestResult::Failed => self.styled("FAILED").red(),
+    fn print_test_case_summary(&self, summary: &TestCaseSummary) -> io::Result<()> {
+        let status = match summary.result {
+            TestResult::Passed => self.styled("ok").green(),
+            TestResult::Failed => self.styled("FAILED").red(),
         };
         writeln!(
             &self.term,
             "test {0:<1$} ... {2}",
-            result.desc.name(),
+            summary.desc.name(),
             self.name_length,
             status
         )?;
@@ -116,7 +115,7 @@ impl Reporter for ConsoleReporter {
 
     fn test_case_starting(&self, _: &TestDesc) {}
 
-    fn test_case_ended(&self, result: &TestCaseResult) {
-        let _ = self.inner.lock().unwrap().print_result(&result);
+    fn test_case_ended(&self, summary: &TestCaseSummary) {
+        let _ = self.inner.lock().unwrap().print_test_case_summary(&summary);
     }
 }

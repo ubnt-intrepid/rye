@@ -228,7 +228,7 @@ pub mod _internal {
     pub use std::{module_path, result::Result, vec};
 
     use crate::{
-        runner::context::{Context, EnterSection},
+        runner::{Context, EnterSection},
         test::{imp::SectionId, Fallible},
     };
 

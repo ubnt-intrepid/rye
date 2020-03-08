@@ -1,21 +1,21 @@
 //! Abstraction of test execution in the rye.
 
-pub(crate) mod context;
-pub(crate) mod result;
-
-pub use context::{AccessError, Context};
-pub use result::{Summary, TestCaseResult};
-
 use crate::{
-    reporter::Reporter,
+    reporter::{Reporter, Summary, TestCaseSummary, TestResult},
     test::{
-        imp::{TestFn, TestFuture},
+        imp::{SectionId, TestFn, TestFuture},
         Fallible, Test, TestDesc,
     },
 };
-use futures::future::Future;
-use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _};
-use std::{cell::Cell, marker::PhantomData, panic::AssertUnwindSafe};
+use futures::{
+    future::Future,
+    task::{self, Poll},
+};
+use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
+use pin_project::pin_project;
+use std::{
+    cell::Cell, marker::PhantomData, mem, panic::AssertUnwindSafe, pin::Pin, ptr::NonNull, rc::Rc,
+};
 
 /// The runner of test cases.
 pub trait TestRunner {
@@ -87,25 +87,28 @@ pub(crate) trait TestRunnerExt: TestRunner {
     where
         R: Reporter + Send + 'static,
     {
-        let desc = test.desc;
-        let reporter = Box::new(reporter);
+        let inner = TestInner {
+            desc: test.desc,
+            reporter: Box::new(reporter),
+            error_message: None,
+        };
         match test.test_fn {
             TestFn::Blocking { f } => self.spawn_blocking(BlockingTest {
-                desc,
-                reporter,
+                inner,
                 f,
                 _marker: PhantomData,
             }),
             TestFn::Async { f, local } => {
-                let inner = AsyncTestInner { desc, reporter, f };
                 if local {
                     self.spawn_local(LocalAsyncTest {
                         inner,
+                        f,
                         _marker: PhantomData,
                     })
                 } else {
                     self.spawn(AsyncTest {
                         inner,
+                        f,
                         _marker: PhantomData,
                     })
                 }
@@ -118,9 +121,8 @@ impl<E: TestRunner + ?Sized> TestRunnerExt for E {}
 
 /// Blocking test function.
 pub struct BlockingTest {
-    desc: &'static TestDesc,
+    inner: TestInner,
     f: fn() -> Box<dyn Fallible>,
-    reporter: Box<dyn Reporter + Send + 'static>,
     _marker: PhantomData<Cell<()>>,
 }
 
@@ -128,173 +130,19 @@ impl BlockingTest {
     #[allow(missing_docs)]
     #[inline]
     pub fn desc(&self) -> &'static TestDesc {
-        self.desc
+        self.inner.desc
     }
 
     /// Run the test function until all sections are completed.
-    pub fn run(&mut self) -> TestCaseResult {
-        self.reporter.test_case_starting(self.desc);
-
-        let mut error_message = None::<String>;
-
-        if self.desc.leaf_sections.is_empty() {
-            let result = maybe_unwind(AssertUnwindSafe(|| {
-                Context {
-                    desc: &self.desc,
-                    target_section: None,
-                    current_section: None,
-                    event_handler: &mut self.reporter,
-                    _marker: PhantomData,
-                }
-                .scope(&self.f)
-            }));
-            match result {
-                Ok(result) => {
-                    if let Some(msg) = result.error_message() {
-                        *error_message.get_or_insert_with(Default::default) +=
-                            &format!("{:?}", msg);
-                    }
-                }
-                Err(unwind) => {
-                    *error_message.get_or_insert_with(Default::default) += &unwind.to_string();
-                }
-            }
-        } else {
-            for &section in &self.desc.leaf_sections {
-                let result = maybe_unwind(AssertUnwindSafe(|| {
-                    Context {
-                        desc: &self.desc,
-                        target_section: Some(section),
-                        current_section: None,
-                        event_handler: &mut self.reporter,
-                        _marker: PhantomData,
-                    }
-                    .scope(&self.f)
-                }));
-                match result {
-                    Ok(result) => {
-                        if let Some(msg) = result.error_message() {
-                            *error_message.get_or_insert_with(Default::default) +=
-                                &format!("{:?}", msg);
-                        }
-                    }
-                    Err(unwind) => {
-                        *error_message.get_or_insert_with(Default::default) += &unwind.to_string();
-                    }
-                }
-            }
-        }
-
-        let result = TestCaseResult {
-            desc: self.desc,
-            result: if error_message.is_none() {
-                result::TestResult::Passed
-            } else {
-                result::TestResult::Failed
-            },
-            error_message,
-        };
-        self.reporter.test_case_ended(&result);
-
-        result
-    }
-}
-
-struct AsyncTestInner {
-    desc: &'static TestDesc,
-    f: fn() -> TestFuture,
-    reporter: Box<dyn Reporter + Send + 'static>,
-}
-
-impl AsyncTestInner {
-    async fn run<F, Fut>(&mut self, f: F) -> TestCaseResult
-    where
-        F: Fn(TestFuture) -> Fut,
-        Fut: Future<Output = Box<dyn Fallible>>,
-    {
-        trait FutureAssertUnwindSafeExt: Future + Sized {
-            fn assert_unwind_safe(self) -> AssertUnwindSafe<Self> {
-                AssertUnwindSafe(self)
-            }
-        }
-
-        impl<F: Future> FutureAssertUnwindSafeExt for F {}
-
-        self.reporter.test_case_starting(self.desc);
-
-        let mut error_message = None::<String>;
-
-        if self.desc.leaf_sections.is_empty() {
-            let fut = f((self.f)());
-            let result = Context {
-                desc: &self.desc,
-                target_section: None,
-                current_section: None,
-                event_handler: &mut self.reporter,
-                _marker: PhantomData,
-            }
-            .scope_async(fut)
-            .assert_unwind_safe()
-            .maybe_unwind()
-            .await;
-            match result {
-                Ok(result) => {
-                    if let Some(msg) = result.error_message() {
-                        *error_message.get_or_insert_with(Default::default) +=
-                            &format!("{:?}", msg);
-                    }
-                }
-                Err(unwind) => {
-                    *error_message.get_or_insert_with(Default::default) += &unwind.to_string();
-                }
-            }
-        } else {
-            for &section in &self.desc.leaf_sections {
-                let fut = f((self.f)());
-                let result = Context {
-                    desc: &self.desc,
-                    target_section: Some(section),
-                    current_section: None,
-                    event_handler: &mut self.reporter,
-                    _marker: PhantomData,
-                }
-                .scope_async(fut)
-                .assert_unwind_safe()
-                .maybe_unwind()
-                .await;
-
-                match result {
-                    Ok(result) => {
-                        if let Some(msg) = result.error_message() {
-                            *error_message.get_or_insert_with(Default::default) +=
-                                &format!("{:?}", msg);
-                        }
-                    }
-                    Err(unwind) => {
-                        *error_message.get_or_insert_with(Default::default) += &unwind.to_string();
-                    }
-                }
-            }
-        }
-
-        let result = TestCaseResult {
-            desc: self.desc,
-            result: if error_message.is_none() {
-                result::TestResult::Passed
-            } else {
-                result::TestResult::Failed
-            },
-            error_message,
-        };
-        self.reporter.test_case_ended(&result);
-
-        result
+    pub fn run(&mut self) -> TestCaseSummary {
+        self.inner.run_blocking(self.f)
     }
 }
 
 /// Asynchronous test function.
 pub struct AsyncTest {
-    inner: AsyncTestInner,
+    inner: TestInner,
+    f: fn() -> TestFuture,
     _marker: PhantomData<Cell<()>>,
 }
 
@@ -307,8 +155,10 @@ impl AsyncTest {
 
     /// Run the test function until all sections are completed.
     #[inline]
-    pub async fn run(&mut self) -> TestCaseResult {
-        self.inner.run(TestFuture::into_future_obj).await
+    pub async fn run(&mut self) -> TestCaseSummary {
+        self.inner
+            .run_async(self.f, TestFuture::into_future_obj)
+            .await
     }
 }
 
@@ -317,8 +167,9 @@ impl AsyncTest {
 /// Unlike `AsyncTest`, this function must be executed
 /// on the current thread.
 pub struct LocalAsyncTest {
-    inner: AsyncTestInner,
-    _marker: PhantomData<std::rc::Rc<std::cell::Cell<()>>>,
+    inner: TestInner,
+    f: fn() -> TestFuture,
+    _marker: PhantomData<Rc<Cell<()>>>,
 }
 
 impl LocalAsyncTest {
@@ -330,9 +181,262 @@ impl LocalAsyncTest {
 
     /// Run the test function until all sections are completed.
     #[inline]
-    pub async fn run(&mut self) -> TestCaseResult {
-        self.inner.run(std::convert::identity).await
+    pub async fn run(&mut self) -> TestCaseSummary {
+        self.inner.run_async(self.f, std::convert::identity).await
     }
+}
+
+struct TestInner {
+    desc: &'static TestDesc,
+    reporter: Box<dyn Reporter + Send + 'static>,
+    error_message: Option<String>,
+}
+
+impl TestInner {
+    async fn run_async<F, Fut>(&mut self, f: fn() -> TestFuture, conv: F) -> TestCaseSummary
+    where
+        F: Fn(TestFuture) -> Fut,
+        Fut: Future<Output = Box<dyn Fallible>>,
+    {
+        self.start();
+
+        if self.desc.leaf_sections.is_empty() {
+            self.run_section_async(None, f, &conv).await;
+        } else {
+            for &section in &self.desc.leaf_sections {
+                self.run_section_async(Some(section), f, &conv).await;
+            }
+        }
+
+        self.end()
+    }
+
+    fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) -> TestCaseSummary {
+        self.start();
+
+        if self.desc.leaf_sections.is_empty() {
+            self.run_section_blocking(None, f);
+        } else {
+            for &section in &self.desc.leaf_sections {
+                self.run_section_blocking(Some(section), f);
+            }
+        }
+
+        self.end()
+    }
+
+    async fn run_section_async<F, Fut>(
+        &mut self,
+        section: Option<SectionId>,
+        f: fn() -> TestFuture,
+        conv: F,
+    ) where
+        F: FnOnce(TestFuture) -> Fut,
+        Fut: Future<Output = Box<dyn Fallible>>,
+    {
+        let fut = conv(f());
+        let result = AssertUnwindSafe(self.context(section).scope_async(fut))
+            .maybe_unwind()
+            .await;
+        self.collect_result(result);
+    }
+
+    fn run_section_blocking(&mut self, section: Option<SectionId>, f: fn() -> Box<dyn Fallible>) {
+        let mut ctx = self.context(section);
+        let result = maybe_unwind(AssertUnwindSafe(|| ctx.scope(f)));
+        self.collect_result(result);
+    }
+
+    fn context(&mut self, target_section: Option<SectionId>) -> Context<'_> {
+        Context {
+            desc: &self.desc,
+            target_section,
+            current_section: None,
+            event_handler: &mut self.reporter,
+            _marker: PhantomData,
+        }
+    }
+
+    fn start(&mut self) {
+        self.reporter.test_case_starting(self.desc);
+    }
+
+    fn end(&mut self) -> TestCaseSummary {
+        let error_message = self.error_message.take();
+        let summary = TestCaseSummary {
+            desc: self.desc,
+            result: if error_message.is_none() {
+                TestResult::Passed
+            } else {
+                TestResult::Failed
+            },
+            error_message,
+        };
+        self.reporter.test_case_ended(&summary);
+        summary
+    }
+
+    fn collect_result(&mut self, result: Result<Box<dyn Fallible>, Unwind>) {
+        match result {
+            Ok(result) => {
+                if let Some(msg) = result.error_message() {
+                    *self.error_message.get_or_insert_with(Default::default) +=
+                        &format!("{:?}", msg);
+                }
+            }
+            Err(unwind) => {
+                *self.error_message.get_or_insert_with(Default::default) += &unwind.to_string();
+            }
+        }
+    }
+}
+
+/// Context values while running the test case.
+pub struct Context<'a> {
+    desc: &'a TestDesc,
+    target_section: Option<SectionId>,
+    current_section: Option<SectionId>,
+    #[allow(dead_code)]
+    event_handler: &'a mut (dyn Reporter + Send),
+    _marker: PhantomData<fn(&'a ()) -> &'a ()>,
+}
+
+thread_local! {
+    static TLS_CTX: Cell<Option<NonNull<Context<'static>>>> = Cell::new(None);
+}
+
+struct Guard(Option<NonNull<Context<'static>>>);
+
+impl Drop for Guard {
+    fn drop(&mut self) {
+        TLS_CTX.with(|tls| tls.set(self.0.take()));
+    }
+}
+
+impl<'a> Context<'a> {
+    pub(crate) fn scope<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let prev = TLS_CTX.with(|tls| unsafe {
+            let ctx_ptr = mem::transmute::<&mut Self, &mut Context<'static>>(self);
+            tls.replace(Some(NonNull::from(ctx_ptr)))
+        });
+        let _guard = Guard(prev);
+        f()
+    }
+
+    #[inline]
+    pub(crate) async fn scope_async<Fut>(&mut self, fut: Fut) -> Fut::Output
+    where
+        Fut: Future,
+    {
+        #[pin_project]
+        struct ScopeAsync<'a, 'ctx, Fut> {
+            #[pin]
+            fut: Fut,
+            ctx: &'a mut Context<'ctx>,
+        }
+
+        impl<Fut> Future for ScopeAsync<'_, '_, Fut>
+        where
+            Fut: Future,
+        {
+            type Output = Fut::Output;
+
+            fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+                let me = self.project();
+                let fut = me.fut;
+                me.ctx.scope(|| fut.poll(cx))
+            }
+        }
+
+        ScopeAsync { fut, ctx: self }.await
+    }
+
+    /// Return whether the test context is available or not.
+    #[inline]
+    pub fn is_set() -> bool {
+        TLS_CTX.with(|tls| tls.get().is_some())
+    }
+
+    /// Attempt to get a reference to the test context and invoke the provided closure.
+    ///
+    /// This function returns an `AccessError` if the test context is not available.
+    pub fn try_with<F, R>(f: F) -> Result<R, AccessError>
+    where
+        F: FnOnce(&mut Context<'_>) -> R,
+    {
+        let ctx_ptr = TLS_CTX.with(|tls| tls.take());
+        let _guard = Guard(ctx_ptr);
+        let mut ctx_ptr = ctx_ptr.ok_or_else(|| AccessError { _p: () })?;
+        Ok(unsafe { f(ctx_ptr.as_mut()) })
+    }
+
+    /// Get a reference to the test context and invoke the provided closure.
+    ///
+    /// # Panics
+    /// This function causes a panic if the test context is not available.
+    #[inline]
+    pub fn with<F, R>(f: F) -> R
+    where
+        F: FnOnce(&mut Context<'_>) -> R,
+    {
+        Self::try_with(f).expect("cannot acquire the test context")
+    }
+
+    /// Return the name of section currently executing.
+    #[inline]
+    pub fn section_name(&self) -> Option<&str> {
+        self.current_section.map(|id| self.desc.sections[&id].name)
+    }
+
+    pub(crate) fn enter_section(&mut self, id: SectionId) -> EnterSection {
+        let enabled = self.target_section.map_or(false, |section_id| {
+            let section = self
+                .desc
+                .sections
+                .get(&section_id)
+                .expect("invalid section id is set");
+            section_id == id || section.ancestors.contains(&id)
+        });
+        let last_section = self.current_section.replace(id);
+        EnterSection {
+            enabled,
+            last_section,
+        }
+    }
+
+    fn leave_section(&mut self, enter: EnterSection) {
+        self.current_section = enter.last_section;
+    }
+}
+
+#[doc(hidden)]
+pub struct EnterSection {
+    enabled: bool,
+    last_section: Option<SectionId>,
+}
+
+impl EnterSection {
+    #[doc(hidden)]
+    #[inline]
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn leave(self) {
+        Context::with(|ctx| ctx.leave_section(self))
+    }
+}
+
+/// The error value returned from `Context::try_with`.
+#[derive(Debug, thiserror::Error)]
+#[error("cannot access the test context outside of the test body")]
+pub struct AccessError {
+    _p: (),
 }
 
 #[cfg(test)]
@@ -341,7 +445,7 @@ mod tests {
     use crate::test::{imp::TestFn, Registration, Registry, RegistryError, Test};
     use futures::task::{self, Poll};
     use scoped_tls::{scoped_thread_local, ScopedKey};
-    use std::{cell::RefCell, marker::PhantomData, pin::Pin};
+    use std::{cell::RefCell, pin::Pin};
 
     trait ScopedKeyExt<T> {
         fn set_async<'a, Fut>(&'static self, t: &'a T, fut: Fut) -> SetAsync<'a, T, Fut>
@@ -407,7 +511,7 @@ mod tests {
         fn test_run_starting(&self, _: &[Test]) {}
         fn test_run_ended(&self, _: &Summary) {}
         fn test_case_starting(&self, _: &TestDesc) {}
-        fn test_case_ended(&self, _: &TestCaseResult) {}
+        fn test_case_ended(&self, _: &TestCaseSummary) {}
     }
 
     fn run_test(r: &dyn Registration) -> Vec<HistoryLog> {
@@ -418,28 +522,18 @@ mod tests {
         };
 
         let history = RefCell::new(vec![]);
-        match test.test_fn {
-            TestFn::Blocking { f } => HISTORY.set(&history, || {
-                BlockingTest {
-                    desc: test.desc,
-                    reporter: Box::new(NullReporter),
-                    f,
-                    _marker: PhantomData,
-                }
-                .run();
-            }),
-            TestFn::Async { f, .. } => {
-                futures::executor::block_on(HISTORY.set_async(&history, async {
-                    AsyncTestInner {
-                        desc: test.desc,
-                        reporter: Box::new(NullReporter),
-                        f,
-                    }
-                    .run(std::convert::identity)
-                    .await;
-                }))
-            }
-        }
+        let mut state = TestInner {
+            desc: test.desc,
+            reporter: Box::new(NullReporter),
+            error_message: None,
+        };
+
+        let _ = match test.test_fn {
+            TestFn::Blocking { f } => HISTORY.set(&history, || state.run_blocking(f)),
+            TestFn::Async { f, .. } => futures::executor::block_on(
+                HISTORY.set_async(&history, state.run_async(f, std::convert::identity)),
+            ),
+        };
 
         history.into_inner()
     }

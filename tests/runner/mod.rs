@@ -6,8 +6,8 @@ use futures::{
 };
 use rye::{
     cli::{Args, Session},
-    reporter::ConsoleReporter,
-    runner::{AsyncTest, BlockingTest, LocalAsyncTest, Summary, TestCaseResult, TestRunner},
+    reporter::{ConsoleReporter, Summary, TestCaseSummary},
+    runner::{AsyncTest, BlockingTest, LocalAsyncTest, TestRunner},
     test::Registration,
 };
 use std::{io, pin::Pin, thread};
@@ -27,8 +27,8 @@ pub(crate) fn run_tests(tests: &[&dyn Registration]) {
 
 #[pin_project::pin_project]
 struct InFlight {
-    handle: RemoteHandle<TestCaseResult>,
-    result: Option<TestCaseResult>,
+    handle: RemoteHandle<TestCaseSummary>,
+    result: Option<TestCaseSummary>,
 }
 
 impl Future for InFlight {
