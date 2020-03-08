@@ -17,6 +17,7 @@ if cargo clippy --version >/dev/null; then
 fi
 
 (set -x; cargo test --workspace)
+(set -x; cargo test --test test_ui -- --ignored)
 
 if cargo +nightly --version >/dev/null; then
     (set -x; cargo +nightly test --features frameworks --test test_frameworks)
