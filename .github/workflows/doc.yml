@@ -30,6 +30,13 @@ jobs:
         toolchain: nightly
         override: true
 
+    - name: Fetch cargo dependencies
+      uses: actions-rs/cargo@v1
+      with:
+        command: fetch
+      env:
+        CARGO_NET_OFFLINE: false
+
     - name: Cache cargo registry
       uses: actions/cache@v1
       with:
@@ -46,13 +53,6 @@ jobs:
     #     path: target
     #     key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Fetch cargo dependencies
-      uses: actions-rs/cargo@v1
-      with:
-        command: fetch
-      env:
-        CARGO_NET_OFFLINE: false
-
     # TODO:
     # * restrict network access during building docs.
     # * restrict all write access expect target/
@@ -60,7 +60,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: doc
-        args: --no-deps --workspace
+        args: --frozen --no-deps --workspace
     - run: rm -fv target/doc/.lock
 
     - name: Upload artifact
