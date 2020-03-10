@@ -1,14 +1,15 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse::{Error, Parse, ParseStream, Result},
+    parse::{Error, Parse, ParseStream, Parser, Result},
     punctuated::Punctuated,
-    Attribute, Path, Token, UseTree,
+    Attribute, Ident, Path, Token, UseTree,
 };
 
 struct Input {
     test_runner: Path,
     test_cases: Vec<UseTree>,
+    reexport_test_harness_main: Option<Ident>,
 }
 
 impl Parse for Input {
@@ -17,6 +18,7 @@ impl Parse for Input {
 
         let mut test_runner = None;
         let mut test_cases = vec![];
+        let mut reexport_test_harness_main = None;
         for attr in attrs {
             match attr.path.get_ident() {
                 Some(id) if id == "test_runner" => {
@@ -26,6 +28,15 @@ impl Parse for Input {
                     let cases =
                         attr.parse_args_with(Punctuated::<UseTree, Token![,]>::parse_terminated)?;
                     test_cases.extend(cases);
+                }
+                Some(id) if id == "reexport_test_harness_main" => {
+                    fn parse(input: ParseStream<'_>) -> Result<Ident> {
+                        let _eq_token: Token![=] = input.parse()?;
+                        let value: syn::LitStr = input.parse()?;
+                        value.parse()
+                    }
+                    let main_id = parse.parse2(attr.tokens)?;
+                    reexport_test_harness_main.replace(main_id);
                 }
                 _ => return Err(Error::new_spanned(&attr.path, "unsupported attribute")),
             }
@@ -39,6 +50,7 @@ impl Parse for Input {
                 )
             })?,
             test_cases,
+            reexport_test_harness_main,
         })
     }
 }
@@ -56,8 +68,13 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error(),
     };
 
+    let main_id = match input.reexport_test_harness_main {
+        Some(id) => id,
+        None => Ident::new("main", Span::call_site()),
+    };
+
     quote! {
-        fn main() {
+        fn #main_id () {
             #test_runner(&[ #( #test_cases ),* ]);
         }
     }
