@@ -105,7 +105,7 @@ mod sub {
         });
     }
 
-    rye::test_group! {
+    rye::test_set! {
         sub_test,
         modified_rye_path,
     }
@@ -141,7 +141,7 @@ fn return_result() -> anyhow::Result<()> {
     Ok(())
 }
 
-rye::test_group! {
+rye::test_set! {
     case_sync,
     case_async_nosend,
     nested,

@@ -71,15 +71,15 @@ impl Fallible for () {}
 
 impl<E> Fallible for Result<(), E> where E: fmt::Debug + 'static {}
 
-/// The registration of one or more test cases.
-pub trait Registration {
+/// A collection of one or more test cases.
+pub trait TestSet: Send + Sync {
     /// Register a collection of test cases in the registry.
     fn register(&self, registry: &mut dyn Registry) -> Result<(), RegistryError>;
 }
 
-impl<R: ?Sized> Registration for &R
+impl<T: ?Sized> TestSet for &T
 where
-    R: Registration,
+    T: TestSet,
 {
     #[inline]
     fn register(&self, registry: &mut dyn Registry) -> Result<(), RegistryError> {
@@ -87,13 +87,26 @@ where
     }
 }
 
-impl<R: ?Sized> Registration for Box<R>
+impl<T: ?Sized> TestSet for Box<T>
 where
-    R: Registration,
+    T: TestSet,
 {
     #[inline]
     fn register(&self, registry: &mut dyn Registry) -> Result<(), RegistryError> {
         (**self).register(registry)
+    }
+}
+
+impl<T> TestSet for [T]
+where
+    T: TestSet,
+{
+    #[inline]
+    fn register(&self, registry: &mut dyn Registry) -> Result<(), RegistryError> {
+        for tests in self {
+            tests.register(registry)?;
+        }
+        Ok(())
     }
 }
 

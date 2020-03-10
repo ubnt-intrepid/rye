@@ -32,14 +32,12 @@ pub(crate) fn test_runner(input: TokenStream) -> TokenStream {
 
     let runner = input.runner;
 
-    let mut registration = input.target.unwrap_or_else(|| syn::parse_quote!(self));
-    registration
-        .segments
-        .push(syn::parse_quote!(__REGISTRATION));
+    let mut tests = input.target.unwrap_or_else(|| syn::parse_quote!(self));
+    tests.segments.push(syn::parse_quote!(__TESTS));
 
     quote! {
         fn main() {
-            #runner(&[ #registration ]);
+            #runner(&[ #tests ]);
         }
     }
 }

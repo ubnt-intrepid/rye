@@ -442,7 +442,7 @@ pub struct AccessError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{imp::TestFn, Registration, Registry, RegistryError, Test};
+    use crate::test::{imp::TestFn, Registry, RegistryError, Test, TestSet};
     use futures::task::{self, Poll};
     use scoped_tls::{scoped_thread_local, ScopedKey};
     use std::{cell::RefCell, pin::Pin};
@@ -514,7 +514,7 @@ mod tests {
         fn test_case_ended(&self, _: &TestCaseSummary) {}
     }
 
-    fn run_test(r: &dyn Registration) -> Vec<HistoryLog> {
+    fn run_test(r: &dyn TestSet) -> Vec<HistoryLog> {
         let test = {
             let mut test = None;
             r.register(&mut MockRegistry(&mut test)).unwrap();
@@ -549,7 +549,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__REGISTRATION);
+            let history = run_test(&test_case::__TESTS);
             assert_eq!(history, vec![("test", None)]);
         }
     }
@@ -571,7 +571,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__REGISTRATION);
+            let history = run_test(&test_case::__TESTS);
             assert_eq!(
                 history,
                 vec![
@@ -604,7 +604,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__REGISTRATION);
+            let history = run_test(&test_case::__TESTS);
             assert_eq!(
                 history,
                 vec![
@@ -654,7 +654,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__REGISTRATION);
+            let history = run_test(&test_case::__TESTS);
             assert_eq!(
                 history,
                 vec![
@@ -725,7 +725,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__REGISTRATION);
+            let history = run_test(&test_case::__TESTS);
             assert_eq!(
                 history,
                 vec![

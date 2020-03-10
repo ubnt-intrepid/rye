@@ -172,12 +172,12 @@ fn case1() {
     // ...
 }
 
-rye::test_group! {
+rye::test_set! {
     case1,
 }
 
 rye::test_runner!(path::to::runner);
-# mod path { pub mod to { pub fn runner(_: &[&dyn rye::test::Registration]) {} } }
+# mod path { pub mod to { pub fn runner(_: &[&dyn rye::test::TestSet]) {} } }
 # }
 ```
 
@@ -221,7 +221,7 @@ mod global;
 pub mod _internal {
     pub use crate::test::{
         imp::{Section, TestFn, TestFuture},
-        Registration, Registry, RegistryError, Test, TestDesc,
+        Registry, RegistryError, Test, TestDesc, TestSet,
     };
     pub use lazy_static::lazy_static;
     pub use maplit::hashset;
@@ -301,9 +301,9 @@ pub mod _internal {
                 }
 
                 #[allow(non_camel_case_types)]
-                struct __registration(());
+                struct __tests(());
 
-                impl $crate::_internal::Registration for __registration {
+                impl $crate::_internal::TestSet for __tests {
                     fn register(&self, __registry: &mut dyn $crate::_internal::Registry) -> $crate::_internal::Result<(), $crate::_internal::RegistryError> {
                         __registry.add_test($crate::_internal::Test {
                             desc: &*DESC,
@@ -316,7 +316,7 @@ pub mod _internal {
                 }
 
                 $crate::__annotate_test_case! {
-                    pub(crate) const __REGISTRATION: &dyn $crate::_internal::Registration = &__registration(());
+                    pub(crate) static __TESTS: &dyn $crate::_internal::TestSet = &__tests(());
                 }
             }
         };
@@ -345,7 +345,7 @@ pub mod _internal {
 /// Generate a single test case.
 pub use rye_macros::test;
 
-/// Re-export the collection of test cases from the current module.
+/// Define a set of test cases onto the current module.
 ///
 /// # Example
 ///
@@ -371,7 +371,7 @@ pub use rye_macros::test;
 ///     #[path = "sub2.rs"]
 ///     mod sub2;
 ///
-///     rye::test_group! {
+///     rye::test_set! {
 ///         case2,
 ///         case3,
 ///         sub2,
@@ -387,9 +387,9 @@ pub use rye_macros::test;
 ///     // ...
 /// }
 ///
-/// rye::test_group! { case4 }
+/// rye::test_set! { case4 }
 /// ```
-pub use rye_macros::test_group;
+pub use rye_macros::test_set;
 
 /// Generate the main function for running the test cases.
 pub use rye_macros::test_runner;

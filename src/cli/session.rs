@@ -2,7 +2,7 @@ use crate::{
     cli::{args::Args, exit_status::ExitStatus},
     reporter::Reporter,
     runner::{TestRunner, TestRunnerExt as _},
-    test::{Registration, Registry, RegistryError, Test},
+    test::{Registry, RegistryError, Test, TestSet},
 };
 use std::{
     collections::HashSet,
@@ -56,7 +56,7 @@ impl<'sess> Session<'sess> {
     #[inline]
     pub fn run<T: ?Sized, R: ?Sized>(
         &mut self,
-        tests: &[&dyn Registration],
+        tests: &[&dyn TestSet],
         runner: &mut T,
         reporter: &mut R,
     ) -> ExitStatus
@@ -64,12 +64,10 @@ impl<'sess> Session<'sess> {
         T: TestRunner,
         R: Reporter + Send + Clone + 'static,
     {
-        for &test in tests {
-            let res = test.register(&mut MainRegistry { session: self });
-            if let Err(err) = res {
-                eprintln!("registry error: {}", err);
-                return ExitStatus::FAILED;
-            }
+        let res = tests.register(&mut MainRegistry { session: self });
+        if let Err(err) = res {
+            eprintln!("registry error: {}", err);
+            return ExitStatus::FAILED;
         }
 
         // sort test cases by name.

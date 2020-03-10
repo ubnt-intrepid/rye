@@ -32,14 +32,13 @@ impl Parse for Input {
     }
 }
 
-pub(crate) fn test_group(input: TokenStream) -> TokenStream {
+pub(crate) fn test_set(input: TokenStream) -> TokenStream {
     let input: Input = try_parse!(syn::parse2(input));
     let paths = try_parse!(extract_test_cases(&input));
     Generated {
         body: quote! {
-            let registrations = &[#( & #paths as &dyn rye::_internal::Registration ),*];
-            for registration in registrations {
-                registration.register(__registry)?;
+            for tests in &[#( & #paths as &dyn rye::_internal::TestSet ),*] {
+                tests.register(__registry)?;
             }
             Ok(())
         },
@@ -79,12 +78,12 @@ fn expand_use_tree(
     match tree {
         UseTree::Name(UseName { ident }) => {
             #[allow(nonstandard_style)]
-            let __REGISTRATION = syn::Ident::new("__REGISTRATION", Span::call_site());
+            let __TESTS = syn::Ident::new("__TESTS", Span::call_site());
             let path: Punctuated<&Ident, Token![::]> = ancestors
                 .iter()
                 .copied()
                 .chain(Some(ident))
-                .chain(Some(&__REGISTRATION))
+                .chain(Some(&__TESTS))
                 .collect();
             paths.push(syn::parse_quote!(#path));
         }
@@ -116,13 +115,13 @@ where
         let body = &self.body;
         tokens.append_all(&[
             quote! {
-                struct __registration(());
-                impl ::rye::_internal::Registration for __registration {
+                struct __tests(());
+                impl ::rye::_internal::TestSet for __tests {
                     fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> Result<(), ::rye::_internal::RegistryError> {
                         #body
                     }
                 }
-                pub(crate) const __REGISTRATION: &dyn ::rye::_internal::Registration = &__registration(());
+                pub(crate) const __TESTS: &dyn ::rye::_internal::TestSet = &__tests(());
             }
         ]);
     }

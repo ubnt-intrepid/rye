@@ -8,11 +8,11 @@ use rye::{
     cli::{Args, Session},
     reporter::{ConsoleReporter, Summary, TestCaseSummary},
     runner::{AsyncTest, BlockingTest, LocalAsyncTest, TestRunner},
-    test::Registration,
+    test::TestSet,
 };
 use std::{io, pin::Pin, thread};
 
-pub(crate) fn run_tests(tests: &[&dyn Registration]) {
+pub(crate) fn run_tests(tests: &[&dyn TestSet]) {
     rye::cli::install();
 
     let args = Args::from_env().unwrap_or_else(|st| st.exit());
