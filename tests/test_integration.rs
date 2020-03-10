@@ -84,6 +84,13 @@ async fn case_async_nosend() {
 }
 
 mod sub {
+    rye::test_module! {
+        #![test_cases(
+            sub_test,
+            modified_rye_path,
+        )]
+    }
+
     #[rye::test]
     fn sub_test() {
         let mut vec = vec![0usize; 5];
@@ -115,11 +122,6 @@ mod sub {
             assert_eq!(vec.len(), 10);
             assert!(vec.capacity() >= 5);
         });
-    }
-
-    rye::test_set! {
-        sub_test,
-        modified_rye_path,
     }
 }
 

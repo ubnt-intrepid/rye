@@ -51,7 +51,7 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
 
     let test_runner = input.test_runner;
 
-    let test_cases = match crate::test_set::extract_test_cases(&input.test_cases) {
+    let test_cases = match crate::common::extract_test_cases(&input.test_cases) {
         Ok(paths) => paths,
         Err(err) => return err.to_compile_error(),
     };

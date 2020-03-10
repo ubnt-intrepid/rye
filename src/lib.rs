@@ -344,12 +344,18 @@ pub mod _internal {
 /// Generate a single test case.
 pub use rye_macros::test;
 
+/// Generate the main function for running the test cases.
+pub use rye_macros::test_harness;
+
 /// Define a set of test cases onto the current module.
 ///
 /// # Example
 ///
 /// ```ignore
-/// // tests.rs
+/// rye::test_harness! {
+///     #![test_runner(path::to::runner)]
+///     #![test_cases(case1, sub1)]
+/// }
 ///
 /// #[rye::test]
 /// fn case1() {
@@ -357,6 +363,10 @@ pub use rye_macros::test;
 /// }
 ///
 /// mod sub1 {
+///     rye::test_module! {
+///         #![test_cases(case2, case3, sub2)]
+///     }
+///
 ///     #[rye::test]
 ///     fn case2() {
 ///         // ...
@@ -369,26 +379,19 @@ pub use rye_macros::test;
 ///
 ///     #[path = "sub2.rs"]
 ///     mod sub2;
-///
-///     rye::test_set! {
-///         case2,
-///         case3,
-///         sub2,
-///     }
 /// }
 /// ```
 ///
 /// ```ignore
 /// // sub2.rs
 ///
+/// rye::test_module! {
+///     #![test_cases(case4)]
+/// }
+///
 /// #[rye::test]
 /// fn case4() {
 ///     // ...
 /// }
-///
-/// rye::test_set! { case4 }
 /// ```
-pub use rye_macros::test_set;
-
-/// Generate the main function for running the test cases.
-pub use rye_macros::test_harness;
+pub use rye_macros::test_module;
