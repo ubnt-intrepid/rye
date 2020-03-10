@@ -1,7 +1,63 @@
-use proc_macro2::Span;
-use syn::{parse, punctuated::Punctuated, Ident, Path, Token, UseGroup, UseName, UsePath, UseTree};
+use proc_macro2::{Span, TokenStream};
+use quote::{quote, ToTokens, TokenStreamExt as _};
+use syn::{
+    parse, punctuated::Punctuated, Attribute, Ident, Path, Token, UseGroup, UseName, UsePath,
+    UseTree,
+};
 
-pub(crate) fn extract_test_cases(
+#[derive(Default)]
+pub(crate) struct TestCases {
+    test_cases: Vec<UseTree>,
+}
+
+impl TestCases {
+    pub(crate) fn append_cases(&mut self, attr: &Attribute) -> parse::Result<()> {
+        let cases = attr.parse_args_with(Punctuated::<UseTree, Token![,]>::parse_terminated)?;
+        self.test_cases.extend(cases);
+        Ok(())
+    }
+}
+
+impl ToTokens for TestCases {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        struct Generated<T: ToTokens> {
+            body: T,
+        }
+
+        impl<T> ToTokens for Generated<T>
+        where
+            T: ToTokens,
+        {
+            fn to_tokens(&self, tokens: &mut TokenStream) {
+                let body = &self.body;
+                tokens.append_all(&[
+                    quote! {
+                        struct __tests(());
+                        impl ::rye::_internal::TestSet for __tests {
+                            fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> Result<(), ::rye::_internal::RegistryError> {
+                                #body
+                            }
+                        }
+                        pub(crate) const __TESTS: &dyn ::rye::_internal::TestSet = &__tests(());
+                    }
+                ]);
+            }
+        }
+
+        let body = extract_test_cases(&self.test_cases)
+            .map(|paths| {
+                quote! {
+                    #( (#paths as &dyn rye::_internal::TestSet).register(__registry)?; )*
+                    Ok(())
+                }
+            })
+            .unwrap_or_else(|err| err.to_compile_error());
+
+        tokens.append_all(&[Generated { body }]);
+    }
+}
+
+fn extract_test_cases(
     trees: impl IntoIterator<Item = impl std::ops::Deref<Target = UseTree>>,
 ) -> parse::Result<Vec<Path>> {
     let mut paths = vec![];

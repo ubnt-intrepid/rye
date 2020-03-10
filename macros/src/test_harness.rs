@@ -1,14 +1,14 @@
+use crate::common::TestCases;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
     parse::{Error, Parse, ParseStream, Parser, Result},
-    punctuated::Punctuated,
-    Attribute, Ident, Path, Token, UseTree,
+    Attribute, Ident, Path, Token,
 };
 
 struct Input {
     test_runner: Path,
-    test_cases: Vec<UseTree>,
+    test_cases: TestCases,
     reexport_test_harness_main: Option<Ident>,
 }
 
@@ -17,7 +17,7 @@ impl Parse for Input {
         let attrs = Attribute::parse_inner(input)?;
 
         let mut test_runner = None;
-        let mut test_cases = vec![];
+        let mut test_cases = TestCases::default();
         let mut reexport_test_harness_main = None;
         for attr in attrs {
             match attr.path.get_ident() {
@@ -25,9 +25,7 @@ impl Parse for Input {
                     test_runner.replace(attr.parse_args()?);
                 }
                 Some(id) if id == "test_cases" => {
-                    let cases =
-                        attr.parse_args_with(Punctuated::<UseTree, Token![,]>::parse_terminated)?;
-                    test_cases.extend(cases);
+                    test_cases.append_cases(&attr)?;
                 }
                 Some(id) if id == "reexport_test_harness_main" => {
                     fn parse(input: ParseStream<'_>) -> Result<Ident> {
@@ -61,12 +59,8 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error(),
     };
 
-    let test_runner = input.test_runner;
-
-    let test_cases = match crate::common::extract_test_cases(&input.test_cases) {
-        Ok(paths) => paths,
-        Err(err) => return err.to_compile_error(),
-    };
+    let test_runner = &input.test_runner;
+    let test_cases = &input.test_cases;
 
     let main_id = match input.reexport_test_harness_main {
         Some(id) => id,
@@ -74,8 +68,9 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
     };
 
     quote! {
+        #test_cases
         fn #main_id () {
-            #test_runner(&[ #( #test_cases ),* ]);
+            #test_runner(&[ self::__TESTS ]);
         }
     }
 }
