@@ -34,7 +34,7 @@ impl Parse for Input {
 
 pub(crate) fn test_set(input: TokenStream) -> TokenStream {
     let input: Input = try_parse!(syn::parse2(input));
-    let paths = try_parse!(extract_test_cases(&input));
+    let paths = try_parse!(extract_test_cases(input.test_cases.iter()));
     Generated {
         body: quote! {
             for tests in &[#( & #paths as &dyn rye::_internal::TestSet ),*] {
@@ -46,12 +46,14 @@ pub(crate) fn test_set(input: TokenStream) -> TokenStream {
     .into_token_stream()
 }
 
-fn extract_test_cases(input: &Input) -> Result<Vec<Path>> {
+pub(crate) fn extract_test_cases(
+    trees: impl IntoIterator<Item = impl std::ops::Deref<Target = UseTree>>,
+) -> Result<Vec<Path>> {
     let mut paths = vec![];
     let mut errors = vec![];
 
-    for tree in &input.test_cases {
-        expand_use_tree(tree, &mut paths, &[], &mut errors);
+    for tree in trees {
+        expand_use_tree(&*tree, &mut paths, &[], &mut errors);
     }
 
     let errors = errors.into_iter().fold(None::<Error>, |mut errors, error| {

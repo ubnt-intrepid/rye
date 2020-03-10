@@ -1,7 +1,7 @@
 extern crate proc_macro;
 
 mod test;
-mod test_runner;
+mod test_harness;
 mod test_set;
 
 use proc_macro::TokenStream;
@@ -17,6 +17,6 @@ pub fn test_set(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn test_runner(input: TokenStream) -> TokenStream {
-    crate::test_runner::test_runner(input.into()).into()
+pub fn test_harness(input: TokenStream) -> TokenStream {
+    crate::test_harness::test_harness(input.into()).into()
 }

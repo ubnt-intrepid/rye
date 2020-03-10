@@ -151,7 +151,7 @@ section 2
 teardown
 ```
 
-# Running Test Application
+# Generating Test Harness
 
 On the current stable compiler, test cases annotated by `#[rye::test]` attribute are not
 implicitly registered for the execution.
@@ -172,11 +172,10 @@ fn case1() {
     // ...
 }
 
-rye::test_set! {
-    case1,
+rye::test_harness! {
+    #![test_runner(path::to::runner)]
+    #![test_cases(case1)]
 }
-
-rye::test_runner!(path::to::runner);
 # mod path { pub mod to { pub fn runner(_: &[&dyn rye::test::TestSet]) {} } }
 # }
 ```
@@ -392,4 +391,4 @@ pub use rye_macros::test;
 pub use rye_macros::test_set;
 
 /// Generate the main function for running the test cases.
-pub use rye_macros::test_runner;
+pub use rye_macros::test_harness;

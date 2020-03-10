@@ -1,3 +1,15 @@
+rye::test_harness! {
+    #![test_runner(crate::runner::run_tests)]
+    #![test_cases(
+        case_sync,
+        case_async_nosend,
+        nested,
+        case_async,
+        sub,
+        return_result,
+    )]
+}
+
 mod runner;
 
 #[rye::test]
@@ -140,14 +152,3 @@ fn return_result() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-rye::test_set! {
-    case_sync,
-    case_async_nosend,
-    nested,
-    case_async,
-    sub,
-    return_result,
-}
-
-rye::test_runner!(crate::runner::run_tests);
