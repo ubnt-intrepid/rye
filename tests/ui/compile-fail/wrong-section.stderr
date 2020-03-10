@@ -1,23 +1,23 @@
 error: unexpected end of input, expected expression
- --> $DIR/02-wrong-section.rs:5:13
+ --> $DIR/wrong-section.rs:5:13
   |
 5 |     section!();
   |             ^^
 
 error: unexpected end of input, expected expression
-  --> $DIR/02-wrong-section.rs:10:13
+  --> $DIR/wrong-section.rs:10:13
    |
 10 |     section!();
    |             ^^
 
 error: unexpected end of input, expected expression
-  --> $DIR/02-wrong-section.rs:11:13
+  --> $DIR/wrong-section.rs:11:13
    |
 11 |     section!();
    |             ^^
 
 error: unexpected end of input, expected expression
-  --> $DIR/02-wrong-section.rs:17:17
+  --> $DIR/wrong-section.rs:17:17
    |
 17 |         section!();
    |                 ^^

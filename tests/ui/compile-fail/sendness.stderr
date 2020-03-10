@@ -1,11 +1,11 @@
 error: only '?Send' or '!Send' is accepted
- --> $DIR/07-sendness.rs:3:13
+ --> $DIR/sendness.rs:3:13
   |
 3 | #[rye::test(non_send)]
   |             ^^^^^^^^
 
 error: accepted only for async functions
-  --> $DIR/07-sendness.rs:10:13
+  --> $DIR/sendness.rs:10:13
    |
 10 | #[rye::test(?Send)]
    |             ^^^^^

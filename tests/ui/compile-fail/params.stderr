@@ -1,17 +1,17 @@
 error: required a string literal
- --> $DIR/06-params.rs:4:15
+ --> $DIR/params.rs:4:15
   |
 4 | #[rye(crate = 10)]
   |               ^^
 
 error: duplicated parameter
- --> $DIR/06-params.rs:9:7
+ --> $DIR/params.rs:9:7
   |
 9 | #[rye(crate = "rye")]
   |       ^^^^^^^^^^^^^
 
 error: unknown parameter name
-  --> $DIR/06-params.rs:13:7
+  --> $DIR/params.rs:13:7
    |
 13 | #[rye(the_quick_fox = "lazy")]
    |       ^^^^^^^^^^^^^

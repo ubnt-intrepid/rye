@@ -1,5 +1,5 @@
 error: section cannot be described in an async block
- --> $DIR/05-section-in-async-block.rs:6:9
+ --> $DIR/section-in-async-block.rs:6:9
   |
 6 | /         section!("section", {
 7 | |             assert!(true);

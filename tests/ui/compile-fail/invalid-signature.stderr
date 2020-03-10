@@ -1,11 +1,11 @@
 error: test functions cannot accept arguments
- --> $DIR/08-invalid-signature.rs:4:14
+ --> $DIR/invalid-signature.rs:4:14
   |
 4 | fn has_input(x: u32) {}
   |              ^^^^^^
 
 error: test functions cannot take generic parameters
- --> $DIR/08-invalid-signature.rs:7:16
+ --> $DIR/invalid-signature.rs:7:16
   |
 7 | fn has_generics<T>() {}
   |                ^^^
