@@ -224,7 +224,7 @@ pub mod _internal {
     };
     pub use lazy_static::lazy_static;
     pub use maplit::hashset;
-    pub use std::{module_path, result::Result, vec};
+    pub use std::{module_path, result::Result};
 
     use crate::{
         runner::{Context, EnterSection},
@@ -295,7 +295,7 @@ pub mod _internal {
                     static ref DESC: $crate::_internal::TestDesc = $crate::_internal::TestDesc {
                         module_path: $crate::_internal::module_path!(),
                         sections: $crate::__declare_section!($($sections)*),
-                        leaf_sections: $crate::_internal::vec![ $($leaf_sections)* ],
+                        leaf_sections: &[ $($leaf_sections)* ],
                     };
                 }
 

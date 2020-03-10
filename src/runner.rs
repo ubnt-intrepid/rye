@@ -203,7 +203,7 @@ impl TestInner {
         if self.desc.leaf_sections.is_empty() {
             self.run_section_async(None, f, &conv).await;
         } else {
-            for &section in &self.desc.leaf_sections {
+            for &section in self.desc.leaf_sections {
                 self.run_section_async(Some(section), f, &conv).await;
             }
         }
@@ -217,7 +217,7 @@ impl TestInner {
         if self.desc.leaf_sections.is_empty() {
             self.run_section_blocking(None, f);
         } else {
-            for &section in &self.desc.leaf_sections {
+            for &section in self.desc.leaf_sections {
                 self.run_section_blocking(Some(section), f);
             }
         }

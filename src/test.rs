@@ -47,7 +47,7 @@ pub struct TestDesc {
     #[doc(hidden)]
     pub sections: HashMap<SectionId, Section>,
     #[doc(hidden)]
-    pub leaf_sections: Vec<SectionId>,
+    pub leaf_sections: &'static [SectionId],
 }
 
 impl TestDesc {
