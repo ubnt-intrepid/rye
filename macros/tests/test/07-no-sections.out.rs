@@ -4,9 +4,31 @@ fn no_sections() {
     assert!(vec.capacity() >= 5);
 }
 
-::rye::__declare_test_module! {
-    name = no_sections;
-    sections = {};
-    leaf_sections = {};
-    [blocking] test_fn = no_sections;
+pub(crate) mod no_sections {
+    use super::*;
+
+    ::rye::_internal::lazy_static! {
+        static ref __DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
+            module_path: ::rye::_internal::module_path!(),
+            sections: ::rye::__declare_section! {},
+            leaf_sections: &[],
+        };
+    }
+
+    #[allow(non_camel_case_types)]
+    struct __tests(());
+
+    impl ::rye::_internal::TestSet for __tests {
+        fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
+            __registry.add_test(::rye::_internal::Test {
+                desc: &*__DESC,
+                test_fn: ::rye::__test_fn!([blocking] no_sections),
+            })?;
+            ::rye::_internal::Result::Ok(())
+        }
+    }
+
+    ::rye::__annotate_test_case! {
+        pub(crate) static __TESTS: &dyn ::rye::_internal::TestSet = &__tests(());
+    }
 }

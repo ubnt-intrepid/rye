@@ -279,44 +279,22 @@ pub mod _internal {
 
     #[doc(hidden)] // private API.
     #[macro_export]
-    macro_rules! __declare_test_module {
-        (
-            name = $name:ident;
-            sections = { $($sections:tt)* };
-            leaf_sections = { $($leaf_sections:tt)* };
-            $( [async(local = false)] test_fn = $async_test_fn:ident; )?
-            $( [async(local = true)]  test_fn = $async_local_test_fn:ident; )?
-            $( [blocking]             test_fn = $blocking_test_fn:ident; )?
-        ) => {
-            pub(crate) mod $name {
-                use super::*;
-
-                $crate::_internal::lazy_static! {
-                    static ref DESC: $crate::_internal::TestDesc = $crate::_internal::TestDesc {
-                        module_path: $crate::_internal::module_path!(),
-                        sections: $crate::__declare_section!($($sections)*),
-                        leaf_sections: &[ $($leaf_sections)* ],
-                    };
-                }
-
-                #[allow(non_camel_case_types)]
-                struct __tests(());
-
-                impl $crate::_internal::TestSet for __tests {
-                    fn register(&self, __registry: &mut dyn $crate::_internal::Registry) -> $crate::_internal::Result<(), $crate::_internal::RegistryError> {
-                        __registry.add_test($crate::_internal::Test {
-                            desc: &*DESC,
-                            $( test_fn: $crate::_internal::TestFn::Async { f: || $crate::_internal::TestFuture::new($async_test_fn()), local: false }, )?
-                            $( test_fn: $crate::_internal::TestFn::Async { f: || $crate::_internal::TestFuture::new_local($async_local_test_fn()), local: true }, )?
-                            $( test_fn: $crate::_internal::TestFn::Blocking { f: || $crate::_internal::test_result($blocking_test_fn()) }, )?
-                        })?;
-                        $crate::_internal::Result::Ok(())
-                    }
-                }
-
-                $crate::__annotate_test_case! {
-                    pub(crate) static __TESTS: &dyn $crate::_internal::TestSet = &__tests(());
-                }
+    macro_rules! __test_fn {
+        ([async] $path:path) => {
+            $crate::_internal::TestFn::Async {
+                f: || $crate::_internal::TestFuture::new($path()),
+                local: false,
+            }
+        };
+        ([async_local] $path:path) => {
+            $crate::_internal::TestFn::Async {
+                f: || $crate::_internal::TestFuture::new_local($path()),
+                local: true,
+            }
+        };
+        ([blocking] $path:path) => {
+            $crate::_internal::TestFn::Blocking {
+                f: || $crate::_internal::test_result($path()),
             }
         };
     }

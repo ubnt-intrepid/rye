@@ -1,12 +1,12 @@
 use indexmap::IndexMap;
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
     parse::{Error, Parse, ParseStream, Result},
     visit_mut::{self, VisitMut},
-    Attribute, Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Item, ItemFn,
-    Macro, MetaNameValue, Stmt, Token,
+    Attribute, Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Ident, Item,
+    ItemFn, Macro, MetaNameValue, Stmt, Token,
 };
 
 macro_rules! try_quote {
@@ -372,19 +372,40 @@ impl ToTokens for Generated<'_> {
         let ident = &self.item.sig.ident;
         let crate_path = &self.params.crate_path;
 
-        let test_fn = if self.item.sig.asyncness.is_some() {
-            let local = self.args.local;
-            quote!( [async(local = #local)] test_fn = #ident; )
-        } else {
-            quote!( [blocking] test_fn = #ident; )
+        let test_fn_kind = match self.item.sig.asyncness {
+            Some(..) if self.args.local => Ident::new("async_local", Span::call_site()),
+            Some(..) => Ident::new("async", Span::call_site()),
+            None => Ident::new("blocking", Span::call_site()),
         };
 
         tokens.append_all(vec![quote! {
-            #crate_path::__declare_test_module! {
-                name = #ident;
-                sections = { #( #section_map_entries )* };
-                leaf_sections = { #( #leaf_section_ids ),* };
-                #test_fn
+            pub(crate) mod #ident {
+                use super::*;
+
+                #crate_path::_internal::lazy_static! {
+                    static ref __DESC: #crate_path::_internal::TestDesc = #crate_path::_internal::TestDesc {
+                        module_path: #crate_path::_internal::module_path!(),
+                        sections: #crate_path::__declare_section! { #( #section_map_entries )* },
+                        leaf_sections: &[ #( #leaf_section_ids ),* ],
+                    };
+                }
+
+                #[allow(non_camel_case_types)]
+                struct __tests(());
+
+                impl #crate_path::_internal::TestSet for __tests {
+                    fn register(&self, __registry: &mut dyn #crate_path::_internal::Registry) -> #crate_path::_internal::Result<(), #crate_path::_internal::RegistryError> {
+                        __registry.add_test(#crate_path::_internal::Test {
+                            desc: &*__DESC,
+                            test_fn: #crate_path::__test_fn!([#test_fn_kind] #ident),
+                        })?;
+                        #crate_path::_internal::Result::Ok(())
+                    }
+                }
+
+                #crate_path::__annotate_test_case! {
+                    pub(crate) static __TESTS: &dyn #crate_path::_internal::TestSet = &__tests(());
+                }
             }
         }]);
     }
