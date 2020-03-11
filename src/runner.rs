@@ -443,49 +443,8 @@ pub struct AccessError {
 mod tests {
     use super::*;
     use crate::test::{imp::TestFn, Registry, RegistryError, Test, TestSet};
-    use futures::task::{self, Poll};
-    use scoped_tls::{scoped_thread_local, ScopedKey};
-    use std::{cell::RefCell, pin::Pin};
-
-    trait ScopedKeyExt<T> {
-        fn set_async<'a, Fut>(&'static self, t: &'a T, fut: Fut) -> SetAsync<'a, T, Fut>
-        where
-            T: 'static,
-            Fut: Future;
-    }
-
-    impl<T> ScopedKeyExt<T> for ScopedKey<T> {
-        fn set_async<'a, Fut>(&'static self, t: &'a T, fut: Fut) -> SetAsync<'a, T, Fut>
-        where
-            T: 'static,
-            Fut: Future,
-        {
-            SetAsync { key: self, t, fut }
-        }
-    }
-
-    #[pin_project::pin_project]
-    struct SetAsync<'a, T: 'static, Fut> {
-        key: &'static ScopedKey<T>,
-        t: &'a T,
-        #[pin]
-        fut: Fut,
-    }
-
-    impl<T, Fut> Future for SetAsync<'_, T, Fut>
-    where
-        Fut: Future,
-    {
-        type Output = Fut::Output;
-
-        fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-            let me = self.project();
-            let key = me.key;
-            let t = *me.t;
-            let fut = me.fut;
-            key.set(t, || fut.poll(cx))
-        }
-    }
+    use scoped_tls_async::{scoped_thread_local, ScopedKeyExt as _};
+    use std::cell::RefCell;
 
     type HistoryLog = (&'static str, Option<&'static str>);
 

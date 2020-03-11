@@ -29,7 +29,7 @@ thiserror = "1"
 anyhow = "1"
 futures = { version = "0.3", features = [ "thread-pool" ] }
 futures-test = "0.3"
-scoped-tls = "1"
+scoped-tls-async = { git = "https://github.com/ubnt-intrepid/scoped-tls-async.git" }
 trybuild = "1"
 
 [dev-dependencies.cargo-husky]
