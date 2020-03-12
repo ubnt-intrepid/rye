@@ -90,7 +90,6 @@ pub(crate) trait TestRunnerExt: TestRunner {
         let inner = TestInner {
             desc: test.desc,
             reporter: Box::new(reporter),
-            error_message: None,
         };
         match test.test_fn {
             TestFn::Blocking { f } => self.spawn_blocking(BlockingTest {
@@ -186,10 +185,32 @@ impl LocalAsyncTest {
     }
 }
 
+fn target_sections(desc: &TestDesc) -> impl Iterator<Item = Option<SectionId>> + '_ {
+    enum TargetSections<'a> {
+        Root { terminated: bool },
+        Leaves(std::slice::Iter<'a, SectionId>),
+    }
+    let mut target_sections = if desc.leaf_sections.is_empty() {
+        TargetSections::Root { terminated: false }
+    } else {
+        TargetSections::Leaves(desc.leaf_sections.iter())
+    };
+    std::iter::from_fn(move || match target_sections {
+        TargetSections::Root { ref mut terminated } => {
+            if !*terminated {
+                *terminated = true;
+                Some(None)
+            } else {
+                None
+            }
+        }
+        TargetSections::Leaves(ref mut iter) => iter.next().map(|&section| Some(section)),
+    })
+}
+
 struct TestInner {
     desc: &'static TestDesc,
     reporter: Box<dyn Reporter + Send + 'static>,
-    error_message: Option<String>,
 }
 
 impl TestInner {
@@ -198,71 +219,50 @@ impl TestInner {
         F: Fn(TestFuture) -> Fut,
         Fut: Future<Output = Box<dyn Fallible>>,
     {
-        self.start();
+        self.start_test_case();
 
-        if self.desc.leaf_sections.is_empty() {
-            self.run_section_async(None, f, &conv).await;
-        } else {
-            for &section in self.desc.leaf_sections {
-                self.run_section_async(Some(section), f, &conv).await;
-            }
+        let mut error_message = None;
+        for section in target_sections(self.desc) {
+            self.context(section, &mut error_message)
+                .run_section_async(f, &conv)
+                .await;
         }
 
-        self.end()
+        self.end_test_case(error_message)
     }
 
     fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) -> TestCaseSummary {
-        self.start();
+        self.start_test_case();
 
-        if self.desc.leaf_sections.is_empty() {
-            self.run_section_blocking(None, f);
-        } else {
-            for &section in self.desc.leaf_sections {
-                self.run_section_blocking(Some(section), f);
-            }
+        let mut error_message = None;
+        for section in target_sections(self.desc) {
+            self.context(section, &mut error_message)
+                .run_section_blocking(f);
         }
 
-        self.end()
+        self.end_test_case(error_message)
     }
 
-    async fn run_section_async<F, Fut>(
-        &mut self,
-        section: Option<SectionId>,
-        f: fn() -> TestFuture,
-        conv: F,
-    ) where
-        F: FnOnce(TestFuture) -> Fut,
-        Fut: Future<Output = Box<dyn Fallible>>,
-    {
-        let fut = conv(f());
-        let result = AssertUnwindSafe(self.context(section).scope_async(fut))
-            .maybe_unwind()
-            .await;
-        self.collect_result(result);
-    }
-
-    fn run_section_blocking(&mut self, section: Option<SectionId>, f: fn() -> Box<dyn Fallible>) {
-        let mut ctx = self.context(section);
-        let result = maybe_unwind(AssertUnwindSafe(|| ctx.scope(f)));
-        self.collect_result(result);
-    }
-
-    fn context(&mut self, target_section: Option<SectionId>) -> Context<'_> {
+    fn context<'a>(
+        &'a mut self,
+        target_section: Option<SectionId>,
+        error_message: &'a mut Option<String>,
+    ) -> Context<'a> {
         Context {
             desc: &self.desc,
             target_section,
             current_section: None,
-            event_handler: &mut self.reporter,
+            reporter: &mut self.reporter,
+            error_message,
             _marker: PhantomData,
         }
     }
 
-    fn start(&mut self) {
+    fn start_test_case(&mut self) {
         self.reporter.test_case_starting(self.desc);
     }
 
-    fn end(&mut self) -> TestCaseSummary {
-        let error_message = self.error_message.take();
+    fn end_test_case(&mut self, error_message: Option<String>) -> TestCaseSummary {
         let summary = TestCaseSummary {
             desc: self.desc,
             result: if error_message.is_none() {
@@ -275,20 +275,6 @@ impl TestInner {
         self.reporter.test_case_ended(&summary);
         summary
     }
-
-    fn collect_result(&mut self, result: Result<Box<dyn Fallible>, Unwind>) {
-        match result {
-            Ok(result) => {
-                if let Some(msg) = result.error_message() {
-                    *self.error_message.get_or_insert_with(Default::default) +=
-                        &format!("{:?}", msg);
-                }
-            }
-            Err(unwind) => {
-                *self.error_message.get_or_insert_with(Default::default) += &unwind.to_string();
-            }
-        }
-    }
 }
 
 /// Context values while running the test case.
@@ -297,7 +283,8 @@ pub struct Context<'a> {
     target_section: Option<SectionId>,
     current_section: Option<SectionId>,
     #[allow(dead_code)]
-    event_handler: &'a mut (dyn Reporter + Send),
+    reporter: &'a mut (dyn Reporter + Send),
+    error_message: &'a mut Option<String>,
     _marker: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
@@ -410,6 +397,35 @@ impl<'a> Context<'a> {
     fn leave_section(&mut self, enter: EnterSection) {
         self.current_section = enter.last_section;
     }
+
+    async fn run_section_async<F, Fut>(&mut self, f: fn() -> TestFuture, conv: F)
+    where
+        F: FnOnce(TestFuture) -> Fut,
+        Fut: Future<Output = Box<dyn Fallible>>,
+    {
+        let fut = conv(f());
+        let result = AssertUnwindSafe(self.scope_async(fut)).maybe_unwind().await;
+        self.end_section(result);
+    }
+
+    fn run_section_blocking(&mut self, f: fn() -> Box<dyn Fallible>) {
+        let result = maybe_unwind(AssertUnwindSafe(|| self.scope(f)));
+        self.end_section(result);
+    }
+
+    fn end_section(&mut self, result: Result<Box<dyn Fallible>, Unwind>) {
+        match result {
+            Ok(result) => {
+                if let Some(msg) = result.error_message() {
+                    *self.error_message.get_or_insert_with(Default::default) +=
+                        &format!("{:?}", msg);
+                }
+            }
+            Err(unwind) => {
+                *self.error_message.get_or_insert_with(Default::default) += &unwind.to_string();
+            }
+        }
+    }
 }
 
 #[doc(hidden)]
@@ -484,7 +500,6 @@ mod tests {
         let mut state = TestInner {
             desc: test.desc,
             reporter: Box::new(NullReporter),
-            error_message: None,
         };
 
         let _ = match test.test_fn {
