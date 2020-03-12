@@ -14,7 +14,13 @@ use futures::{
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use pin_project::pin_project;
 use std::{
-    cell::Cell, marker::PhantomData, mem, panic::AssertUnwindSafe, pin::Pin, ptr::NonNull, rc::Rc,
+    cell::Cell,
+    marker::PhantomData,
+    mem,
+    panic::{AssertUnwindSafe, PanicInfo},
+    pin::Pin,
+    ptr::NonNull,
+    rc::Rc,
 };
 
 /// The runner of test cases.
@@ -425,6 +431,10 @@ impl<'a> Context<'a> {
                 *self.error_message.get_or_insert_with(Default::default) += &unwind.to_string();
             }
         }
+    }
+
+    pub(crate) fn capture_panic_info(&mut self, info: &PanicInfo) {
+        maybe_unwind::capture_panic_info(info);
     }
 }
 
