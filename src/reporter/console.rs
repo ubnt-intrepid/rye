@@ -1,4 +1,4 @@
-use super::{Reporter, Summary, TestCaseSummary, TestResult};
+use super::{Reporter, ResultDisposition, Summary, TestCaseSummary};
 use crate::{
     cli::args::{Args, ColorConfig},
     test::{Test, TestDesc},
@@ -27,8 +27,8 @@ impl Inner {
 
     fn print_test_case_summary(&self, summary: &TestCaseSummary) -> io::Result<()> {
         let status = match summary.result {
-            TestResult::Passed => self.styled("ok").green(),
-            TestResult::Failed => self.styled("FAILED").red(),
+            ResultDisposition::Passed => self.styled("ok").green(),
+            ResultDisposition::Failed => self.styled("FAILED").red(),
         };
         writeln!(
             &self.term,

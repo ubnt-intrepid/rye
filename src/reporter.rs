@@ -5,10 +5,11 @@ mod log;
 
 pub use self::{console::ConsoleReporter, log::LogReporter};
 
-use crate::test::{Test, TestDesc};
+use crate::test::{Fallible, Test, TestDesc};
+use maybe_unwind::Unwind;
 
 #[derive(Debug)]
-pub(crate) enum TestResult {
+enum ResultDisposition {
     Passed,
     Failed,
 }
@@ -16,16 +17,40 @@ pub(crate) enum TestResult {
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub struct TestCaseSummary {
-    pub(crate) desc: &'static TestDesc,
-    pub(crate) result: TestResult,
-    pub(crate) error_message: Option<String>,
+    desc: &'static TestDesc,
+    result: ResultDisposition,
+    error_message: Option<String>,
 }
 
 impl TestCaseSummary {
+    pub(crate) fn new(desc: &'static TestDesc) -> Self {
+        Self {
+            desc,
+            result: ResultDisposition::Passed,
+            error_message: None,
+        }
+    }
+
     pub(crate) fn is_passed(&self) -> bool {
         match self.result {
-            TestResult::Passed => true,
+            ResultDisposition::Passed => true,
             _ => false,
+        }
+    }
+
+    pub(crate) fn check_result(&mut self, result: Result<Box<dyn Fallible>, Unwind>) {
+        match result {
+            Ok(result) => {
+                if let Some(msg) = result.error_message() {
+                    self.result = ResultDisposition::Failed;
+                    *self.error_message.get_or_insert_with(Default::default) +=
+                        &format!("{:?}", msg);
+                }
+            }
+            Err(unwind) => {
+                self.result = ResultDisposition::Failed;
+                *self.error_message.get_or_insert_with(Default::default) += &unwind.to_string();
+            }
         }
     }
 }
@@ -47,10 +72,10 @@ impl Summary {
     #[allow(missing_docs)]
     pub fn append(&mut self, result: TestCaseSummary) {
         match result.result {
-            TestResult::Passed => {
+            ResultDisposition::Passed => {
                 self.passed.push(result);
             }
-            TestResult::Failed => {
+            ResultDisposition::Failed => {
                 self.failed.push(result);
             }
         }

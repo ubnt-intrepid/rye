@@ -62,6 +62,30 @@ impl TestDesc {
             .nth(1)
             .unwrap_or("<unknown>")
     }
+
+    /// Return the iterator over the section ids to be enabled.
+    pub(crate) fn target_sections(&self) -> impl Iterator<Item = Option<SectionId>> + '_ {
+        enum TargetSections<'a> {
+            Root { terminated: bool },
+            Leaves(std::slice::Iter<'a, SectionId>),
+        }
+        let mut target_sections = if self.leaf_sections.is_empty() {
+            TargetSections::Root { terminated: false }
+        } else {
+            TargetSections::Leaves(self.leaf_sections.iter())
+        };
+        std::iter::from_fn(move || match target_sections {
+            TargetSections::Root { ref mut terminated } => {
+                if !*terminated {
+                    *terminated = true;
+                    Some(None)
+                } else {
+                    None
+                }
+            }
+            TargetSections::Leaves(ref mut iter) => iter.next().map(|&section| Some(section)),
+        })
+    }
 }
 
 /// The result values returned from test functions.
