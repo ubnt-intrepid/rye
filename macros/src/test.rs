@@ -6,7 +6,7 @@ use syn::{
     parse::{Error, Parse, ParseStream, Result},
     visit_mut::{self, VisitMut},
     Attribute, Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Ident, Item,
-    ItemFn, Macro, MetaNameValue, Stmt, Token,
+    ItemFn, Macro, Meta, Stmt, Token,
 };
 
 macro_rules! try_quote {
@@ -103,11 +103,13 @@ impl Parse for Args {
 
 struct Params {
     crate_path: syn::Path,
+    todo: bool,
 }
 
 impl Params {
     fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut crate_path = None;
+        let mut todo = false;
         let mut errors: Option<Error> = None;
 
         attrs.retain(|attr| {
@@ -116,20 +118,31 @@ impl Params {
             }
 
             if let Err(error) = (|| -> Result<()> {
-                let param: MetaNameValue = attr.parse_args()?;
-                if param.path.is_ident("crate") {
-                    match param.lit {
-                        syn::Lit::Str(ref lit) if crate_path.is_none() => {
-                            crate_path.replace(lit.parse()?);
+                let param: Meta = attr.parse_args()?;
+                match param {
+                    Meta::Path(path) => match path.get_ident() {
+                        Some(id) if id == "todo" => {
+                            todo = true;
                             Ok(())
                         }
-                        syn::Lit::Str(..) => {
-                            Err(Error::new_spanned(&param, "duplicated parameter"))
-                        }
-                        lit => Err(Error::new_spanned(&lit, "required a string literal")),
+                        _ => Err(Error::new_spanned(&path, "unknown parameter name")),
+                    },
+                    Meta::List(list) => {
+                        Err(Error::new_spanned(&list, "unsupported parameter type"))
                     }
-                } else {
-                    Err(Error::new_spanned(&param.path, "unknown parameter name"))
+                    Meta::NameValue(param) => match param.path.get_ident() {
+                        Some(id) if id == "crate" => match param.lit {
+                            syn::Lit::Str(ref lit) if crate_path.is_none() => {
+                                crate_path.replace(lit.parse()?);
+                                Ok(())
+                            }
+                            syn::Lit::Str(..) => {
+                                Err(Error::new_spanned(&param, "duplicated parameter"))
+                            }
+                            lit => Err(Error::new_spanned(&lit, "required a string literal")),
+                        },
+                        _ => Err(Error::new_spanned(&param.path, "unknown parameter name")),
+                    },
                 }
             })() {
                 if let Some(ref mut errors) = errors {
@@ -148,6 +161,7 @@ impl Params {
 
         Ok(Self {
             crate_path: crate_path.unwrap_or_else(|| syn::parse_quote!(::rye)),
+            todo,
         })
     }
 }
@@ -371,6 +385,7 @@ impl ToTokens for Generated<'_> {
 
         let ident = &self.item.sig.ident;
         let crate_path = &self.params.crate_path;
+        let todo = &self.params.todo;
 
         let test_fn_kind = match self.item.sig.asyncness {
             Some(..) if self.args.local => Ident::new("async_local", Span::call_site()),
@@ -385,6 +400,7 @@ impl ToTokens for Generated<'_> {
                 #crate_path::_internal::lazy_static! {
                     static ref __DESC: #crate_path::_internal::TestDesc = #crate_path::_internal::TestDesc {
                         module_path: #crate_path::_internal::module_path!(),
+                        todo: #todo,
                         sections: #crate_path::__declare_section! { #( #section_map_entries )* },
                         leaf_sections: &[ #( #leaf_section_ids ),* ],
                     };

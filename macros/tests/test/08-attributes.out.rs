@@ -11,6 +11,7 @@ pub(crate) mod attributes {
     path::to::rye::_internal::lazy_static! {
         static ref __DESC: path::to::rye::_internal::TestDesc = path::to::rye::_internal::TestDesc {
             module_path: path::to::rye::_internal::module_path!(),
+            todo: true,
             sections: path::to::rye::__declare_section! {},
             leaf_sections: &[],
         };

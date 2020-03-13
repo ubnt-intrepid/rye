@@ -32,6 +32,7 @@ pub(crate) mod multi_section_in_scope {
     ::rye::_internal::lazy_static! {
         static ref __DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
             module_path: ::rye::_internal::module_path!(),
+            todo: false,
             sections: ::rye::__declare_section! {
                 0u64 => ("section1"     , {});
                 1u64 => ("section2"     , {});

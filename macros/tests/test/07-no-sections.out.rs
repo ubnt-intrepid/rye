@@ -10,6 +10,7 @@ pub(crate) mod no_sections {
     ::rye::_internal::lazy_static! {
         static ref __DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
             module_path: ::rye::_internal::module_path!(),
+            todo: false,
             sections: ::rye::__declare_section! {},
             leaf_sections: &[],
         };

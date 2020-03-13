@@ -28,6 +28,7 @@ impl Inner {
     fn print_test_case_summary(&self, summary: &TestCaseSummary) -> io::Result<()> {
         let status = match summary.result {
             ResultDisposition::Passed => self.styled("ok").green(),
+            ResultDisposition::Failed if summary.desc.todo => self.styled("FAILED (todo)").yellow(),
             ResultDisposition::Failed => self.styled("FAILED").red(),
         };
         writeln!(
@@ -41,10 +42,13 @@ impl Inner {
     }
 
     fn print_summary(&mut self, summary: &Summary) -> io::Result<()> {
-        let mut status = self.styled("ok").green();
+        let status = if summary.is_passed() {
+            self.styled("ok").green()
+        } else {
+            self.styled("FAILED").red()
+        };
 
         if !summary.failed.is_empty() {
-            status = self.styled("FAILED").red();
             writeln!(&self.term)?;
             writeln!(&self.term, "failures:")?;
             for result in &summary.failed {
@@ -67,10 +71,11 @@ impl Inner {
         writeln!(&self.term)?;
         writeln!(
             &self.term,
-            "test result: {status}. {passed} passed; {failed} failed; {filtered_out} filtered out",
+            "test result: {status}. {passed} passed; {failed} failed ({todo} todo); {filtered_out} filtered out",
             status = status,
             passed = summary.passed.len(),
             failed = summary.failed.len(),
+            todo = summary.failed.iter().filter(|s| s.desc.todo).count(),
             filtered_out = summary.filtered_out.len(),
         )?;
 

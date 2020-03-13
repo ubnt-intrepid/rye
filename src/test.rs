@@ -45,6 +45,8 @@ pub struct TestDesc {
     #[doc(hidden)]
     pub module_path: &'static str,
     #[doc(hidden)]
+    pub todo: bool,
+    #[doc(hidden)]
     pub sections: HashMap<SectionId, Section>,
     #[doc(hidden)]
     pub leaf_sections: &'static [SectionId],

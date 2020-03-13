@@ -7,6 +7,7 @@ rye::test_harness! {
         case_async,
         sub,
         return_result,
+        incomplete_test,
     )]
 }
 
@@ -153,4 +154,10 @@ fn return_result() -> anyhow::Result<()> {
     });
 
     Ok(())
+}
+
+#[rye::test]
+#[rye(todo)]
+fn incomplete_test() {
+    todo!()
 }

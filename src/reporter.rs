@@ -34,7 +34,7 @@ impl TestCaseSummary {
     pub(crate) fn is_passed(&self) -> bool {
         match self.result {
             ResultDisposition::Passed => true,
-            _ => false,
+            ResultDisposition::Failed => false,
         }
     }
 
@@ -66,18 +66,15 @@ pub struct Summary {
 impl Summary {
     #[allow(missing_docs)]
     pub fn is_passed(&self) -> bool {
-        self.failed.is_empty()
+        self.failed.is_empty() || self.failed.iter().all(|summary| summary.desc.todo)
     }
 
     #[allow(missing_docs)]
     pub fn append(&mut self, result: TestCaseSummary) {
-        match result.result {
-            ResultDisposition::Passed => {
-                self.passed.push(result);
-            }
-            ResultDisposition::Failed => {
-                self.failed.push(result);
-            }
+        if result.is_passed() {
+            self.passed.push(result);
+        } else {
+            self.failed.push(result);
         }
     }
 }

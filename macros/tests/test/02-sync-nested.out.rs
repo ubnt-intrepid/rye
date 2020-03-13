@@ -22,6 +22,7 @@ pub(crate) mod case_sync_nested {
     ::rye::_internal::lazy_static! {
         static ref __DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
             module_path: ::rye::_internal::module_path!(),
+            todo: false,
             sections: ::rye::__declare_section! {
                 0u64 => ("resizing bigger changes size and capacity", {});
                 1u64 => ("shrinking smaller does not changes capacity", { 0u64 });
