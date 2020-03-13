@@ -7,6 +7,7 @@ pub use self::{console::ConsoleReporter, log::LogReporter};
 
 use crate::test::{Fallible, Test, TestDesc};
 use maybe_unwind::Unwind;
+use std::error;
 
 #[derive(Debug)]
 enum ResultDisposition {
@@ -14,12 +15,21 @@ enum ResultDisposition {
     Failed,
 }
 
+#[derive(Debug)]
+struct Fail(FailKind);
+
+#[derive(Debug)]
+enum FailKind {
+    Unwind(Unwind),
+    Error(Box<dyn error::Error + Send + Sync + 'static>),
+}
+
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub struct TestCaseSummary {
     desc: &'static TestDesc,
     result: ResultDisposition,
-    error_message: Option<String>,
+    fails: Vec<Fail>,
 }
 
 impl TestCaseSummary {
@@ -27,7 +37,7 @@ impl TestCaseSummary {
         Self {
             desc,
             result: ResultDisposition::Passed,
-            error_message: None,
+            fails: vec![],
         }
     }
 
@@ -41,15 +51,14 @@ impl TestCaseSummary {
     pub(crate) fn check_result(&mut self, result: Result<Box<dyn Fallible>, Unwind>) {
         match result {
             Ok(result) => {
-                if let Some(msg) = result.error_message() {
+                if let Err(err) = result.into_result() {
                     self.result = ResultDisposition::Failed;
-                    *self.error_message.get_or_insert_with(Default::default) +=
-                        &format!("{:?}", msg);
+                    self.fails.push(Fail(FailKind::Error(err)));
                 }
             }
             Err(unwind) => {
                 self.result = ResultDisposition::Failed;
-                *self.error_message.get_or_insert_with(Default::default) += &unwind.to_string();
+                self.fails.push(Fail(FailKind::Unwind(unwind)));
             }
         }
     }

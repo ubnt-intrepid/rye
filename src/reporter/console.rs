@@ -1,4 +1,4 @@
-use super::{Reporter, ResultDisposition, Summary, TestCaseSummary};
+use super::{FailKind, Reporter, ResultDisposition, Summary, TestCaseSummary};
 use crate::{
     cli::args::{Args, ColorConfig},
     test::{Test, TestDesc},
@@ -53,10 +53,13 @@ impl Inner {
             writeln!(&self.term, "failures:")?;
             for result in &summary.failed {
                 writeln!(&self.term, "---- {} ----", result.desc.name())?;
-                if let Some(ref msg) = result.error_message {
-                    write!(&self.term, "{}", msg)?;
-                    if msg.chars().last().map_or(true, |c| c != '\n') {
+                for (i, fail) in result.fails.iter().enumerate() {
+                    if i > 0 {
                         writeln!(&self.term)?;
+                    }
+                    match fail.0 {
+                        FailKind::Unwind(ref unwind) => writeln!(&self.term, "{}", unwind)?,
+                        FailKind::Error(ref err) => writeln!(&self.term, "{}", &**err)?,
                     }
                 }
             }

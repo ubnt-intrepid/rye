@@ -232,7 +232,7 @@ pub mod _internal {
     };
 
     #[inline]
-    pub fn test_result<T: Fallible>(res: T) -> Box<dyn Fallible> {
+    pub fn test_result<T: Fallible + 'static>(res: T) -> Box<dyn Fallible + 'static> {
         Box::new(res)
     }
 

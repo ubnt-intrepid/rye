@@ -1,7 +1,7 @@
 //! Registration of test cases.
 
 use self::imp::{Section, SectionId, TestFn};
-use std::{collections::HashMap, error, fmt};
+use std::{collections::HashMap, error};
 
 /// Description about a single test case.
 #[derive(Debug)]
@@ -91,11 +91,11 @@ impl TestDesc {
 }
 
 /// The result values returned from test functions.
-pub trait Fallible: imp::FallibleImp + 'static {}
+pub trait Fallible: imp::FallibleImp {}
 
 impl Fallible for () {}
 
-impl<E> Fallible for Result<(), E> where E: fmt::Debug + 'static {}
+impl<E> Fallible for Result<(), E> where E: Into<Box<dyn error::Error + Send + Sync + 'static>> {}
 
 /// A collection of one or more test cases.
 pub trait TestSet: Send + Sync {
@@ -183,36 +183,33 @@ pub(crate) mod imp {
         task::{self, FutureObj, Poll},
     };
     use pin_project::pin_project;
-    use std::{collections::HashSet, fmt, pin::Pin};
+    use std::{collections::HashSet, error, pin::Pin};
 
     pub trait FallibleImp {
-        fn is_success(&self) -> bool;
-
-        fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)>;
+        fn is_ok(&self) -> bool;
+        fn into_result(self: Box<Self>) -> Result<(), Box<dyn error::Error + Send + Sync>>;
     }
 
     impl FallibleImp for () {
-        fn is_success(&self) -> bool {
+        fn is_ok(&self) -> bool {
             true
         }
 
-        fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)> {
-            None
+        fn into_result(self: Box<Self>) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+            Ok(())
         }
     }
 
     impl<E> FallibleImp for Result<(), E>
     where
-        E: fmt::Debug + 'static,
+        E: Into<Box<dyn error::Error + Send + Sync + 'static>>,
     {
-        fn is_success(&self) -> bool {
+        fn is_ok(&self) -> bool {
             self.is_ok()
         }
 
-        fn error_message(&self) -> Option<&(dyn fmt::Debug + 'static)> {
-            self.as_ref()
-                .err()
-                .map(|e| e as &(dyn fmt::Debug + 'static))
+        fn into_result(self: Box<Self>) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+            (*self).map_err(|e| e.into())
         }
     }
 
