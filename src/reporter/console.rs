@@ -1,4 +1,4 @@
-use super::{FailKind, Reporter, ResultDisposition, Summary, TestCaseSummary};
+use super::{Failure, Reporter, Status, Summary, TestCaseSummary};
 use crate::{
     cli::args::{Args, ColorConfig},
     test::{Test, TestDesc},
@@ -26,10 +26,10 @@ impl Inner {
     }
 
     fn print_test_case_summary(&self, summary: &TestCaseSummary) -> io::Result<()> {
-        let status = match summary.result {
-            ResultDisposition::Passed => self.styled("ok").green(),
-            ResultDisposition::Failed if summary.desc.todo => self.styled("FAILED (todo)").yellow(),
-            ResultDisposition::Failed => self.styled("FAILED").red(),
+        let status = match summary.status() {
+            Status::Passed => self.styled("ok").green(),
+            Status::Failed if summary.desc.todo => self.styled("FAILED (todo)").yellow(),
+            Status::Failed => self.styled("FAILED").red(),
         };
         writeln!(
             &self.term,
@@ -53,15 +53,13 @@ impl Inner {
             writeln!(&self.term, "failures:")?;
             for result in &summary.failed {
                 writeln!(&self.term, "---- {} ----", result.desc.name())?;
-                for (i, fail) in result.fails.iter().enumerate() {
-                    if i > 0 {
-                        writeln!(&self.term)?;
-                    }
-                    match fail.0 {
-                        FailKind::Unwind(ref unwind) => writeln!(&self.term, "{}", unwind)?,
-                        FailKind::Error(ref err) => writeln!(&self.term, "{}", &**err)?,
+                for failure in &result.failures {
+                    match failure {
+                        Failure::Unwind(ref unwind) => writeln!(&self.term, "{}", unwind)?,
+                        Failure::Error(ref err) => writeln!(&self.term, "{}", &**err)?,
                     }
                 }
+                writeln!(&self.term)?;
             }
 
             writeln!(&self.term)?;

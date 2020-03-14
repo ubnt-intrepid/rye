@@ -9,17 +9,14 @@ use crate::test::{Fallible, Test, TestDesc};
 use maybe_unwind::Unwind;
 use std::error;
 
-#[derive(Debug)]
-enum ResultDisposition {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum Status {
     Passed,
     Failed,
 }
 
 #[derive(Debug)]
-struct Fail(FailKind);
-
-#[derive(Debug)]
-enum FailKind {
+enum Failure {
     Unwind(Unwind),
     Error(Box<dyn error::Error + Send + Sync + 'static>),
 }
@@ -28,23 +25,27 @@ enum FailKind {
 #[derive(Debug)]
 pub struct TestCaseSummary {
     desc: &'static TestDesc,
-    result: ResultDisposition,
-    fails: Vec<Fail>,
+    status: Status,
+    failures: Vec<Failure>,
 }
 
 impl TestCaseSummary {
     pub(crate) fn new(desc: &'static TestDesc) -> Self {
         Self {
             desc,
-            result: ResultDisposition::Passed,
-            fails: vec![],
+            status: Status::Passed,
+            failures: vec![],
         }
     }
 
-    pub(crate) fn is_passed(&self) -> bool {
-        match self.result {
-            ResultDisposition::Passed => true,
-            ResultDisposition::Failed => false,
+    pub(crate) fn status(&self) -> Status {
+        self.status
+    }
+
+    pub(crate) fn should_terminate(&self) -> bool {
+        match self.status() {
+            Status::Passed => false,
+            Status::Failed => !self.desc.todo,
         }
     }
 
@@ -52,13 +53,13 @@ impl TestCaseSummary {
         match result {
             Ok(result) => {
                 if let Err(err) = result.into_result() {
-                    self.result = ResultDisposition::Failed;
-                    self.fails.push(Fail(FailKind::Error(err)));
+                    self.status = Status::Failed;
+                    self.failures.push(Failure::Error(err));
                 }
             }
             Err(unwind) => {
-                self.result = ResultDisposition::Failed;
-                self.fails.push(Fail(FailKind::Unwind(unwind)));
+                self.status = Status::Failed;
+                self.failures.push(Failure::Unwind(unwind));
             }
         }
     }
@@ -80,10 +81,9 @@ impl Summary {
 
     #[allow(missing_docs)]
     pub fn append(&mut self, result: TestCaseSummary) {
-        if result.is_passed() {
-            self.passed.push(result);
-        } else {
-            self.failed.push(result);
+        match result.status() {
+            Status::Passed => self.passed.push(result),
+            Status::Failed => self.failed.push(result),
         }
     }
 }

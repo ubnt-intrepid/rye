@@ -209,6 +209,9 @@ impl TestInner {
             self.context(section, &mut summary)
                 .run_async(f, &conv)
                 .await;
+            if summary.should_terminate() {
+                break;
+            }
         }
 
         self.end_test_case(&summary);
@@ -221,6 +224,9 @@ impl TestInner {
         let mut summary = TestCaseSummary::new(self.desc);
         for section in self.desc.target_sections() {
             self.context(section, &mut summary).run_blocking(f);
+            if summary.should_terminate() {
+                break;
+            }
         }
 
         self.end_test_case(&summary);
