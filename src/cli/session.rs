@@ -58,7 +58,7 @@ impl<'sess> Session<'sess> {
         &mut self,
         tests: &[&dyn TestSet],
         runner: &mut T,
-        reporter: &mut R,
+        reporter: &R,
     ) -> ExitStatus
     where
         T: TestRunner,

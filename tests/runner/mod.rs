@@ -19,8 +19,8 @@ pub(crate) fn run_tests(tests: &[&dyn TestSet]) {
     let mut session = Session::new(&args);
 
     let mut runner = FuturesTestRunner::new().unwrap();
-    let mut reporter = ConsoleReporter::new(&args);
-    let st = session.run(tests, &mut runner, &mut reporter);
+    let reporter = ConsoleReporter::new(&args);
+    let st = session.run(tests, &mut runner, &reporter);
 
     st.exit();
 }
