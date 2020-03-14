@@ -1,39 +1,44 @@
 fn multi_section_in_scope() {
-    ::rye::__enter_section!(0u64, {
+    #[allow(unused_imports)]
+    use ::rye::_internal as __rye;
+
+    __rye::enter_section!(0u64, {
         assert!(1 + 1 == 2);
     });
 
-    ::rye::__enter_section!(1u64, {
+    __rye::enter_section!(1u64, {
         assert!(1 + 1 == 2);
 
-        ::rye::__enter_section!(2u64, {
+        __rye::enter_section!(2u64, {
             assert!(true);
 
-            ::rye::__enter_section!(3u64, {
+            __rye::enter_section!(3u64, {
                 assert!(true);
             });
         });
 
-        ::rye::__enter_section!(4u64, {
+        __rye::enter_section!(4u64, {
             assert!(true);
         });
 
         assert!(1 + 2 == 3);
     });
 
-    ::rye::__enter_section!(5u64, {
+    __rye::enter_section!(5u64, {
         assert!(false);
     });
 }
 
 pub(crate) mod multi_section_in_scope {
     use super::*;
+    #[allow(unused_imports)]
+    use ::rye::_internal as __rye;
 
-    ::rye::_internal::lazy_static! {
-        static ref __DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
-            module_path: ::rye::_internal::module_path!(),
+    __rye::lazy_static! {
+        static ref __DESC: __rye::TestDesc = __rye::TestDesc {
+            module_path: __rye::module_path!(),
             todo: false,
-            sections: ::rye::__declare_section! {
+            sections: __rye::declare_section! {
                 0u64 => ("section1"     , {});
                 1u64 => ("section2"     , {});
                 2u64 => ("section2-1"   , { 1u64 });
@@ -48,17 +53,17 @@ pub(crate) mod multi_section_in_scope {
     #[allow(non_camel_case_types)]
     struct __tests(());
 
-    impl ::rye::_internal::TestSet for __tests {
-        fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
-            __registry.add_test(::rye::_internal::Test {
+    impl __rye::TestSet for __tests {
+        fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
+            __registry.add_test(__rye::Test {
                 desc: &*__DESC,
-                test_fn: ::rye::__test_fn!([blocking] multi_section_in_scope),
+                test_fn: __rye::test_fn!([blocking] multi_section_in_scope),
             })?;
-            ::rye::_internal::Result::Ok(())
+            __rye::Result::Ok(())
         }
     }
 
-    ::rye::__annotate_test_case! {
-        pub(crate) static __TESTS: &dyn ::rye::_internal::TestSet = &__tests(());
+    __rye::annotate_test_case! {
+        pub(crate) static __TESTS: &dyn __rye::TestSet = &__tests(());
     }
 }

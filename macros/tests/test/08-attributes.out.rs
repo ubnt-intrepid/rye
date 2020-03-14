@@ -1,5 +1,8 @@
 #[allow(missing_docs)]
 fn attributes() {
+    #[allow(unused_imports)]
+    use path::to::rye::_internal as __rye;
+
     let mut vec = vec![0usize; 5];
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
@@ -7,12 +10,14 @@ fn attributes() {
 
 pub(crate) mod attributes {
     use super::*;
+    #[allow(unused_imports)]
+    use path::to::rye::_internal as __rye;
 
-    path::to::rye::_internal::lazy_static! {
-        static ref __DESC: path::to::rye::_internal::TestDesc = path::to::rye::_internal::TestDesc {
-            module_path: path::to::rye::_internal::module_path!(),
+    __rye::lazy_static! {
+        static ref __DESC: __rye::TestDesc = __rye::TestDesc {
+            module_path: __rye::module_path!(),
             todo: true,
-            sections: path::to::rye::__declare_section! {},
+            sections: __rye::declare_section! {},
             leaf_sections: &[],
         };
     }
@@ -20,17 +25,17 @@ pub(crate) mod attributes {
     #[allow(non_camel_case_types)]
     struct __tests(());
 
-    impl path::to::rye::_internal::TestSet for __tests {
-        fn register(&self, __registry: &mut dyn path::to::rye::_internal::Registry) -> path::to::rye::_internal::Result<(), path::to::rye::_internal::RegistryError> {
-            __registry.add_test(path::to::rye::_internal::Test {
+    impl __rye::TestSet for __tests {
+        fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
+            __registry.add_test(__rye::Test {
                 desc: &*__DESC,
-                test_fn: path::to::rye::__test_fn!([blocking] attributes),
+                test_fn: __rye::test_fn!([blocking] attributes),
             })?;
-            path::to::rye::_internal::Result::Ok(())
+            __rye::Result::Ok(())
         }
     }
 
-    path::to::rye::__annotate_test_case! {
-        pub(crate) static __TESTS: &dyn path::to::rye::_internal::TestSet = &__tests(());
+    __rye::annotate_test_case! {
+        pub(crate) static __TESTS: &dyn __rye::TestSet = &__tests(());
     }
 }

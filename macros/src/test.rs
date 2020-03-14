@@ -3,7 +3,8 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
-    parse::{Error, Parse, ParseStream, Result},
+    parse::{Error, Parse, ParseStream, Parser as _, Result},
+    spanned::Spanned as _,
     visit_mut::{self, VisitMut},
     Attribute, Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Ident, Item,
     ItemFn, Macro, Meta, Stmt, Token,
@@ -47,7 +48,6 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 
     // expand section!()
     let mut expand = ExpandBlock {
-        params: &params,
         sections: IndexMap::new(),
         next_section_id: 0,
         parent: None,
@@ -57,6 +57,10 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     };
     expand.visit_block_mut(&mut *item.block);
     let sections: Vec<_> = expand.sections.into_iter().map(|(_k, v)| v).collect();
+
+    item.block
+        .stmts
+        .insert(0, Stmt::Item(params.reexport_internal_module()));
 
     let generated = Generated {
         item: &item,
@@ -104,6 +108,16 @@ impl Parse for Args {
 struct Params {
     crate_path: syn::Path,
     todo: bool,
+}
+
+impl Params {
+    fn reexport_internal_module(&self) -> syn::Item {
+        let crate_path = &self.crate_path;
+        syn::parse_quote! {
+            #[allow(unused_imports)]
+            use #crate_path::_internal as __rye;
+        }
+    }
 }
 
 impl Params {
@@ -191,8 +205,7 @@ impl Parse for SectionBody {
     }
 }
 
-struct ExpandBlock<'a> {
-    params: &'a Params,
+struct ExpandBlock {
     sections: IndexMap<SectionId, Section>,
     next_section_id: SectionId,
     parent: Option<SectionId>,
@@ -201,7 +214,7 @@ struct ExpandBlock<'a> {
     in_async_block: bool,
 }
 
-impl ExpandBlock<'_> {
+impl ExpandBlock {
     fn expand_section_macro(&mut self, mac: &Macro) -> Result<Stmt> {
         if self.in_loop {
             return Err(Error::new_spanned(
@@ -251,11 +264,8 @@ impl ExpandBlock<'_> {
             me.visit_block_mut(&mut *block);
         });
 
-        let block = &*block;
-
-        let crate_path = &self.params.crate_path;
-        Ok(syn::parse_quote! {
-            #crate_path::__enter_section!(#section_id, #block);
+        Stmt::parse.parse2(quote::quote_spanned! { mac.span() =>
+            __rye::enter_section!(#section_id, #block);
         })
     }
 
@@ -300,7 +310,7 @@ impl ExpandBlock<'_> {
     }
 }
 
-impl VisitMut for ExpandBlock<'_> {
+impl VisitMut for ExpandBlock {
     fn visit_stmt_mut(&mut self, item: &mut Stmt) {
         match item {
             Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _) => {
@@ -384,7 +394,7 @@ impl ToTokens for Generated<'_> {
         });
 
         let ident = &self.item.sig.ident;
-        let crate_path = &self.params.crate_path;
+        let rye_reexport = &self.params.reexport_internal_module();
         let todo = &self.params.todo;
 
         let test_fn_kind = match self.item.sig.asyncness {
@@ -396,12 +406,13 @@ impl ToTokens for Generated<'_> {
         tokens.append_all(vec![quote! {
             pub(crate) mod #ident {
                 use super::*;
+                #rye_reexport
 
-                #crate_path::_internal::lazy_static! {
-                    static ref __DESC: #crate_path::_internal::TestDesc = #crate_path::_internal::TestDesc {
-                        module_path: #crate_path::_internal::module_path!(),
+                __rye::lazy_static! {
+                    static ref __DESC: __rye::TestDesc = __rye::TestDesc {
+                        module_path: __rye::module_path!(),
                         todo: #todo,
-                        sections: #crate_path::__declare_section! { #( #section_map_entries )* },
+                        sections: __rye::declare_section! { #( #section_map_entries )* },
                         leaf_sections: &[ #( #leaf_section_ids ),* ],
                     };
                 }
@@ -409,18 +420,18 @@ impl ToTokens for Generated<'_> {
                 #[allow(non_camel_case_types)]
                 struct __tests(());
 
-                impl #crate_path::_internal::TestSet for __tests {
-                    fn register(&self, __registry: &mut dyn #crate_path::_internal::Registry) -> #crate_path::_internal::Result<(), #crate_path::_internal::RegistryError> {
-                        __registry.add_test(#crate_path::_internal::Test {
+                impl __rye::TestSet for __tests {
+                    fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
+                        __registry.add_test(__rye::Test {
                             desc: &*__DESC,
-                            test_fn: #crate_path::__test_fn!([#test_fn_kind] #ident),
+                            test_fn: __rye::test_fn!([#test_fn_kind] #ident),
                         })?;
-                        #crate_path::_internal::Result::Ok(())
+                        __rye::Result::Ok(())
                     }
                 }
 
-                #crate_path::__annotate_test_case! {
-                    pub(crate) static __TESTS: &dyn #crate_path::_internal::TestSet = &__tests(());
+                __rye::annotate_test_case! {
+                    pub(crate) static __TESTS: &dyn __rye::TestSet = &__tests(());
                 }
             }
         }]);
@@ -431,7 +442,6 @@ impl ToTokens for Generated<'_> {
 mod tests {
     use super::*;
     use std::path::Path;
-    use syn::parse::Parser as _;
 
     fn parse_items(input: ParseStream) -> Result<Vec<Item>> {
         let mut items = vec![];

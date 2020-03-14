@@ -1,14 +1,17 @@
 async fn case_async_nested() {
+    #[allow(unused_imports)]
+    use ::rye::_internal as __rye;
+
     let mut vec = vec![0usize; 5];
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
 
-    ::rye::__enter_section!(0u64, {
+    __rye::enter_section!(0u64, {
         vec.resize(10, 0);
         assert_eq!(vec.len(), 10);
         assert!(vec.capacity() >= 10);
 
-        ::rye::__enter_section!(1u64, {
+        __rye::enter_section!(1u64, {
             vec.resize(0, 0);
             assert_eq!(vec.len(), 0);
             assert!(vec.capacity() >= 10);
@@ -18,12 +21,14 @@ async fn case_async_nested() {
 
 pub(crate) mod case_async_nested {
     use super::*;
+    #[allow(unused_imports)]
+    use ::rye::_internal as __rye;
 
-    ::rye::_internal::lazy_static! {
-        static ref __DESC: ::rye::_internal::TestDesc = ::rye::_internal::TestDesc {
-            module_path: ::rye::_internal::module_path!(),
+    __rye::lazy_static! {
+        static ref __DESC: __rye::TestDesc = __rye::TestDesc {
+            module_path: __rye::module_path!(),
             todo: false,
-            sections: ::rye::__declare_section! {
+            sections: __rye::declare_section! {
                 0u64 => ("resizing bigger changes size and capacity", {});
                 1u64 => ("shrinking smaller does not changes capacity", { 0u64 });
             },
@@ -34,17 +39,17 @@ pub(crate) mod case_async_nested {
     #[allow(non_camel_case_types)]
     struct __tests(());
 
-    impl ::rye::_internal::TestSet for __tests {
-        fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> ::rye::_internal::Result<(), ::rye::_internal::RegistryError> {
-            __registry.add_test(::rye::_internal::Test {
+    impl __rye::TestSet for __tests {
+        fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
+            __registry.add_test(__rye::Test {
                 desc: &*__DESC,
-                test_fn: ::rye::__test_fn!([async] case_async_nested),
+                test_fn: __rye::test_fn!([async] case_async_nested),
             })?;
-            ::rye::_internal::Result::Ok(())
+            __rye::Result::Ok(())
         }
     }
 
-    ::rye::__annotate_test_case! {
-        pub(crate) static __TESTS: &dyn ::rye::_internal::TestSet = &__tests(());
+    __rye::annotate_test_case! {
+        pub(crate) static __TESTS: &dyn __rye::TestSet = &__tests(());
     }
 }

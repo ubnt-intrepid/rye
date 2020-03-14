@@ -218,9 +218,15 @@ mod global;
 
 #[doc(hidden)] // private API.
 pub mod _internal {
-    pub use crate::test::{
-        imp::{Section, TestFn, TestFuture},
-        Registry, RegistryError, Test, TestDesc, TestSet,
+    pub use crate::{
+        __annotate_test_case as annotate_test_case, //
+        __declare_section as declare_section,
+        __enter_section as enter_section,
+        __test_fn as test_fn,
+        test::{
+            imp::{Section, TestFn, TestFuture},
+            Registry, RegistryError, Test, TestDesc, TestSet,
+        },
     };
     pub use lazy_static::lazy_static;
     pub use maplit::hashset;
