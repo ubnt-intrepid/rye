@@ -67,7 +67,6 @@ impl ConsoleReporter {
     ) -> io::Result<()> {
         let status = match summary.status() {
             Status::Passed => colored("ok").fg(Color::Green),
-            Status::Failed if summary.desc.todo => colored("FAILED (todo)").fg(Color::Yellow),
             Status::Failed => colored("FAILED").fg(Color::Red),
         };
         let name_length = self.name_length.load(Ordering::SeqCst);
@@ -115,10 +114,9 @@ impl ConsoleReporter {
         write!(w, ".")?;
         writeln!(
             w,
-            " {passed} passed; {failed} failed ({todo} todo); {filtered_out} filtered out",
+            " {passed} passed; {failed} failed; {filtered_out} filtered out",
             passed = summary.passed.len(),
             failed = summary.failed.len(),
-            todo = summary.failed.iter().filter(|s| s.desc.todo).count(),
             filtered_out = summary.filtered_out.len(),
         )?;
 

@@ -28,7 +28,6 @@ pub(crate) mod case_async_nested {
         static ref __DESC: __rye::TestDesc = __rye::TestDesc {
             module_path: __rye::module_path!(),
             location: __rye::location!(),
-            todo: false,
             sections: __rye::declare_section! {
                 0u64 => ("resizing bigger changes size and capacity", {});
                 1u64 => ("shrinking smaller does not changes capacity", { 0u64 });

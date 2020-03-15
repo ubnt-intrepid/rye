@@ -18,7 +18,6 @@ pub(crate) mod ignore_inner_items {
         static ref __DESC: __rye::TestDesc = __rye::TestDesc {
             module_path: __rye::module_path!(),
             location: __rye::location!(),
-            todo: false,
             sections: __rye::declare_section! {},
             leaf_sections: &[],
         };

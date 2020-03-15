@@ -107,7 +107,6 @@ impl Parse for Args {
 
 struct Params {
     crate_path: syn::Path,
-    todo: bool,
 }
 
 impl Params {
@@ -123,7 +122,6 @@ impl Params {
 impl Params {
     fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut crate_path = None;
-        let mut todo = false;
         let mut errors: Option<Error> = None;
 
         attrs.retain(|attr| {
@@ -135,10 +133,6 @@ impl Params {
                 let param: Meta = attr.parse_args()?;
                 match param {
                     Meta::Path(path) => match path.get_ident() {
-                        Some(id) if id == "todo" => {
-                            todo = true;
-                            Ok(())
-                        }
                         _ => Err(Error::new_spanned(&path, "unknown parameter name")),
                     },
                     Meta::List(list) => {
@@ -175,7 +169,6 @@ impl Params {
 
         Ok(Self {
             crate_path: crate_path.unwrap_or_else(|| syn::parse_quote!(::rye)),
-            todo,
         })
     }
 }
@@ -396,7 +389,6 @@ impl ToTokens for Generated<'_> {
         let ident = &self.item.sig.ident;
         let rye_reexport = &self.params.reexport_internal_module();
         let location = quote_spanned!(self.item.span() => __rye::location!());
-        let todo = &self.params.todo;
 
         let test_fn_id = match self.item.sig.asyncness {
             Some(..) if self.args.local => Ident::new("async_local_test_fn", Span::call_site()),
@@ -413,7 +405,6 @@ impl ToTokens for Generated<'_> {
                     static ref __DESC: __rye::TestDesc = __rye::TestDesc {
                         module_path: __rye::module_path!(),
                         location: #location,
-                        todo: #todo,
                         sections: __rye::declare_section! { #( #section_map_entries )* },
                         leaf_sections: &[ #( #leaf_section_ids ),* ],
                     };

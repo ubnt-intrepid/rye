@@ -22,7 +22,6 @@ pub(crate) mod case_sync {
         static ref __DESC: __rye::TestDesc = __rye::TestDesc {
             module_path: __rye::module_path!(),
             location: __rye::location!(),
-            todo: false,
             sections: __rye::declare_section! {
                 0u64 => ("resizing bigger changes size and capacity", {});
             },

@@ -45,7 +45,7 @@ impl TestCaseSummary {
     pub(crate) fn should_terminate(&self) -> bool {
         match self.status() {
             Status::Passed => false,
-            Status::Failed => !self.desc.todo,
+            Status::Failed => true,
         }
     }
 
@@ -76,7 +76,7 @@ pub struct Summary {
 impl Summary {
     #[allow(missing_docs)]
     pub fn is_passed(&self) -> bool {
-        self.failed.is_empty() || self.failed.iter().all(|summary| summary.desc.todo)
+        self.failed.is_empty()
     }
 
     #[allow(missing_docs)]

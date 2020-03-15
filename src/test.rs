@@ -72,8 +72,6 @@ pub struct TestDesc {
     #[doc(hidden)]
     pub location: Location,
     #[doc(hidden)]
-    pub todo: bool,
-    #[doc(hidden)]
     pub sections: HashMap<SectionId, Section>,
     #[doc(hidden)]
     pub leaf_sections: &'static [SectionId],
