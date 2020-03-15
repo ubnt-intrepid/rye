@@ -6,7 +6,6 @@ use crate::{
 use std::{
     fmt,
     io::{self, Write as _},
-    sync::atomic::{AtomicUsize, Ordering},
 };
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
 
@@ -45,7 +44,6 @@ fn colored<T>(val: T) -> Colored<T> {
 
 pub struct ConsoleReporter {
     stream: StandardStream,
-    name_length: AtomicUsize,
 }
 
 impl ConsoleReporter {
@@ -56,7 +54,6 @@ impl ConsoleReporter {
                 ColorConfig::Always => ColorChoice::Always,
                 ColorConfig::Never => ColorChoice::Never,
             }),
-            name_length: AtomicUsize::new(0),
         }
     }
 
@@ -69,8 +66,7 @@ impl ConsoleReporter {
             Status::Passed => colored("ok").fg(Color::Green),
             Status::Failed => colored("FAILED").fg(Color::Red),
         };
-        let name_length = self.name_length.load(Ordering::SeqCst);
-        write!(w, "test {0:<1$} ... ", summary.desc.name(), name_length)?;
+        write!(w, "test {} ... ", summary.desc.name(),)?;
         status.fmt_colored(w)?;
         writeln!(w)?;
         Ok(())
@@ -130,15 +126,6 @@ impl Reporter for ConsoleReporter {
 
         let num_tests = tests.iter().filter(|test| !test.filtered_out).count();
         let _ = writeln!(w, "running {} tests", num_tests);
-
-        self.name_length.store(
-            tests
-                .iter()
-                .map(|test| test.desc().name().len())
-                .max()
-                .unwrap_or(0),
-            Ordering::SeqCst,
-        );
     }
 
     fn test_run_ended(&self, summary: &Summary) {
