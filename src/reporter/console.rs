@@ -3,82 +3,119 @@ use crate::{
     cli::args::{Args, ColorConfig},
     test::{Test, TestDesc},
 };
-use console::{Style, StyledObject, Term};
 use std::{
-    io::{self, Write},
-    sync::{Arc, Mutex},
+    fmt,
+    io::{self, Write as _},
+    sync::atomic::{AtomicUsize, Ordering},
 };
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
 
-#[derive(Clone)]
+struct Colored<T> {
+    val: T,
+    spec: Option<ColorSpec>,
+}
+
+impl<T> Colored<T> {
+    fn fg(mut self, color: Color) -> Self {
+        self.spec
+            .get_or_insert_with(ColorSpec::new)
+            .set_fg(Some(color));
+        self
+    }
+
+    fn fmt_colored<W: ?Sized>(&self, w: &mut W) -> io::Result<()>
+    where
+        T: fmt::Display,
+        W: WriteColor,
+    {
+        if let Some(ref spec) = self.spec {
+            w.set_color(spec)?;
+        }
+        write!(w, "{}", &self.val)?;
+        if let Some(..) = self.spec {
+            w.reset()?;
+        }
+        Ok(())
+    }
+}
+
+fn colored<T>(val: T) -> Colored<T> {
+    Colored { val, spec: None }
+}
+
 pub struct ConsoleReporter {
-    inner: Arc<Mutex<Inner>>,
+    stream: StandardStream,
+    name_length: AtomicUsize,
 }
 
-struct Inner {
-    term: Term,
-    style: Style,
-    name_length: usize,
-}
-
-impl Inner {
-    fn styled<D>(&self, val: D) -> StyledObject<D> {
-        self.style.apply_to(val)
+impl ConsoleReporter {
+    pub fn new(args: &Args) -> Self {
+        Self {
+            stream: StandardStream::stdout(match args.color {
+                ColorConfig::Auto => ColorChoice::Auto,
+                ColorConfig::Always => ColorChoice::Always,
+                ColorConfig::Never => ColorChoice::Never,
+            }),
+            name_length: AtomicUsize::new(0),
+        }
     }
 
-    fn print_test_case_summary(&self, summary: &TestCaseSummary) -> io::Result<()> {
+    fn print_test_case_summary(
+        &self,
+        w: &mut StandardStreamLock<'_>,
+        summary: &TestCaseSummary,
+    ) -> io::Result<()> {
         let status = match summary.status() {
-            Status::Passed => self.styled("ok").green(),
-            Status::Failed if summary.desc.todo => self.styled("FAILED (todo)").yellow(),
-            Status::Failed => self.styled("FAILED").red(),
+            Status::Passed => colored("ok").fg(Color::Green),
+            Status::Failed if summary.desc.todo => colored("FAILED (todo)").fg(Color::Yellow),
+            Status::Failed => colored("FAILED").fg(Color::Red),
         };
-        writeln!(
-            &self.term,
-            "test {0:<1$} ... {2}",
-            summary.desc.name(),
-            self.name_length,
-            status
-        )?;
-        self.term.flush()
+        let name_length = self.name_length.load(Ordering::SeqCst);
+        write!(w, "test {0:<1$} ... ", summary.desc.name(), name_length)?;
+        status.fmt_colored(w)?;
+        writeln!(w)?;
+        Ok(())
     }
 
-    fn print_summary(&mut self, summary: &Summary) -> io::Result<()> {
-        let status = if summary.is_passed() {
-            self.styled("ok").green()
-        } else {
-            self.styled("FAILED").red()
-        };
-
+    fn print_summary(&self, w: &mut StandardStreamLock<'_>, summary: &Summary) -> io::Result<()> {
         if !summary.failed.is_empty() {
-            writeln!(&self.term)?;
-            writeln!(&self.term, "failures:")?;
+            writeln!(w)?;
+            writeln!(w, "failures:")?;
             for result in &summary.failed {
                 writeln!(
-                    &self.term,
+                    w,
                     "---- {} at {} ----",
                     result.desc.name(),
                     result.desc.location
                 )?;
                 for failure in &result.failures {
                     match failure {
-                        Failure::Unwind(ref unwind) => writeln!(&self.term, "{}", unwind)?,
-                        Failure::Error(ref err) => writeln!(&self.term, "{}", &**err)?,
+                        Failure::Unwind(ref unwind) => writeln!(w, "{}", unwind)?,
+                        Failure::Error(ref err) => writeln!(w, "{}", &**err)?,
                     }
                 }
-                writeln!(&self.term)?;
+                writeln!(w)?;
             }
 
-            writeln!(&self.term)?;
-            writeln!(&self.term, "failures:")?;
+            writeln!(w)?;
+            writeln!(w, "failures:")?;
             for result in &summary.failed {
-                writeln!(&self.term, "    {}", result.desc.name())?;
+                writeln!(w, "    {}", result.desc.name())?;
             }
         }
 
-        writeln!(&self.term)?;
+        let status = if summary.is_passed() {
+            colored("ok").fg(Color::Green)
+        } else {
+            colored("FAILED").fg(Color::Red)
+        };
+        writeln!(w)?;
+        write!(w, "test result: ")?;
+        status.fmt_colored(w)?;
+        write!(w, ".")?;
         writeln!(
-            &self.term,
-            "test result: {status}. {passed} passed; {failed} failed ({todo} todo); {filtered_out} filtered out",
-            status = status,
+            w,
+            " {passed} passed; {failed} failed ({todo} todo); {filtered_out} filtered out",
             passed = summary.passed.len(),
             failed = summary.failed.len(),
             todo = summary.failed.iter().filter(|s| s.desc.todo).count(),
@@ -89,53 +126,32 @@ impl Inner {
     }
 }
 
-impl ConsoleReporter {
-    pub fn new(args: &Args) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(Inner {
-                term: Term::buffered_stdout(),
-                style: {
-                    let mut style = Style::new();
-                    match args.color {
-                        ColorConfig::Always => style = style.force_styling(true),
-                        ColorConfig::Never => style = style.force_styling(false),
-                        _ => (),
-                    }
-                    style
-                },
-                name_length: 0,
-            })),
-        }
-    }
-}
-
 impl Reporter for ConsoleReporter {
     fn test_run_starting(&self, tests: &[Test]) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut w = self.stream.lock();
 
         let num_tests = tests.iter().filter(|test| !test.filtered_out).count();
-        let _ = writeln!(&inner.term, "running {} tests", num_tests);
+        let _ = writeln!(w, "running {} tests", num_tests);
 
-        inner.name_length = tests
-            .iter()
-            .filter_map(|test| {
-                if !test.filtered_out {
-                    Some(test.desc().name().len())
-                } else {
-                    None
-                }
-            })
-            .max()
-            .unwrap_or(0);
+        self.name_length.store(
+            tests
+                .iter()
+                .map(|test| test.desc().name().len())
+                .max()
+                .unwrap_or(0),
+            Ordering::SeqCst,
+        );
     }
 
     fn test_run_ended(&self, summary: &Summary) {
-        let _ = self.inner.lock().unwrap().print_summary(summary);
+        let mut w = self.stream.lock();
+        let _ = self.print_summary(&mut w, summary);
     }
 
     fn test_case_starting(&self, _: &TestDesc) {}
 
     fn test_case_ended(&self, summary: &TestCaseSummary) {
-        let _ = self.inner.lock().unwrap().print_test_case_summary(&summary);
+        let mut w = self.stream.lock();
+        let _ = self.print_test_case_summary(&mut w, &summary);
     }
 }

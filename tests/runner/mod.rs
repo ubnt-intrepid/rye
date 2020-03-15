@@ -10,7 +10,7 @@ use rye::{
     runner::{AsyncTest, BlockingTest, LocalAsyncTest, TestRunner},
     test::TestSet,
 };
-use std::{io, pin::Pin, thread};
+use std::{io, pin::Pin, sync::Arc, thread};
 
 pub(crate) fn run_tests(tests: &[&dyn TestSet]) {
     rye::cli::install();
@@ -19,7 +19,7 @@ pub(crate) fn run_tests(tests: &[&dyn TestSet]) {
     let mut session = Session::new(&args);
 
     let mut runner = FuturesTestRunner::new().unwrap();
-    let reporter = ConsoleReporter::new(&args);
+    let reporter = Arc::new(ConsoleReporter::new(&args));
     let st = session.run(tests, &mut runner, &reporter);
 
     st.exit();
