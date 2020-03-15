@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt as _};
+use quote::{quote, quote_spanned, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
     parse::{Error, Parse, ParseStream, Parser as _, Result},
@@ -264,7 +264,7 @@ impl ExpandBlock {
             me.visit_block_mut(&mut *block);
         });
 
-        Stmt::parse.parse2(quote::quote_spanned! { mac.span() =>
+        Stmt::parse.parse2(quote_spanned! { mac.span() =>
             __rye::enter_section!(#section_id, #block);
         })
     }
@@ -395,6 +395,7 @@ impl ToTokens for Generated<'_> {
 
         let ident = &self.item.sig.ident;
         let rye_reexport = &self.params.reexport_internal_module();
+        let location = quote_spanned!(self.item.span() => __rye::location!());
         let todo = &self.params.todo;
 
         let test_fn_kind = match self.item.sig.asyncness {
@@ -411,6 +412,7 @@ impl ToTokens for Generated<'_> {
                 __rye::lazy_static! {
                     static ref __DESC: __rye::TestDesc = __rye::TestDesc {
                         module_path: __rye::module_path!(),
+                        location: #location,
                         todo: #todo,
                         sections: __rye::declare_section! { #( #section_map_entries )* },
                         leaf_sections: &[ #( #leaf_section_ids ),* ],

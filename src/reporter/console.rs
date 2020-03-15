@@ -52,7 +52,12 @@ impl Inner {
             writeln!(&self.term)?;
             writeln!(&self.term, "failures:")?;
             for result in &summary.failed {
-                writeln!(&self.term, "---- {} ----", result.desc.name())?;
+                writeln!(
+                    &self.term,
+                    "---- {} at {} ----",
+                    result.desc.name(),
+                    result.desc.location
+                )?;
                 for failure in &result.failures {
                     match failure {
                         Failure::Unwind(ref unwind) => writeln!(&self.term, "{}", unwind)?,

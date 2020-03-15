@@ -1,7 +1,33 @@
 //! Registration of test cases.
 
 use self::imp::{Section, SectionId, TestFn};
-use std::{collections::HashMap, error};
+use std::{collections::HashMap, error, fmt};
+
+#[doc(hidden)] // private API.
+#[derive(Debug)]
+pub struct Location {
+    pub file: &'static str,
+    pub line: u32,
+    pub column: u32,
+}
+
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}:{}", self.file, self.line, self.column)
+    }
+}
+
+#[doc(hidden)] // private API.
+#[macro_export]
+macro_rules! __location {
+    () => {
+        $crate::test::Location {
+            file: file!(),
+            line: line!(),
+            column: column!(),
+        }
+    };
+}
 
 /// Description about a single test case.
 #[derive(Debug)]
@@ -44,6 +70,8 @@ impl Test {
 pub struct TestDesc {
     #[doc(hidden)]
     pub module_path: &'static str,
+    #[doc(hidden)]
+    pub location: Location,
     #[doc(hidden)]
     pub todo: bool,
     #[doc(hidden)]

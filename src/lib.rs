@@ -222,6 +222,7 @@ pub mod _internal {
         __annotate_test_case as annotate_test_case, //
         __declare_section as declare_section,
         __enter_section as enter_section,
+        __location as location,
         __test_fn as test_fn,
         test::{
             imp::{Section, TestFn, TestFuture},
