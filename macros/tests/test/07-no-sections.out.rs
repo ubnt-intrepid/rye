@@ -27,10 +27,7 @@ pub(crate) mod no_sections {
 
     impl __rye::TestSet for __tests {
         fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(__rye::Test {
-                desc: &*__DESC,
-                test_fn: __rye::test_fn!([blocking] no_sections),
-            })?;
+            __registry.add_test(&*__DESC, __rye::blocking_test_fn!(no_sections))?;
             __rye::Result::Ok(())
         }
     }

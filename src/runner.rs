@@ -428,7 +428,7 @@ pub struct AccessError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{imp::TestFn, Registry, RegistryError, Test, TestSet};
+    use crate::test::{imp::TestFn, Registry, RegistryError, TestDesc, TestSet};
     use scoped_tls_async::{scoped_thread_local, ScopedKeyExt as _};
     use std::cell::RefCell;
 
@@ -442,10 +442,14 @@ mod tests {
         HISTORY.with(|history| history.borrow_mut().push((msg, current_section)));
     }
 
-    struct MockRegistry<'a>(&'a mut Option<Test>);
+    struct MockRegistry<'a>(&'a mut Option<(&'static TestDesc, TestFn)>);
     impl Registry for MockRegistry<'_> {
-        fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
-            self.0.replace(test);
+        fn add_test(
+            &mut self,
+            desc: &'static TestDesc,
+            test_fn: TestFn,
+        ) -> Result<(), RegistryError> {
+            self.0.replace((desc, test_fn));
             Ok(())
         }
     }
@@ -460,7 +464,7 @@ mod tests {
     }
 
     fn run_test(r: &dyn TestSet) -> Vec<HistoryLog> {
-        let test = {
+        let (desc, test_fn) = {
             let mut test = None;
             r.register(&mut MockRegistry(&mut test)).unwrap();
             test.take().expect("test is not registered")
@@ -468,11 +472,11 @@ mod tests {
 
         let history = RefCell::new(vec![]);
         let mut state = TestInner {
-            desc: test.desc,
+            desc,
             reporter: Box::new(NullReporter),
         };
 
-        let _ = match test.test_fn {
+        let _ = match test_fn {
             TestFn::Blocking { f } => HISTORY.set(&history, || state.run_blocking(f)),
             TestFn::Async { f, .. } => futures::executor::block_on(
                 HISTORY.set_async(&history, state.run_async(f, std::convert::identity)),

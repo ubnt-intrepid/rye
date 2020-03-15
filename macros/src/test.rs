@@ -398,10 +398,10 @@ impl ToTokens for Generated<'_> {
         let location = quote_spanned!(self.item.span() => __rye::location!());
         let todo = &self.params.todo;
 
-        let test_fn_kind = match self.item.sig.asyncness {
-            Some(..) if self.args.local => Ident::new("async_local", Span::call_site()),
-            Some(..) => Ident::new("async", Span::call_site()),
-            None => Ident::new("blocking", Span::call_site()),
+        let test_fn_id = match self.item.sig.asyncness {
+            Some(..) if self.args.local => Ident::new("async_local_test_fn", Span::call_site()),
+            Some(..) => Ident::new("async_test_fn", Span::call_site()),
+            None => Ident::new("blocking_test_fn", Span::call_site()),
         };
 
         tokens.append_all(vec![quote! {
@@ -424,10 +424,7 @@ impl ToTokens for Generated<'_> {
 
                 impl __rye::TestSet for __tests {
                     fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-                        __registry.add_test(__rye::Test {
-                            desc: &*__DESC,
-                            test_fn: __rye::test_fn!([#test_fn_kind] #ident),
-                        })?;
+                        __registry.add_test(&*__DESC, __rye::#test_fn_id!(#ident))?;
                         __rye::Result::Ok(())
                     }
                 }

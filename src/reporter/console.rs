@@ -112,10 +112,19 @@ impl ConsoleReporter {
 impl Reporter for ConsoleReporter {
     fn test_run_starting(&self, tests: &[Test]) {
         let mut inner = self.inner.lock().unwrap();
-        let _ = writeln!(&inner.term, "running {} tests", tests.len());
+
+        let num_tests = tests.iter().filter(|test| !test.filtered_out).count();
+        let _ = writeln!(&inner.term, "running {} tests", num_tests);
+
         inner.name_length = tests
             .iter()
-            .map(|test| test.desc().name().len())
+            .filter_map(|test| {
+                if !test.filtered_out {
+                    Some(test.desc().name().len())
+                } else {
+                    None
+                }
+            })
             .max()
             .unwrap_or(0);
     }

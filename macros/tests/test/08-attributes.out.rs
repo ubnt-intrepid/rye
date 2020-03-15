@@ -28,10 +28,7 @@ pub(crate) mod attributes {
 
     impl __rye::TestSet for __tests {
         fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(__rye::Test {
-                desc: &*__DESC,
-                test_fn: __rye::test_fn!([blocking] attributes),
-            })?;
+            __registry.add_test(&*__DESC, __rye::blocking_test_fn!(attributes))?;
             __rye::Result::Ok(())
         }
     }

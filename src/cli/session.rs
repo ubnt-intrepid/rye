@@ -2,7 +2,7 @@ use crate::{
     cli::{args::Args, exit_status::ExitStatus},
     reporter::Reporter,
     runner::{TestRunner, TestRunnerExt as _},
-    test::{Registry, RegistryError, Test, TestSet},
+    test::{imp::TestFn, Registry, RegistryError, Test, TestDesc, TestSet},
 };
 use std::{
     collections::HashSet,
@@ -11,8 +11,7 @@ use std::{
 
 pub struct Session<'sess> {
     args: &'sess Args,
-    pending_tests: Vec<Test>,
-    filtered_out_tests: Vec<Test>,
+    registered_tests: Vec<Test>,
     unique_test_names: HashSet<String>,
 }
 
@@ -21,8 +20,7 @@ impl<'sess> Session<'sess> {
     pub fn new(args: &'sess Args) -> Self {
         Self {
             args,
-            pending_tests: vec![],
-            filtered_out_tests: vec![],
+            registered_tests: vec![],
             unique_test_names: HashSet::new(),
         }
     }
@@ -32,7 +30,11 @@ impl<'sess> Session<'sess> {
         let mut term = term.lock();
         let mut num_tests = 0;
 
-        for test in &self.pending_tests {
+        for test in self
+            .registered_tests
+            .iter()
+            .filter(|test| !test.filtered_out)
+        {
             num_tests += 1;
             writeln!(term, "{}: test", test.desc().name())?;
         }
@@ -71,7 +73,7 @@ impl<'sess> Session<'sess> {
         }
 
         // sort test cases by name.
-        self.pending_tests
+        self.registered_tests
             .sort_by(|t1, t2| t1.desc().name().cmp(t2.desc().name()));
 
         if self.args.list_tests {
@@ -79,19 +81,20 @@ impl<'sess> Session<'sess> {
             return ExitStatus::OK;
         }
 
-        reporter.test_run_starting(&self.pending_tests);
+        reporter.test_run_starting(&self.registered_tests);
 
-        for test in self.pending_tests.drain(..) {
-            let reporter = reporter.clone();
-            runner.spawn_test(&test, reporter);
+        let mut filtered_out_tests = vec![];
+        for test in self.registered_tests.drain(..) {
+            if test.filtered_out {
+                filtered_out_tests.push(test.desc());
+            } else {
+                let reporter = reporter.clone();
+                runner.spawn_test(&test, reporter);
+            }
         }
 
         let mut summary = runner.run();
-        summary.filtered_out = self
-            .filtered_out_tests
-            .iter()
-            .map(|test| test.desc())
-            .collect();
+        summary.filtered_out = filtered_out_tests;
 
         reporter.test_run_ended(&summary);
 
@@ -108,21 +111,22 @@ struct MainRegistry<'a, 'sess> {
 }
 
 impl Registry for MainRegistry<'_, '_> {
-    fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
+    fn add_test(&mut self, desc: &'static TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
         let session = &mut *self.session;
+        let filtered_out = session.args.is_filtered_out(desc.name());
 
-        if !session.unique_test_names.insert(test.desc().name().into()) {
+        if !session.unique_test_names.insert(desc.name().into()) {
             return Err(RegistryError::new(format!(
                 "the test name '{}' is conflicted",
-                test.desc().name()
+                desc.name()
             )));
         }
 
-        if session.args.is_filtered_out(test.desc().name()) {
-            session.filtered_out_tests.push(test);
-        } else {
-            session.pending_tests.push(test);
-        }
+        session.registered_tests.push(Test {
+            desc,
+            test_fn,
+            filtered_out,
+        });
 
         Ok(())
     }

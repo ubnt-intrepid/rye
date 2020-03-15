@@ -32,10 +32,9 @@ macro_rules! __location {
 /// Description about a single test case.
 #[derive(Debug)]
 pub struct Test {
-    #[doc(hidden)] // private API.
-    pub desc: &'static TestDesc,
-    #[doc(hidden)] // private API.
-    pub test_fn: TestFn,
+    pub(crate) desc: &'static TestDesc,
+    pub(crate) test_fn: TestFn,
+    pub(crate) filtered_out: bool,
 }
 
 impl Test {
@@ -166,17 +165,18 @@ where
 
 /// The registry of test cases.
 pub trait Registry {
-    /// Register a test case.
-    fn add_test(&mut self, test: Test) -> Result<(), RegistryError>;
+    #[doc(hidden)] // private API.
+    fn add_test(&mut self, desc: &'static TestDesc, test_fn: TestFn) -> Result<(), RegistryError>;
 }
 
 impl<R: ?Sized> Registry for &mut R
 where
     R: Registry,
 {
+    #[doc(hidden)] // private API.
     #[inline]
-    fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
-        (**self).add_test(test)
+    fn add_test(&mut self, desc: &'static TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
+        (**self).add_test(desc, test_fn)
     }
 }
 
@@ -184,9 +184,10 @@ impl<R: ?Sized> Registry for Box<R>
 where
     R: Registry,
 {
+    #[doc(hidden)] // private API.
     #[inline]
-    fn add_test(&mut self, test: Test) -> Result<(), RegistryError> {
-        (**self).add_test(test)
+    fn add_test(&mut self, desc: &'static TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
+        (**self).add_test(desc, test_fn)
     }
 }
 

@@ -220,13 +220,15 @@ mod global;
 pub mod _internal {
     pub use crate::{
         __annotate_test_case as annotate_test_case, //
+        __async_local_test_fn as async_local_test_fn,
+        __async_test_fn as async_test_fn,
+        __blocking_test_fn as blocking_test_fn,
         __declare_section as declare_section,
         __enter_section as enter_section,
         __location as location,
-        __test_fn as test_fn,
         test::{
             imp::{Section, TestFn, TestFuture},
-            Registry, RegistryError, Test, TestDesc, TestSet,
+            Registry, RegistryError, TestDesc, TestSet,
         },
     };
     pub use lazy_static::lazy_static;
@@ -286,20 +288,30 @@ pub mod _internal {
 
     #[doc(hidden)] // private API.
     #[macro_export]
-    macro_rules! __test_fn {
-        ([async] $path:path) => {
-            $crate::_internal::TestFn::Async {
-                f: || $crate::_internal::TestFuture::new($path()),
-                local: false,
-            }
-        };
-        ([async_local] $path:path) => {
+    macro_rules! __async_local_test_fn {
+        ($path:path) => {
             $crate::_internal::TestFn::Async {
                 f: || $crate::_internal::TestFuture::new_local($path()),
                 local: true,
             }
         };
-        ([blocking] $path:path) => {
+    }
+
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __async_test_fn {
+        ($path:path) => {
+            $crate::_internal::TestFn::Async {
+                f: || $crate::_internal::TestFuture::new($path()),
+                local: false,
+            }
+        };
+    }
+
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __blocking_test_fn {
+        ($path:path) => {
             $crate::_internal::TestFn::Blocking {
                 f: || $crate::_internal::test_result($path()),
             }
