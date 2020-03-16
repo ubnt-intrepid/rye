@@ -3,11 +3,11 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
+    ext::IdentExt as _,
     parse::{Error, Parse, ParseStream, Parser as _, Result},
     spanned::Spanned as _,
     visit_mut::{self, VisitMut},
-    Attribute, Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprMacro, ExprWhile,
-    Ident, Item, ItemFn, Meta, Stmt, Token,
+    Attribute, Block, Expr, ExprMacro, Ident, Item, ItemFn, Stmt, Token,
 };
 
 macro_rules! try_quote {
@@ -43,20 +43,11 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     }
     let args = try_quote!(syn::parse2::<Args>(args));
 
-    // extract attributes
+    // extract rye-specific attributes.
     let params = try_quote!(Params::from_attrs(&mut item.attrs));
 
     // expand section!()
-    let mut expand = ExpandBlock {
-        sections: IndexMap::new(),
-        next_section_id: 0,
-        parent: None,
-        in_loop: false,
-        in_closure: false,
-        in_async_block: false,
-    };
-    expand.visit_block_mut(&mut *item.block);
-    let sections: Vec<_> = expand.sections.into_iter().map(|(_k, v)| v).collect();
+    let sections = expand_sections(&mut item);
 
     item.block
         .stmts
@@ -122,54 +113,57 @@ impl Params {
 impl Params {
     fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut crate_path = None;
-        let mut errors: Option<Error> = None;
 
+        let mut parse_attr = |input: ParseStream<'_>| -> Result<()> {
+            match input.call(Ident::parse_any)? {
+                id if id == "crate" => {
+                    let _: Token![=] = input.parse()?;
+                    let lit: syn::LitStr = input.parse()?;
+
+                    if let Some(..) = crate_path {
+                        return Err(Error::new_spanned(&id, "duplicated parameter"));
+                    }
+
+                    crate_path.replace(lit.parse()?);
+                    Ok(())
+                }
+                id => Err(Error::new_spanned(id, "unknown parameter name")),
+            }
+        };
+
+        let mut errors = Errors::default();
         attrs.retain(|attr| {
             if !attr.path.is_ident("rye") {
                 return true;
             }
-
-            if let Err(error) = (|| -> Result<()> {
-                let param: Meta = attr.parse_args()?;
-                match param {
-                    Meta::Path(path) => match path.get_ident() {
-                        _ => Err(Error::new_spanned(&path, "unknown parameter name")),
-                    },
-                    Meta::List(list) => {
-                        Err(Error::new_spanned(&list, "unsupported parameter type"))
-                    }
-                    Meta::NameValue(param) => match param.path.get_ident() {
-                        Some(id) if id == "crate" => match param.lit {
-                            syn::Lit::Str(ref lit) if crate_path.is_none() => {
-                                crate_path.replace(lit.parse()?);
-                                Ok(())
-                            }
-                            syn::Lit::Str(..) => {
-                                Err(Error::new_spanned(&param, "duplicated parameter"))
-                            }
-                            lit => Err(Error::new_spanned(&lit, "required a string literal")),
-                        },
-                        _ => Err(Error::new_spanned(&param.path, "unknown parameter name")),
-                    },
-                }
-            })() {
-                if let Some(ref mut errors) = errors {
-                    errors.combine(error);
-                } else {
-                    errors.replace(error);
-                }
-            }
-
+            errors.append_if_error(attr.parse_args_with(&mut parse_attr));
             false
         });
-
-        if let Some(errors) = errors {
-            return Err(errors);
-        }
+        errors.into_result()?;
 
         Ok(Self {
             crate_path: crate_path.unwrap_or_else(|| syn::parse_quote!(::rye)),
         })
+    }
+}
+
+#[derive(Default)]
+struct Errors(Option<Error>);
+
+impl Errors {
+    fn append_if_error(&mut self, res: Result<()>) {
+        match (self.0.as_mut(), res) {
+            (Some(errors), Err(error)) => errors.combine(error),
+            (None, Err(error)) => self.0 = Some(error),
+            (_, Ok(())) => (),
+        }
+    }
+
+    fn into_result(self) -> Result<()> {
+        match self.0 {
+            None => Ok(()),
+            Some(err) => Err(err),
+        }
     }
 }
 
@@ -182,23 +176,20 @@ struct Section {
     children: Vec<SectionId>,
 }
 
-struct SectionBody {
-    name: Expr,
-    _comma: Token![,],
-    block: Box<Block>,
+fn expand_sections(item: &mut ItemFn) -> Vec<Section> {
+    let mut expand = ExpandSections {
+        sections: IndexMap::new(),
+        next_section_id: 0,
+        parent: None,
+        in_loop: false,
+        in_closure: false,
+        in_async_block: false,
+    };
+    expand.visit_block_mut(&mut *item.block);
+    expand.sections.into_iter().map(|(_k, v)| v).collect()
 }
 
-impl Parse for SectionBody {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(Self {
-            name: input.parse()?,
-            _comma: input.parse()?,
-            block: input.parse()?,
-        })
-    }
-}
-
-struct ExpandBlock {
+struct ExpandSections {
     sections: IndexMap<SectionId, Section>,
     next_section_id: SectionId,
     parent: Option<SectionId>,
@@ -207,7 +198,7 @@ struct ExpandBlock {
     in_async_block: bool,
 }
 
-impl ExpandBlock {
+impl ExpandSections {
     fn expand_section_macro(&mut self, expr: &ExprMacro) -> Result<Stmt> {
         if self.in_loop {
             return Err(Error::new_spanned(
@@ -230,9 +221,14 @@ impl ExpandBlock {
 
         let attrs = &expr.attrs;
 
-        let SectionBody {
-            name, mut block, ..
-        } = expr.mac.parse_body()?;
+        let (name, mut block) =
+            expr.mac
+                .parse_body_with(|input: ParseStream<'_>| -> Result<_> {
+                    let name: Expr = input.parse()?;
+                    let _: Token![,] = input.parse()?;
+                    let block: Box<Block> = input.parse()?;
+                    Ok((name, block))
+                })?;
 
         let section_id = self.next_section_id;
         let ancestors = if let Some(parent) = self.parent {
@@ -273,78 +269,47 @@ impl ExpandBlock {
         self.parent = prev;
         res
     }
-
-    fn mark_in_loop<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce(&mut Self) -> R,
-    {
-        let prev = mem::replace(&mut self.in_loop, true);
-        let res = f(self);
-        self.in_loop = prev;
-        res
-    }
-
-    fn mark_in_closure<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce(&mut Self) -> R,
-    {
-        let prev = mem::replace(&mut self.in_closure, true);
-        let res = f(self);
-        self.in_closure = prev;
-        res
-    }
-
-    fn mark_in_async_block<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce(&mut Self) -> R,
-    {
-        let prev = mem::replace(&mut self.in_async_block, true);
-        let res = f(self);
-        self.in_async_block = prev;
-        res
-    }
 }
 
-impl VisitMut for ExpandBlock {
+impl VisitMut for ExpandSections {
     fn visit_stmt_mut(&mut self, item: &mut Stmt) {
         match item {
-            Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _) => {
-                if expr_macro.mac.path.is_ident("section") {
-                    let stmt = match self.expand_section_macro(&*expr_macro) {
-                        Ok(expanded) => expanded,
-                        Err(err) => {
-                            let err = err.to_compile_error();
-                            syn::parse_quote!(#err)
-                        }
-                    };
-                    mem::replace(item, stmt);
-                    return;
-                }
+            Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _)
+                if expr_macro.mac.path.is_ident("section") =>
+            {
+                let stmt = match self.expand_section_macro(&*expr_macro) {
+                    Ok(expanded) => expanded,
+                    Err(err) => {
+                        let err = err.to_compile_error();
+                        syn::parse_quote!(#err)
+                    }
+                };
+                mem::replace(item, stmt);
             }
+            _ => visit_mut::visit_stmt_mut(self, item),
+        }
+    }
+
+    fn visit_expr_mut(&mut self, node: &mut syn::Expr) {
+        let mut in_loop = self.in_loop;
+        let mut in_closure = self.in_closure;
+        let mut in_async_block = self.in_async_block;
+        match node {
+            Expr::ForLoop(..) | Expr::Loop(..) | Expr::While(..) => in_loop = true,
+            Expr::Closure(..) => in_closure = true,
+            Expr::Async(..) => in_async_block = true,
             _ => (),
         }
 
-        visit_mut::visit_stmt_mut(self, item)
-    }
+        let in_loop_prev = mem::replace(&mut self.in_loop, in_loop);
+        let in_closure_prev = mem::replace(&mut self.in_closure, in_closure);
+        let in_async_block_prev = mem::replace(&mut self.in_async_block, in_async_block);
 
-    fn visit_expr_for_loop_mut(&mut self, node: &mut ExprForLoop) {
-        self.mark_in_loop(|me| visit_mut::visit_expr_for_loop_mut(me, node));
-    }
+        visit_mut::visit_expr_mut(self, node);
 
-    fn visit_expr_loop_mut(&mut self, node: &mut ExprLoop) {
-        self.mark_in_loop(|me| visit_mut::visit_expr_loop_mut(me, node));
-    }
-
-    fn visit_expr_while_mut(&mut self, node: &mut ExprWhile) {
-        self.mark_in_loop(|me| visit_mut::visit_expr_while_mut(me, node));
-    }
-
-    fn visit_expr_closure_mut(&mut self, node: &mut ExprClosure) {
-        self.mark_in_closure(|me| visit_mut::visit_expr_closure_mut(me, node));
-    }
-
-    fn visit_expr_async_mut(&mut self, node: &mut ExprAsync) {
-        self.mark_in_async_block(|me| visit_mut::visit_expr_async_mut(me, node));
+        self.in_loop = in_loop_prev;
+        self.in_closure = in_closure_prev;
+        self.in_async_block = in_async_block_prev;
     }
 
     fn visit_item_mut(&mut self, _node: &mut Item) {

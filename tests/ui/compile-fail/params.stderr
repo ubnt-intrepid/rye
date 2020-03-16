@@ -1,4 +1,4 @@
-error: required a string literal
+error: expected string literal
  --> $DIR/params.rs:4:15
   |
 4 | #[rye(crate = 10)]
@@ -8,7 +8,7 @@ error: duplicated parameter
  --> $DIR/params.rs:9:7
   |
 9 | #[rye(crate = "rye")]
-  |       ^^^^^^^^^^^^^
+  |       ^^^^^
 
 error: unknown parameter name
   --> $DIR/params.rs:13:7
