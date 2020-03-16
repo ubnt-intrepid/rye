@@ -6,8 +6,8 @@ use syn::{
     parse::{Error, Parse, ParseStream, Parser as _, Result},
     spanned::Spanned as _,
     visit_mut::{self, VisitMut},
-    Attribute, Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprWhile, Ident, Item,
-    ItemFn, Macro, Meta, Stmt, Token,
+    Attribute, Block, Expr, ExprAsync, ExprClosure, ExprForLoop, ExprLoop, ExprMacro, ExprWhile,
+    Ident, Item, ItemFn, Meta, Stmt, Token,
 };
 
 macro_rules! try_quote {
@@ -208,29 +208,31 @@ struct ExpandBlock {
 }
 
 impl ExpandBlock {
-    fn expand_section_macro(&mut self, mac: &Macro) -> Result<Stmt> {
+    fn expand_section_macro(&mut self, expr: &ExprMacro) -> Result<Stmt> {
         if self.in_loop {
             return Err(Error::new_spanned(
-                mac,
+                expr,
                 "section cannot be described in a loop",
             ));
         }
         if self.in_closure {
             return Err(Error::new_spanned(
-                mac,
+                expr,
                 "section cannot be described in a closure",
             ));
         }
         if self.in_async_block {
             return Err(Error::new_spanned(
-                mac,
+                expr,
                 "section cannot be described in an async block",
             ));
         }
 
+        let attrs = &expr.attrs;
+
         let SectionBody {
             name, mut block, ..
-        } = mac.parse_body()?;
+        } = expr.mac.parse_body()?;
 
         let section_id = self.next_section_id;
         let ancestors = if let Some(parent) = self.parent {
@@ -257,8 +259,8 @@ impl ExpandBlock {
             me.visit_block_mut(&mut *block);
         });
 
-        Stmt::parse.parse2(quote_spanned! { mac.span() =>
-            __rye::enter_section!(#section_id, #block);
+        Stmt::parse.parse2(quote_spanned! { expr.mac.span() =>
+            __rye::enter_section!(#section_id, #(#attrs)* #block);
         })
     }
 
@@ -308,7 +310,7 @@ impl VisitMut for ExpandBlock {
         match item {
             Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _) => {
                 if expr_macro.mac.path.is_ident("section") {
-                    let stmt = match self.expand_section_macro(&expr_macro.mac) {
+                    let stmt = match self.expand_section_macro(&*expr_macro) {
                         Ok(expanded) => expanded,
                         Err(err) => {
                             let err = err.to_compile_error();

@@ -152,5 +152,10 @@ fn return_result() -> anyhow::Result<()> {
         require!(vec.capacity() >= 10);
     });
 
+    #[cfg(FALSE)]
+    section!("with unused variables", {
+        let a = 10;
+    });
+
     Ok(())
 }

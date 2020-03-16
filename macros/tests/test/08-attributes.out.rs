@@ -6,6 +6,14 @@ fn attributes() {
     let mut vec = vec![0usize; 5];
     assert_eq!(vec.len(), 5);
     assert!(vec.capacity() >= 5);
+
+    __rye::enter_section!(
+        0u64,
+        #[allow(unused_variables)]
+        {
+            let foo = 10;
+        }
+    );
 }
 
 pub(crate) mod attributes {
@@ -17,8 +25,10 @@ pub(crate) mod attributes {
         static ref __DESC: __rye::TestDesc = __rye::TestDesc {
             module_path: __rye::module_path!(),
             location: __rye::location!(),
-            sections: __rye::declare_section! {},
-            leaf_sections: &[],
+            sections: __rye::declare_section! {
+                0u64 => ("with unused variable", {});
+            },
+            leaf_sections: &[ 0u64 ],
         };
     }
 

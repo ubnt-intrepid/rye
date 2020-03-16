@@ -253,13 +253,16 @@ pub mod _internal {
     #[doc(hidden)] // private API.
     #[macro_export]
     macro_rules! __enter_section {
-        ($id:expr, $block:block) => {{
-            let section = $crate::_internal::enter_section($id);
-            if section.enabled() {
-                $block
+        ( $id:expr, $(#[$attr:meta])* $block:block ) => {
+            $(#[$attr])*
+            {
+                let section = $crate::_internal::enter_section($id);
+                if section.enabled() {
+                    $block
+                }
+                section.leave();
             }
-            section.leave();
-        }};
+        };
     }
 
     #[doc(hidden)] // private API.
