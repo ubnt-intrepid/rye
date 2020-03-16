@@ -84,36 +84,13 @@ async fn case_async_nosend() {
 
 `rye` supports the scope-based code sharing mechanism inspired by Catch2.
 Test cases could distinguish specific code blocks during test execution by
-enclosing a particular code block in the test body with `section!()`. Here,
-`section!()` is a procedural macro interpreted by `#[test]` and expands to
-an `if` statement to toggle the section. For example, the following test case
-
-```
-# fn main() {}
-#[rye::test]
-fn with_section() {
-    println!("setup");
-
-    section!("section", {
-        println!("section");
-    });
-
-    println!("teardown");
-}
-```
-
-will be roughly expanded as the follows:
+enclosing a particular code block in the test body with `section!()`.
+Here, `section!()` is an expression-style procedural macro expanded by `#[test]`
+and has the following syntax:
 
 ```ignore
-fn with_section() {
-    println!("setup");
-
-    if /* is_section_enabled */ {
-        println!("section");
-    }
-
-    println!("teardown");
-}
+$( #[ $META:meta ] )*
+section!( $NAME:expr , $BODY:block );
 ```
 
 If there are multiple sections in the same scope, enable them in order and
