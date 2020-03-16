@@ -66,7 +66,7 @@ impl TestCaseSummary {
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Summary {
     pub(crate) passed: Vec<TestCaseSummary>,
     pub(crate) failed: Vec<TestCaseSummary>,
@@ -74,13 +74,20 @@ pub struct Summary {
 }
 
 impl Summary {
-    #[allow(missing_docs)]
-    pub fn is_passed(&self) -> bool {
+    #[inline]
+    pub(crate) fn empty() -> Self {
+        Self {
+            passed: vec![],
+            failed: vec![],
+            filtered_out: vec![],
+        }
+    }
+
+    pub(crate) fn is_passed(&self) -> bool {
         self.failed.is_empty()
     }
 
-    #[allow(missing_docs)]
-    pub fn append(&mut self, result: TestCaseSummary) {
+    pub(crate) fn append(&mut self, result: TestCaseSummary) {
         match result.status() {
             Status::Passed => self.passed.push(result),
             Status::Failed => self.failed.push(result),

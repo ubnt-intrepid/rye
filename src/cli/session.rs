@@ -1,6 +1,6 @@
 use crate::{
     cli::{args::Args, exit_status::ExitStatus},
-    reporter::Reporter,
+    reporter::{Reporter, Summary},
     runner::{TestRunner, TestRunnerExt as _},
     test::{imp::TestFn, Registry, RegistryError, Test, TestDesc, TestSet},
 };
@@ -83,18 +83,22 @@ impl<'sess> Session<'sess> {
 
         reporter.test_run_starting(&self.registered_tests);
 
-        let mut filtered_out_tests = vec![];
+        let mut summary = Summary::empty();
+        let mut handles = vec![];
         for test in self.registered_tests.drain(..) {
             if test.filtered_out {
-                filtered_out_tests.push(test.desc());
+                summary.filtered_out.push(test.desc());
             } else {
                 let reporter = reporter.clone();
-                runner.spawn_test(&test, reporter);
+                handles.push(runner.spawn_test(&test, reporter));
             }
         }
-
-        let mut summary = runner.run();
-        summary.filtered_out = filtered_out_tests;
+        runner.run(async {
+            let results = futures::future::join_all(handles).await;
+            for result in results {
+                summary.append(result);
+            }
+        });
 
         reporter.test_run_ended(&summary);
 

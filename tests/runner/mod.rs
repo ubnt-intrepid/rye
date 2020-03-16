@@ -2,15 +2,15 @@ use futures::{
     channel::oneshot,
     executor::{LocalPool, LocalSpawner, ThreadPool},
     future::{Future, FutureExt as _, RemoteHandle},
-    task::{self, LocalSpawnExt as _, Poll, SpawnExt as _},
+    task::{LocalSpawnExt as _, SpawnExt as _},
 };
 use rye::{
     cli::{Args, Session},
-    reporter::{ConsoleReporter, Summary, TestCaseSummary},
+    reporter::{ConsoleReporter, TestCaseSummary},
     runner::{AsyncTest, BlockingTest, LocalAsyncTest, TestRunner},
     test::TestSet,
 };
-use std::{io, pin::Pin, sync::Arc, thread};
+use std::{io, sync::Arc, thread};
 
 pub(crate) fn run_tests(tests: &[&dyn TestSet]) {
     rye::cli::install();
@@ -25,28 +25,10 @@ pub(crate) fn run_tests(tests: &[&dyn TestSet]) {
     st.exit();
 }
 
-#[pin_project::pin_project]
-struct InFlight {
-    handle: RemoteHandle<TestCaseSummary>,
-    result: Option<TestCaseSummary>,
-}
-
-impl Future for InFlight {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        let me = self.project();
-        let result = futures::ready!(me.handle.poll_unpin(cx));
-        me.result.replace(result);
-        Poll::Ready(())
-    }
-}
-
 struct FuturesTestRunner {
     thread_pool: ThreadPool,
     local_pool: LocalPool,
     local_spawner: LocalSpawner,
-    in_flights: Vec<InFlight>,
 }
 
 impl FuturesTestRunner {
@@ -57,35 +39,26 @@ impl FuturesTestRunner {
             thread_pool: ThreadPool::new()?,
             local_pool,
             local_spawner,
-            in_flights: vec![],
         })
     }
 }
 
 impl TestRunner for FuturesTestRunner {
-    fn spawn(&mut self, mut test: AsyncTest) {
-        let handle = self
-            .thread_pool
+    type Handle = RemoteHandle<TestCaseSummary>;
+
+    fn spawn(&mut self, mut test: AsyncTest) -> Self::Handle {
+        self.thread_pool
             .spawn_with_handle(async move { test.run().await })
-            .unwrap();
-        self.in_flights.push(InFlight {
-            handle,
-            result: None,
-        });
+            .unwrap()
     }
 
-    fn spawn_local(&mut self, mut test: LocalAsyncTest) {
-        let handle = self
-            .local_spawner
+    fn spawn_local(&mut self, mut test: LocalAsyncTest) -> Self::Handle {
+        self.local_spawner
             .spawn_local_with_handle(async move { test.run().await })
-            .unwrap();
-        self.in_flights.push(InFlight {
-            handle,
-            result: None,
-        });
+            .unwrap()
     }
 
-    fn spawn_blocking(&mut self, mut test: BlockingTest) {
+    fn spawn_blocking(&mut self, mut test: BlockingTest) -> Self::Handle {
         let (tx, rx) = oneshot::channel();
         let (remote, handle) = rx.map(|res| res.unwrap()).remote_handle();
         self.local_spawner.spawn(remote).unwrap();
@@ -93,22 +66,13 @@ impl TestRunner for FuturesTestRunner {
             let is_success = test.run();
             let _ = tx.send(is_success);
         });
-        self.in_flights.push(InFlight {
-            handle,
-            result: None,
-        });
+        handle
     }
 
-    fn run(&mut self) -> Summary {
-        let in_flights = &mut self.in_flights;
-        let mut summary = Summary::default();
-        self.local_pool.run_until(async {
-            futures::future::join_all(in_flights.iter_mut()).await;
-            for in_flight in in_flights.drain(..) {
-                let result = in_flight.result.unwrap();
-                summary.append(result);
-            }
-        });
-        summary
+    fn run<Fut>(&mut self, fut: Fut)
+    where
+        Fut: Future<Output = ()>,
+    {
+        self.local_pool.run_until(fut)
     }
 }

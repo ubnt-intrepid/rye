@@ -1,7 +1,7 @@
 //! Abstraction of test execution in the rye.
 
 use crate::{
-    reporter::{Reporter, Summary, TestCaseSummary},
+    reporter::{Reporter, TestCaseSummary},
     test::{
         imp::{SectionId, TestFn, TestFuture},
         Fallible, Test, TestDesc,
@@ -25,41 +25,51 @@ use std::{
 
 /// The runner of test cases.
 pub trait TestRunner {
+    /// Future for awaiting a result of test execution.
+    type Handle: Future<Output = TestCaseSummary>;
+
     /// Spawn a task to execute the specified test function.
-    fn spawn(&mut self, test: AsyncTest);
+    fn spawn(&mut self, test: AsyncTest) -> Self::Handle;
 
     /// Spawn a task to execute the specified test function onto the current thread.
-    fn spawn_local(&mut self, test: LocalAsyncTest);
+    fn spawn_local(&mut self, test: LocalAsyncTest) -> Self::Handle;
 
     /// Spawn a taek to execute the specified test function that may block the running thread.
-    fn spawn_blocking(&mut self, test: BlockingTest);
+    fn spawn_blocking(&mut self, test: BlockingTest) -> Self::Handle;
 
     /// Run all test cases and collect their results.
-    fn run(&mut self) -> Summary;
+    fn run<Fut>(&mut self, fut: Fut)
+    where
+        Fut: Future<Output = ()>;
 }
 
 impl<T: ?Sized> TestRunner for &mut T
 where
     T: TestRunner,
 {
+    type Handle = T::Handle;
+
     #[inline]
-    fn spawn(&mut self, test: AsyncTest) {
+    fn spawn(&mut self, test: AsyncTest) -> Self::Handle {
         (**self).spawn(test)
     }
 
     #[inline]
-    fn spawn_local(&mut self, test: LocalAsyncTest) {
+    fn spawn_local(&mut self, test: LocalAsyncTest) -> Self::Handle {
         (**self).spawn_local(test)
     }
 
     #[inline]
-    fn spawn_blocking(&mut self, test: BlockingTest) {
+    fn spawn_blocking(&mut self, test: BlockingTest) -> Self::Handle {
         (**self).spawn_blocking(test)
     }
 
     #[inline]
-    fn run(&mut self) -> Summary {
-        (**self).run()
+    fn run<Fut>(&mut self, fut: Fut)
+    where
+        Fut: Future<Output = ()>,
+    {
+        (**self).run(fut)
     }
 }
 
@@ -67,29 +77,34 @@ impl<T: ?Sized> TestRunner for Box<T>
 where
     T: TestRunner,
 {
+    type Handle = T::Handle;
+
     #[inline]
-    fn spawn(&mut self, test: AsyncTest) {
+    fn spawn(&mut self, test: AsyncTest) -> Self::Handle {
         (**self).spawn(test)
     }
 
     #[inline]
-    fn spawn_local(&mut self, test: LocalAsyncTest) {
+    fn spawn_local(&mut self, test: LocalAsyncTest) -> Self::Handle {
         (**self).spawn_local(test)
     }
 
     #[inline]
-    fn spawn_blocking(&mut self, test: BlockingTest) {
+    fn spawn_blocking(&mut self, test: BlockingTest) -> Self::Handle {
         (**self).spawn_blocking(test)
     }
 
     #[inline]
-    fn run(&mut self) -> Summary {
-        (**self).run()
+    fn run<Fut>(&mut self, fut: Fut)
+    where
+        Fut: Future<Output = ()>,
+    {
+        (**self).run(fut)
     }
 }
 
 pub(crate) trait TestRunnerExt: TestRunner {
-    fn spawn_test<R>(&mut self, test: &Test, reporter: R)
+    fn spawn_test<R>(&mut self, test: &Test, reporter: R) -> Self::Handle
     where
         R: Reporter + Send + 'static,
     {
@@ -428,7 +443,10 @@ pub struct AccessError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{imp::TestFn, Registry, RegistryError, TestDesc, TestSet};
+    use crate::{
+        reporter::Summary,
+        test::{imp::TestFn, Registry, RegistryError, TestDesc, TestSet},
+    };
     use scoped_tls_async::{scoped_thread_local, ScopedKeyExt as _};
     use std::cell::RefCell;
 
