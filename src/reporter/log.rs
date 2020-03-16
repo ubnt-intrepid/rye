@@ -40,6 +40,7 @@ impl Reporter for LogReporter {
         match summary.status() {
             Status::Passed => log::info!("{}: ok", summary.desc.name()),
             Status::Failed => log::error!("{}: FAILED", summary.desc.name()),
+            Status::Skipped => log::info!("{}: skipped", summary.desc.name()),
         }
     }
 }

@@ -216,6 +216,7 @@ pub mod _internal {
         runner::{Context, EnterSection},
         test::{imp::SectionId, Fallible},
     };
+    use std::fmt;
 
     #[inline]
     pub fn test_result<T: Fallible + 'static>(res: T) -> Box<dyn Fallible + 'static> {
@@ -225,6 +226,12 @@ pub mod _internal {
     #[inline]
     pub fn enter_section(id: SectionId) -> EnterSection {
         Context::with(|ctx| ctx.enter_section(id))
+    }
+
+    #[inline]
+    pub fn skip(reason: fmt::Arguments<'_>) -> ! {
+        Context::with(|ctx| ctx.mark_skipped(reason));
+        panic!("skipped")
     }
 
     #[doc(hidden)] // private API.
@@ -372,3 +379,12 @@ pub use rye_macros::test_harness;
 /// }
 /// ```
 pub use rye_macros::test_module;
+
+/// Mark the current test case as having been skipped and terminate its execution.
+#[macro_export]
+macro_rules! skip {
+    () => ( $crate::skip!("explicitly skipped") );
+    ($($arg:tt)+) => {
+        $crate::_internal::skip(format_args!($($arg)+))
+    };
+}

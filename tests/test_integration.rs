@@ -7,6 +7,7 @@ rye::test_harness! {
         case_async,
         sub,
         return_result,
+        expensive_test,
     )]
 }
 
@@ -158,4 +159,13 @@ fn return_result() -> anyhow::Result<()> {
     });
 
     Ok(())
+}
+
+#[rye::test]
+fn expensive_test() {
+    if std::env::var("RUN_EXPENSIVE_TESTS").is_err() {
+        rye::skip!("set RUN_EXPENSIVE_TESTS=true to be enabled");
+    }
+
+    // do expensive tests ...
 }

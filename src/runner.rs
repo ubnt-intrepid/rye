@@ -15,6 +15,7 @@ use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _};
 use pin_project::pin_project;
 use std::{
     cell::Cell,
+    fmt,
     marker::PhantomData,
     mem,
     panic::{AssertUnwindSafe, PanicInfo},
@@ -256,6 +257,7 @@ impl TestInner {
         Context {
             desc: &self.desc,
             summary,
+            skip_reason: None,
             target_section,
             current_section: None,
             reporter: &mut self.reporter,
@@ -276,6 +278,7 @@ impl TestInner {
 pub struct Context<'a> {
     desc: &'a TestDesc,
     summary: &'a mut TestCaseSummary,
+    skip_reason: Option<String>,
     target_section: Option<SectionId>,
     current_section: Option<SectionId>,
     #[allow(dead_code)]
@@ -400,16 +403,30 @@ impl<'a> Context<'a> {
     {
         let fut = conv(f());
         let result = AssertUnwindSafe(self.scope_async(fut)).maybe_unwind().await;
-        self.summary.check_result(result);
+        if let Some(reason) = self.skip_reason.take() {
+            self.summary.mark_skipped(reason);
+        } else {
+            self.summary.check_result(result);
+        }
     }
 
     fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) {
         let result = maybe_unwind(AssertUnwindSafe(|| self.scope(f)));
-        self.summary.check_result(result);
+        if let Some(reason) = self.skip_reason.take() {
+            self.summary.mark_skipped(reason);
+        } else {
+            self.summary.check_result(result);
+        }
     }
 
     pub(crate) fn capture_panic_info(&mut self, info: &PanicInfo) {
         maybe_unwind::capture_panic_info(info);
+    }
+
+    #[inline]
+    pub(crate) fn mark_skipped(&mut self, reason: fmt::Arguments<'_>) {
+        debug_assert!(self.skip_reason.is_none());
+        self.skip_reason.replace(reason.to_string());
     }
 }
 

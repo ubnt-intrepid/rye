@@ -13,6 +13,7 @@ use std::error;
 pub(crate) enum Status {
     Passed,
     Failed,
+    Skipped,
 }
 
 #[derive(Debug)]
@@ -26,6 +27,7 @@ enum Failure {
 pub struct TestCaseSummary {
     desc: &'static TestDesc,
     status: Status,
+    skip_reason: Option<String>,
     failures: Vec<Failure>,
 }
 
@@ -34,6 +36,7 @@ impl TestCaseSummary {
         Self {
             desc,
             status: Status::Passed,
+            skip_reason: None,
             failures: vec![],
         }
     }
@@ -45,8 +48,13 @@ impl TestCaseSummary {
     pub(crate) fn should_terminate(&self) -> bool {
         match self.status() {
             Status::Passed => false,
-            Status::Failed => true,
+            Status::Failed | Status::Skipped => true,
         }
+    }
+
+    pub(crate) fn mark_skipped(&mut self, reason: String) {
+        self.status = Status::Skipped;
+        self.skip_reason.replace(reason);
     }
 
     pub(crate) fn check_result(&mut self, result: Result<Box<dyn Fallible>, Unwind>) {
@@ -70,6 +78,7 @@ impl TestCaseSummary {
 pub struct Summary {
     pub(crate) passed: Vec<TestCaseSummary>,
     pub(crate) failed: Vec<TestCaseSummary>,
+    pub(crate) skipped: Vec<TestCaseSummary>,
     pub(crate) filtered_out: Vec<&'static TestDesc>,
 }
 
@@ -79,6 +88,7 @@ impl Summary {
         Self {
             passed: vec![],
             failed: vec![],
+            skipped: vec![],
             filtered_out: vec![],
         }
     }
@@ -91,6 +101,7 @@ impl Summary {
         match result.status() {
             Status::Passed => self.passed.push(result),
             Status::Failed => self.failed.push(result),
+            Status::Skipped => self.skipped.push(result),
         }
     }
 }

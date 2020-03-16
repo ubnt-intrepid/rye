@@ -65,6 +65,7 @@ impl ConsoleReporter {
         let status = match summary.status() {
             Status::Passed => colored("ok").fg(Color::Green),
             Status::Failed => colored("FAILED").fg(Color::Red),
+            Status::Skipped => colored("skipped").fg(Color::Yellow),
         };
         write!(w, "test {} ... ", summary.desc.name(),)?;
         status.fmt_colored(w)?;
@@ -110,9 +111,10 @@ impl ConsoleReporter {
         write!(w, ".")?;
         writeln!(
             w,
-            " {passed} passed; {failed} failed; {filtered_out} filtered out",
+            " {passed} passed; {failed} failed; {skipped} skipped; {filtered_out} filtered out",
             passed = summary.passed.len(),
             failed = summary.failed.len(),
+            skipped = summary.skipped.len(),
             filtered_out = summary.filtered_out.len(),
         )?;
 
