@@ -1,7 +1,6 @@
-use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt as _};
+use proc_macro2::Span;
 use syn::{
-    parse, punctuated::Punctuated, Attribute, Ident, Path, Token, UseGroup, UseName, UsePath,
+    parse, punctuated::Punctuated, Attribute, Expr, Ident, Token, UseGroup, UseName, UsePath,
     UseTree,
 };
 
@@ -16,50 +15,15 @@ impl TestCases {
         self.test_cases.extend(cases);
         Ok(())
     }
-}
 
-impl ToTokens for TestCases {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        struct Generated<T: ToTokens> {
-            body: T,
-        }
-
-        impl<T> ToTokens for Generated<T>
-        where
-            T: ToTokens,
-        {
-            fn to_tokens(&self, tokens: &mut TokenStream) {
-                let body = &self.body;
-                tokens.append_all(&[
-                    quote! {
-                        struct __tests(());
-                        impl ::rye::_internal::TestSet for __tests {
-                            fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> Result<(), ::rye::_internal::RegistryError> {
-                                #body
-                            }
-                        }
-                        pub(crate) const __TESTS: &dyn ::rye::_internal::TestSet = &__tests(());
-                    }
-                ]);
-            }
-        }
-
-        let body = extract_test_cases(&self.test_cases)
-            .map(|paths| {
-                quote! {
-                    #( (#paths as &dyn rye::_internal::TestSet).register(__registry)?; )*
-                    Ok(())
-                }
-            })
-            .unwrap_or_else(|err| err.to_compile_error());
-
-        tokens.append_all(&[Generated { body }]);
+    pub(crate) fn extract_test_cases(&self) -> parse::Result<Vec<Expr>> {
+        extract_test_cases(&self.test_cases)
     }
 }
 
 fn extract_test_cases(
     trees: impl IntoIterator<Item = impl std::ops::Deref<Target = UseTree>>,
-) -> parse::Result<Vec<Path>> {
+) -> parse::Result<Vec<Expr>> {
     let mut paths = vec![];
     let mut errors = vec![];
 
@@ -86,36 +50,36 @@ fn extract_test_cases(
 
 fn expand_use_tree(
     tree: &UseTree,
-    paths: &mut Vec<Path>,
+    test_cases: &mut Vec<Expr>,
     ancestors: &[&Ident],
     errors: &mut Vec<parse::Error>,
 ) {
     match tree {
         UseTree::Name(UseName { ident }) => {
             #[allow(nonstandard_style)]
-            let __TESTS = syn::Ident::new("__TESTS", Span::call_site());
+            let __tests = syn::Ident::new("__tests", Span::call_site());
             let path: Punctuated<&Ident, Token![::]> = ancestors
                 .iter()
                 .copied()
                 .chain(Some(ident))
-                .chain(Some(&__TESTS))
+                .chain(Some(&__tests))
                 .collect();
-            paths.push(syn::parse_quote!(#path));
+            test_cases.push(syn::parse_quote!(#path::new()));
         }
         UseTree::Glob(..) => {
             #[allow(nonstandard_style)]
-            let __TESTS = syn::Ident::new("__TESTS", Span::call_site());
+            let __tests = syn::Ident::new("__tests", Span::call_site());
             let path: Punctuated<&Ident, Token![::]> =
-                ancestors.iter().copied().chain(Some(&__TESTS)).collect();
-            paths.push(syn::parse_quote!(#path));
+                ancestors.iter().copied().chain(Some(&__tests)).collect();
+            test_cases.push(syn::parse_quote!(#path::new()));
         }
         UseTree::Path(UsePath { ident, tree, .. }) => {
             let ancestors: Vec<_> = ancestors.iter().copied().chain(Some(ident)).collect();
-            expand_use_tree(&*tree, paths, &ancestors[..], errors);
+            expand_use_tree(&*tree, test_cases, &ancestors[..], errors);
         }
         UseTree::Group(UseGroup { items, .. }) => {
             for tree in items {
-                expand_use_tree(&*tree, paths, ancestors, errors);
+                expand_use_tree(&*tree, test_cases, ancestors, errors);
             }
         }
         UseTree::Rename(rename) => errors.push(parse::Error::new_spanned(

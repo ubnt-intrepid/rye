@@ -13,7 +13,13 @@ pub(crate) mod no_sections {
     use ::rye::_internal as __rye;
 
     #[allow(non_camel_case_types)]
-    struct __tests(());
+    pub(crate) struct __tests(());
+
+    impl __tests {
+        pub(crate) const fn new() -> Self {
+            Self(())
+        }
+    }
 
     impl __rye::TestSet for __tests {
         fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
@@ -30,7 +36,8 @@ pub(crate) mod no_sections {
         }
     }
 
-    __rye::annotate_test_case! {
-        pub(crate) static __TESTS: &dyn __rye::TestSet = &__tests(());
+    __rye::cfg_frameworks! {
+        #[test_case]
+        static __TESTS: &dyn __rye::TestSet = &__tests::new();
     }
 }

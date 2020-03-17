@@ -60,7 +60,10 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
     };
 
     let test_runner = &input.test_runner;
-    let test_cases = &input.test_cases;
+    let test_cases = match input.test_cases.extract_test_cases() {
+        Ok(cases) => cases,
+        Err(err) => return err.to_compile_error(),
+    };
 
     let main_id = match input.reexport_test_harness_main {
         Some(id) => id,
@@ -68,9 +71,10 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #test_cases
         fn #main_id () {
-            #test_runner(&[ self::__TESTS ]);
+            #test_runner(&[ #(
+                &#test_cases as &dyn ::rye::_internal::TestSet,
+            )* ]);
         }
     }
 }

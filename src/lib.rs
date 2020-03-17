@@ -196,10 +196,10 @@ mod global;
 #[doc(hidden)] // private API.
 pub mod _internal {
     pub use crate::{
-        __annotate_test_case as annotate_test_case, //
-        __async_local_test_fn as async_local_test_fn,
+        __async_local_test_fn as async_local_test_fn, //
         __async_test_fn as async_test_fn,
         __blocking_test_fn as blocking_test_fn,
+        __cfg_frameworks as cfg_frameworks,
         __declare_section as declare_section,
         __enter_section as enter_section,
         __location as location,
@@ -307,20 +307,15 @@ pub mod _internal {
     #[doc(hidden)] // private API.
     #[cfg(not(feature = "frameworks"))]
     #[macro_export]
-    macro_rules! __annotate_test_case {
-        ($item:item) => {
-            $item
-        };
+    macro_rules! __cfg_frameworks {
+        ($($t:tt)*) => {};
     }
 
     #[doc(hidden)] // private API.
     #[cfg(feature = "frameworks")]
     #[macro_export]
-    macro_rules! __annotate_test_case {
-        ($item:item) => {
-            #[test_case]
-            $item
-        };
+    macro_rules! __cfg_frameworks {
+        ($($t:tt)*) => ( $($t)* );
     }
 }
 

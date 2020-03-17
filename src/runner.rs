@@ -530,7 +530,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__TESTS);
+            let history = run_test(&test_case::__tests::new());
             assert_eq!(history, vec![("test", None)]);
         }
     }
@@ -552,7 +552,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__TESTS);
+            let history = run_test(&test_case::__tests::new());
             assert_eq!(
                 history,
                 vec![
@@ -585,7 +585,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__TESTS);
+            let history = run_test(&test_case::__tests::new());
             assert_eq!(
                 history,
                 vec![
@@ -635,7 +635,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__TESTS);
+            let history = run_test(&test_case::__tests::new());
             assert_eq!(
                 history,
                 vec![
@@ -706,7 +706,7 @@ mod tests {
 
         #[test]
         fn test() {
-            let history = run_test(&test_case::__TESTS);
+            let history = run_test(&test_case::__tests::new());
             assert_eq!(
                 history,
                 vec![

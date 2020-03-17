@@ -33,8 +33,26 @@ pub(crate) fn test_module(input: TokenStream) -> TokenStream {
         Ok(input) => input,
         Err(err) => return err.to_compile_error(),
     };
-    let test_cases = &input.test_cases;
+    let test_cases = match input.test_cases.extract_test_cases() {
+        Ok(cases) => cases,
+        Err(err) => return err.to_compile_error(),
+    };
     quote! {
-        #test_cases
+        pub(crate) struct __tests(());
+
+        impl __tests {
+            pub(crate) const fn new() -> Self {
+                Self(())
+            }
+        }
+
+        impl ::rye::_internal::TestSet for __tests {
+            fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> Result<(), ::rye::_internal::RegistryError> {
+                #(
+                    #test_cases.register(__registry)?;
+                )*
+                Ok(())
+            }
+        }
     }
 }
