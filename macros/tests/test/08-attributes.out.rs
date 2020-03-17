@@ -21,23 +21,22 @@ pub(crate) mod attributes {
     #[allow(unused_imports)]
     use path::to::rye::_internal as __rye;
 
-    __rye::lazy_static! {
-        static ref __DESC: __rye::TestDesc = __rye::TestDesc {
-            module_path: __rye::module_path!(),
-            location: __rye::location!(),
-            sections: __rye::declare_section! {
-                0u64 => ("with unused variable", {});
-            },
-            leaf_sections: &[ 0u64 ],
-        };
-    }
-
     #[allow(non_camel_case_types)]
     struct __tests(());
 
     impl __rye::TestSet for __tests {
         fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(&*__DESC, __rye::blocking_test_fn!(attributes))?;
+            __registry.add_test(
+                __rye::TestDesc {
+                    module_path: __rye::module_path!(),
+                    location: __rye::location!(),
+                    sections: __rye::declare_section! {
+                        0u64 => ("with unused variable", {});
+                    },
+                    leaf_sections: &[ 0u64 ],
+                },
+                __rye::blocking_test_fn!(attributes)
+            )?;
             __rye::Result::Ok(())
         }
     }

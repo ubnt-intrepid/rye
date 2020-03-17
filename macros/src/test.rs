@@ -368,21 +368,20 @@ impl ToTokens for Generated<'_> {
                 use super::*;
                 #rye_reexport
 
-                __rye::lazy_static! {
-                    static ref __DESC: __rye::TestDesc = __rye::TestDesc {
-                        module_path: __rye::module_path!(),
-                        location: #location,
-                        sections: __rye::declare_section! { #( #section_map_entries )* },
-                        leaf_sections: &[ #( #leaf_section_ids ),* ],
-                    };
-                }
-
                 #[allow(non_camel_case_types)]
                 struct __tests(());
 
                 impl __rye::TestSet for __tests {
                     fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-                        __registry.add_test(&*__DESC, __rye::#test_fn_id!(#ident))?;
+                        __registry.add_test(
+                            __rye::TestDesc {
+                                module_path: __rye::module_path!(),
+                                location: #location,
+                                sections: __rye::declare_section! { #( #section_map_entries )* },
+                                leaf_sections: &[ #( #leaf_section_ids ),* ],
+                            },
+                            __rye::#test_fn_id!(#ident)
+                        )?;
                         __rye::Result::Ok(())
                     }
                 }

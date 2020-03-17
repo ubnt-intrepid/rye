@@ -34,28 +34,27 @@ pub(crate) mod multi_section_in_scope {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    __rye::lazy_static! {
-        static ref __DESC: __rye::TestDesc = __rye::TestDesc {
-            module_path: __rye::module_path!(),
-            location: __rye::location!(),
-            sections: __rye::declare_section! {
-                0u64 => ("section1"     , {});
-                1u64 => ("section2"     , {});
-                2u64 => ("section2-1"   , { 1u64 });
-                3u64 => ("section2-1-2" , { 1u64, 2u64 });
-                4u64 => ("section2-2"   , { 1u64 });
-                5u64 => ("section3"     , {});
-            },
-            leaf_sections: &[ 0u64, 3u64, 4u64, 5u64 ],
-        };
-    }
-
     #[allow(non_camel_case_types)]
     struct __tests(());
 
     impl __rye::TestSet for __tests {
         fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(&*__DESC, __rye::blocking_test_fn!(multi_section_in_scope))?;
+            __registry.add_test(
+                __rye::TestDesc {
+                    module_path: __rye::module_path!(),
+                    location: __rye::location!(),
+                    sections: __rye::declare_section! {
+                        0u64 => ("section1"     , {});
+                        1u64 => ("section2"     , {});
+                        2u64 => ("section2-1"   , { 1u64 });
+                        3u64 => ("section2-1-2" , { 1u64, 2u64 });
+                        4u64 => ("section2-2"   , { 1u64 });
+                        5u64 => ("section3"     , {});
+                    },
+                    leaf_sections: &[ 0u64, 3u64, 4u64, 5u64 ],
+                },
+                __rye::blocking_test_fn!(multi_section_in_scope)
+            )?;
             __rye::Result::Ok(())
         }
     }

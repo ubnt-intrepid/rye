@@ -1,7 +1,7 @@
 //! Registration of test cases.
 
 use self::imp::{Section, SectionId, TestFn};
-use std::{collections::HashMap, error, fmt};
+use std::{collections::HashMap, error, fmt, sync::Arc};
 
 #[doc(hidden)] // private API.
 #[derive(Debug)]
@@ -32,7 +32,7 @@ macro_rules! __location {
 /// Description about a single test case.
 #[derive(Debug)]
 pub struct Test {
-    pub(crate) desc: &'static TestDesc,
+    pub(crate) desc: Arc<TestDesc>,
     pub(crate) test_fn: TestFn,
     pub(crate) filtered_out: bool,
 }
@@ -40,8 +40,8 @@ pub struct Test {
 impl Test {
     /// Return the reference to the test description.
     #[inline]
-    pub fn desc(&self) -> &'static TestDesc {
-        self.desc
+    pub fn desc(&self) -> &TestDesc {
+        &self.desc
     }
 
     /// Return the test case is asynchronous or not.
@@ -164,7 +164,7 @@ where
 /// The registry of test cases.
 pub trait Registry {
     #[doc(hidden)] // private API.
-    fn add_test(&mut self, desc: &'static TestDesc, test_fn: TestFn) -> Result<(), RegistryError>;
+    fn add_test(&mut self, desc: TestDesc, test_fn: TestFn) -> Result<(), RegistryError>;
 }
 
 impl<R: ?Sized> Registry for &mut R
@@ -173,7 +173,7 @@ where
 {
     #[doc(hidden)] // private API.
     #[inline]
-    fn add_test(&mut self, desc: &'static TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
+    fn add_test(&mut self, desc: TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
         (**self).add_test(desc, test_fn)
     }
 }
@@ -184,7 +184,7 @@ where
 {
     #[doc(hidden)] // private API.
     #[inline]
-    fn add_test(&mut self, desc: &'static TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
+    fn add_test(&mut self, desc: TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
         (**self).add_test(desc, test_fn)
     }
 }

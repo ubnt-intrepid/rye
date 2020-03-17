@@ -17,7 +17,6 @@ frameworks = []
 rye-macros = { version = "=0.1.0-dev", path = "./macros" }
 futures = "0.3"
 getopts = "0.2"
-lazy_static = "1.4"
 log = "0.4"
 maplit = "1"
 maybe-unwind = { version = "0.2.1", features = [ "futures" ] }

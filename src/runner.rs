@@ -22,6 +22,7 @@ use std::{
     pin::Pin,
     ptr::NonNull,
     rc::Rc,
+    sync::Arc,
 };
 
 /// The runner of test cases.
@@ -110,7 +111,7 @@ pub(crate) trait TestRunnerExt: TestRunner {
         R: Reporter + Send + 'static,
     {
         let inner = TestInner {
-            desc: test.desc,
+            desc: test.desc.clone(),
             reporter: Box::new(reporter),
         };
         match test.test_fn {
@@ -150,8 +151,8 @@ pub struct BlockingTest {
 impl BlockingTest {
     #[allow(missing_docs)]
     #[inline]
-    pub fn desc(&self) -> &'static TestDesc {
-        self.inner.desc
+    pub fn desc(&self) -> &TestDesc {
+        &self.inner.desc
     }
 
     /// Run the test function until all sections are completed.
@@ -170,8 +171,8 @@ pub struct AsyncTest {
 impl AsyncTest {
     #[allow(missing_docs)]
     #[inline]
-    pub fn desc(&self) -> &'static TestDesc {
-        self.inner.desc
+    pub fn desc(&self) -> &TestDesc {
+        &self.inner.desc
     }
 
     /// Run the test function until all sections are completed.
@@ -196,8 +197,8 @@ pub struct LocalAsyncTest {
 impl LocalAsyncTest {
     #[allow(missing_docs)]
     #[inline]
-    pub fn desc(&self) -> &'static TestDesc {
-        self.inner.desc
+    pub fn desc(&self) -> &TestDesc {
+        &self.inner.desc
     }
 
     /// Run the test function until all sections are completed.
@@ -208,7 +209,7 @@ impl LocalAsyncTest {
 }
 
 struct TestInner {
-    desc: &'static TestDesc,
+    desc: Arc<TestDesc>,
     reporter: Box<dyn Reporter + Send + 'static>,
 }
 
@@ -220,9 +221,9 @@ impl TestInner {
     {
         self.start_test_case();
 
-        let mut summary = TestCaseSummary::new(self.desc);
+        let mut summary = TestCaseSummary::new(self.desc.clone());
         for section in self.desc.target_sections() {
-            self.context(section, &mut summary)
+            Context::new(&self.desc, &mut summary, &mut *self.reporter, section)
                 .run_async(f, &conv)
                 .await;
             if summary.should_terminate() {
@@ -237,9 +238,9 @@ impl TestInner {
     fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) -> TestCaseSummary {
         self.start_test_case();
 
-        let mut summary = TestCaseSummary::new(self.desc);
+        let mut summary = TestCaseSummary::new(self.desc.clone());
         for section in self.desc.target_sections() {
-            self.context(section, &mut summary).run_blocking(f);
+            Context::new(&self.desc, &mut summary, &mut *self.reporter, section).run_blocking(f);
             if summary.should_terminate() {
                 break;
             }
@@ -249,24 +250,8 @@ impl TestInner {
         summary
     }
 
-    fn context<'a>(
-        &'a mut self,
-        target_section: Option<SectionId>,
-        summary: &'a mut TestCaseSummary,
-    ) -> Context<'a> {
-        Context {
-            desc: &self.desc,
-            summary,
-            skip_reason: None,
-            target_section,
-            current_section: None,
-            reporter: &mut self.reporter,
-            _marker: PhantomData,
-        }
-    }
-
     fn start_test_case(&mut self) {
-        self.reporter.test_case_starting(self.desc);
+        self.reporter.test_case_starting(&self.desc);
     }
 
     fn end_test_case(&mut self, summary: &TestCaseSummary) {
@@ -299,6 +284,23 @@ impl Drop for Guard {
 }
 
 impl<'a> Context<'a> {
+    fn new(
+        desc: &'a TestDesc,
+        summary: &'a mut TestCaseSummary,
+        reporter: &'a mut (dyn Reporter + Send),
+        target_section: Option<SectionId>,
+    ) -> Self {
+        Self {
+            desc,
+            summary,
+            skip_reason: None,
+            target_section,
+            current_section: None,
+            reporter,
+            _marker: PhantomData,
+        }
+    }
+
     pub(crate) fn scope<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce() -> R,
@@ -477,13 +479,9 @@ mod tests {
         HISTORY.with(|history| history.borrow_mut().push((msg, current_section)));
     }
 
-    struct MockRegistry<'a>(&'a mut Option<(&'static TestDesc, TestFn)>);
+    struct MockRegistry<'a>(&'a mut Option<(TestDesc, TestFn)>);
     impl Registry for MockRegistry<'_> {
-        fn add_test(
-            &mut self,
-            desc: &'static TestDesc,
-            test_fn: TestFn,
-        ) -> Result<(), RegistryError> {
+        fn add_test(&mut self, desc: TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
             self.0.replace((desc, test_fn));
             Ok(())
         }
@@ -507,7 +505,7 @@ mod tests {
 
         let history = RefCell::new(vec![]);
         let mut state = TestInner {
-            desc,
+            desc: Arc::new(desc),
             reporter: Box::new(NullReporter),
         };
 

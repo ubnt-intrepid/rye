@@ -208,7 +208,6 @@ pub mod _internal {
             Registry, RegistryError, TestDesc, TestSet,
         },
     };
-    pub use lazy_static::lazy_static;
     pub use maplit::hashset;
     pub use std::{module_path, result::Result};
 

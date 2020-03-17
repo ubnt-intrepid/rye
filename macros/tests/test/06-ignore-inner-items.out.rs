@@ -14,21 +14,20 @@ pub(crate) mod ignore_inner_items {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    __rye::lazy_static! {
-        static ref __DESC: __rye::TestDesc = __rye::TestDesc {
-            module_path: __rye::module_path!(),
-            location: __rye::location!(),
-            sections: __rye::declare_section! {},
-            leaf_sections: &[],
-        };
-    }
-
     #[allow(non_camel_case_types)]
     struct __tests(());
 
     impl __rye::TestSet for __tests {
         fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(&*__DESC, __rye::blocking_test_fn!(ignore_inner_items))?;
+            __registry.add_test(
+                __rye::TestDesc {
+                    module_path: __rye::module_path!(),
+                    location: __rye::location!(),
+                    sections: __rye::declare_section! {},
+                    leaf_sections: &[],
+                },
+                __rye::blocking_test_fn!(ignore_inner_items)
+            )?;
             __rye::Result::Ok(())
         }
     }

@@ -7,7 +7,7 @@ pub use self::{console::ConsoleReporter, log::LogReporter};
 
 use crate::test::{Fallible, Test, TestDesc};
 use maybe_unwind::Unwind;
-use std::error;
+use std::{error, sync::Arc};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) enum Status {
@@ -25,14 +25,14 @@ enum Failure {
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub struct TestCaseSummary {
-    desc: &'static TestDesc,
+    desc: Arc<TestDesc>,
     status: Status,
     skip_reason: Option<String>,
     failures: Vec<Failure>,
 }
 
 impl TestCaseSummary {
-    pub(crate) fn new(desc: &'static TestDesc) -> Self {
+    pub(crate) fn new(desc: Arc<TestDesc>) -> Self {
         Self {
             desc,
             status: Status::Passed,
@@ -79,7 +79,7 @@ pub struct Summary {
     pub(crate) passed: Vec<TestCaseSummary>,
     pub(crate) failed: Vec<TestCaseSummary>,
     pub(crate) skipped: Vec<TestCaseSummary>,
-    pub(crate) filtered_out: Vec<&'static TestDesc>,
+    pub(crate) filtered_out: Vec<Arc<TestDesc>>,
 }
 
 impl Summary {

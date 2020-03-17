@@ -7,6 +7,7 @@ use crate::{
 use std::{
     collections::HashSet,
     io::{self, Write as _},
+    sync::Arc,
 };
 
 pub struct Session<'sess> {
@@ -87,7 +88,7 @@ impl<'sess> Session<'sess> {
         let mut handles = vec![];
         for test in self.registered_tests.drain(..) {
             if test.filtered_out {
-                summary.filtered_out.push(test.desc());
+                summary.filtered_out.push(test.desc);
             } else {
                 let reporter = reporter.clone();
                 handles.push(runner.spawn_test(&test, reporter));
@@ -115,7 +116,7 @@ struct MainRegistry<'a, 'sess> {
 }
 
 impl Registry for MainRegistry<'_, '_> {
-    fn add_test(&mut self, desc: &'static TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
+    fn add_test(&mut self, desc: TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
         let session = &mut *self.session;
         let filtered_out = session.args.is_filtered_out(desc.name());
 
@@ -127,7 +128,7 @@ impl Registry for MainRegistry<'_, '_> {
         }
 
         session.registered_tests.push(Test {
-            desc,
+            desc: Arc::new(desc),
             test_fn,
             filtered_out,
         });
