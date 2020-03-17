@@ -355,7 +355,7 @@ impl ToTokens for Generated<'_> {
 
         let ident = &self.item.sig.ident;
         let rye_reexport = &self.params.reexport_internal_module();
-        let location = quote_spanned!(self.item.span() => __rye::location!());
+        let location = quote_spanned!(self.item.sig.span() => __rye::location!());
 
         let test_fn_id = match self.item.sig.asyncness {
             Some(..) if self.args.local => Ident::new("async_local_test_fn", Span::call_site()),
