@@ -102,6 +102,13 @@ fn expand_use_tree(
                 .collect();
             paths.push(syn::parse_quote!(#path));
         }
+        UseTree::Glob(..) => {
+            #[allow(nonstandard_style)]
+            let __TESTS = syn::Ident::new("__TESTS", Span::call_site());
+            let path: Punctuated<&Ident, Token![::]> =
+                ancestors.iter().copied().chain(Some(&__TESTS)).collect();
+            paths.push(syn::parse_quote!(#path));
+        }
         UseTree::Path(UsePath { ident, tree, .. }) => {
             let ancestors: Vec<_> = ancestors.iter().copied().chain(Some(ident)).collect();
             expand_use_tree(&*tree, paths, &ancestors[..], errors);
@@ -113,10 +120,7 @@ fn expand_use_tree(
         }
         UseTree::Rename(rename) => errors.push(parse::Error::new_spanned(
             rename,
-            "rename pattern is forbidden",
+            "test cases cannot be renamed",
         )),
-        UseTree::Glob(glob) => {
-            errors.push(parse::Error::new_spanned(glob, "glob pattern is forbidden"))
-        }
     }
 }

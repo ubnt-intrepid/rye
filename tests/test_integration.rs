@@ -5,9 +5,9 @@ rye::test_harness! {
         case_async_nosend,
         nested,
         case_async,
-        sub,
         return_result,
         expensive_test,
+        sub::*,
     )]
 }
 
