@@ -203,19 +203,20 @@ pub mod _internal {
         __declare_section as declare_section,
         __enter_section as enter_section,
         __location as location,
+        __test_name as test_name,
         test::{
             imp::{Section, TestFn, TestFuture},
             Registry, RegistryError, TestDesc, TestSet,
         },
     };
     pub use maplit::hashset;
-    pub use std::{module_path, result::Result};
+    pub use std::{module_path, result::Result, stringify};
 
     use crate::{
         runner::{Context, EnterSection},
         test::{imp::SectionId, Fallible},
     };
-    use std::fmt;
+    use std::{borrow::Cow, fmt};
 
     #[inline]
     pub fn test_result<T: Fallible + 'static>(res: T) -> Box<dyn Fallible + 'static> {
@@ -231,6 +232,25 @@ pub mod _internal {
     pub fn skip(reason: fmt::Arguments<'_>) -> ! {
         Context::with(|ctx| ctx.mark_skipped(reason));
         panic!("skipped")
+    }
+
+    #[inline]
+    pub fn test_name(module_path: &'static str, name: &'static str) -> Cow<'static, str> {
+        module_path
+            .splitn(2, "::")
+            .nth(1)
+            .map_or(name.into(), |m| format!("{}::{}", m, name).into())
+    }
+
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __test_name {
+        ($name:ident) => {
+            $crate::_internal::test_name(
+                $crate::_internal::module_path!(),
+                $crate::_internal::stringify!($name),
+            )
+        };
     }
 
     #[doc(hidden)] // private API.

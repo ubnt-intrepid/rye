@@ -459,7 +459,7 @@ pub struct AccessError {
     _p: (),
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "frameworks")))]
 mod tests {
     use super::*;
     use crate::{
@@ -519,25 +519,20 @@ mod tests {
         history.into_inner()
     }
 
-    mod no_section {
-        use super::*;
-
+    #[test]
+    fn no_section() {
         #[crate::test]
         #[rye(crate = "crate")]
         fn test_case() {
             append_history("test");
         }
 
-        #[test]
-        fn test() {
-            let history = run_test(&test_case::__tests::new());
-            assert_eq!(history, vec![("test", None)]);
-        }
+        let history = run_test(&test_case::__new());
+        assert_eq!(history, vec![("test", None)]);
     }
 
-    mod one_section {
-        use super::*;
-
+    #[test]
+    fn one_section() {
         #[crate::test]
         #[rye(crate = "crate")]
         fn test_case() {
@@ -550,23 +545,19 @@ mod tests {
             append_history("teardown");
         }
 
-        #[test]
-        fn test() {
-            let history = run_test(&test_case::__tests::new());
-            assert_eq!(
-                history,
-                vec![
-                    ("setup", None),
-                    ("section1", Some("section1")),
-                    ("teardown", None)
-                ]
-            );
-        }
+        let history = run_test(&test_case::__new());
+        assert_eq!(
+            history,
+            vec![
+                ("setup", None),
+                ("section1", Some("section1")),
+                ("teardown", None)
+            ]
+        );
     }
 
-    mod multi_section {
-        use super::*;
-
+    #[test]
+    fn multi_section() {
         #[crate::test]
         #[rye(crate = "crate")]
         fn test_case() {
@@ -583,28 +574,24 @@ mod tests {
             append_history("teardown");
         }
 
-        #[test]
-        fn test() {
-            let history = run_test(&test_case::__tests::new());
-            assert_eq!(
-                history,
-                vec![
-                    // phase 1
-                    ("setup", None),
-                    ("section1", Some("section1")),
-                    ("teardown", None),
-                    // phase 2
-                    ("setup", None),
-                    ("section2", Some("section2")),
-                    ("teardown", None),
-                ]
-            );
-        }
+        let history = run_test(&test_case::__new());
+        assert_eq!(
+            history,
+            vec![
+                // phase 1
+                ("setup", None),
+                ("section1", Some("section1")),
+                ("teardown", None),
+                // phase 2
+                ("setup", None),
+                ("section2", Some("section2")),
+                ("teardown", None),
+            ]
+        );
     }
 
-    mod nested_section {
-        use super::*;
-
+    #[test]
+    fn nested_section() {
         #[crate::test]
         #[rye(crate = "crate")]
         fn test_case() {
@@ -633,39 +620,35 @@ mod tests {
             append_history("teardown");
         }
 
-        #[test]
-        fn test() {
-            let history = run_test(&test_case::__tests::new());
-            assert_eq!(
-                history,
-                vec![
-                    // phase 1
-                    ("setup", None),
-                    ("section1:setup", Some("section1")),
-                    ("section2", Some("section2")),
-                    ("section1:teardown", Some("section1")),
-                    ("test", None),
-                    ("teardown", None),
-                    // phase 2
-                    ("setup", None),
-                    ("section1:setup", Some("section1")),
-                    ("section3", Some("section3")),
-                    ("section1:teardown", Some("section1")),
-                    ("test", None),
-                    ("teardown", None),
-                    // phase 3
-                    ("setup", None),
-                    ("test", None),
-                    ("section4", Some("section4")),
-                    ("teardown", None),
-                ]
-            );
-        }
+        let history = run_test(&test_case::__new());
+        assert_eq!(
+            history,
+            vec![
+                // phase 1
+                ("setup", None),
+                ("section1:setup", Some("section1")),
+                ("section2", Some("section2")),
+                ("section1:teardown", Some("section1")),
+                ("test", None),
+                ("teardown", None),
+                // phase 2
+                ("setup", None),
+                ("section1:setup", Some("section1")),
+                ("section3", Some("section3")),
+                ("section1:teardown", Some("section1")),
+                ("test", None),
+                ("teardown", None),
+                // phase 3
+                ("setup", None),
+                ("test", None),
+                ("section4", Some("section4")),
+                ("teardown", None),
+            ]
+        );
     }
 
-    mod smoke_async {
-        use super::*;
-
+    #[test]
+    fn smoke_async() {
         #[crate::test]
         #[rye(crate = "crate")]
         async fn test_case() {
@@ -704,33 +687,30 @@ mod tests {
             append_history("teardown");
         }
 
-        #[test]
-        fn test() {
-            let history = run_test(&test_case::__tests::new());
-            assert_eq!(
-                history,
-                vec![
-                    // phase 1
-                    ("setup", None),
-                    ("section1:setup", Some("section1")),
-                    ("section2", Some("section2")),
-                    ("section1:teardown", Some("section1")),
-                    ("test", None),
-                    ("teardown", None),
-                    // phase 2
-                    ("setup", None),
-                    ("section1:setup", Some("section1")),
-                    ("section3", Some("section3")),
-                    ("section1:teardown", Some("section1")),
-                    ("test", None),
-                    ("teardown", None),
-                    // phase 3
-                    ("setup", None),
-                    ("test", None),
-                    ("section4", Some("section4")),
-                    ("teardown", None),
-                ]
-            );
-        }
+        let history = run_test(&test_case::__new());
+        assert_eq!(
+            history,
+            vec![
+                // phase 1
+                ("setup", None),
+                ("section1:setup", Some("section1")),
+                ("section2", Some("section2")),
+                ("section1:teardown", Some("section1")),
+                ("test", None),
+                ("teardown", None),
+                // phase 2
+                ("setup", None),
+                ("section1:setup", Some("section1")),
+                ("section3", Some("section3")),
+                ("section1:teardown", Some("section1")),
+                ("test", None),
+                ("teardown", None),
+                // phase 3
+                ("setup", None),
+                ("test", None),
+                ("section4", Some("section4")),
+                ("teardown", None),
+            ]
+        );
     }
 }

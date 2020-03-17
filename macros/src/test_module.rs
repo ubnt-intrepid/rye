@@ -41,7 +41,7 @@ pub(crate) fn test_module(input: TokenStream) -> TokenStream {
         pub(crate) struct __tests(());
 
         impl __tests {
-            pub(crate) const fn new() -> Self {
+            pub(crate) const fn __new() -> Self {
                 Self(())
             }
         }

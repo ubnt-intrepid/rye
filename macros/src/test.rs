@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens, TokenStreamExt as _};
+use quote::{format_ident, quote, quote_spanned, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
     ext::IdentExt as _,
@@ -49,21 +49,16 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     // expand section!()
     let sections = expand_sections(&mut item);
 
-    item.block
-        .stmts
-        .insert(0, Stmt::Item(params.reexport_internal_module()));
+    let ident = mem::replace(&mut item.sig.ident, Ident::new("__body", Span::call_site()));
 
-    let generated = Generated {
+    Generated {
         item: &item,
         params: &params,
         args: &args,
+        ident: &ident,
         sections: &sections,
-    };
-
-    quote! {
-        #item
-        #generated
     }
+    .to_token_stream()
 }
 
 struct Args {
@@ -321,6 +316,7 @@ struct Generated<'a> {
     params: &'a Params,
     args: &'a Args,
     item: &'a ItemFn,
+    ident: &'a Ident,
     sections: &'a [Section],
 }
 
@@ -353,51 +349,61 @@ impl ToTokens for Generated<'_> {
             }
         });
 
-        let ident = &self.item.sig.ident;
+        let item = &*self.item;
+        let vis = &self.item.vis;
+        let ident = &*self.ident;
         let rye_reexport = &self.params.reexport_internal_module();
         let location = quote_spanned!(self.item.sig.span() => __rye::location!());
 
-        let test_fn_id = match self.item.sig.asyncness {
-            Some(..) if self.args.local => Ident::new("async_local_test_fn", Span::call_site()),
-            Some(..) => Ident::new("async_test_fn", Span::call_site()),
-            None => Ident::new("blocking_test_fn", Span::call_site()),
+        let scope_for_id = format_ident!("__SCOPE_FOR__{}", ident);
+        let test_fn_id = {
+            let prefix = match (self.item.sig.asyncness.is_some(), self.args.local) {
+                (true, true) => "async_local",
+                (true, false) => "async",
+                (false, _) => "blocking",
+            };
+            format_ident!("{}_test_fn", prefix)
         };
 
         tokens.append_all(vec![quote! {
-            pub(crate) mod #ident {
-                use super::*;
+            #[allow(non_camel_case_types)]
+            #vis struct #ident(());
+
+            #[allow(non_upper_case_globals)]
+            const #scope_for_id: () = {
                 #rye_reexport
-
-                #[allow(non_camel_case_types)]
-                pub(crate) struct __tests(());
-
-                impl __tests {
-                    pub(crate) const fn new() -> Self {
+                impl #ident {
+                    #vis const fn __new() -> Self {
                         Self(())
                     }
+                    #item
                 }
-
-                impl __rye::TestSet for __tests {
+                impl __rye::TestSet for #ident {
                     fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
                         __registry.add_test(
                             __rye::TestDesc {
-                                module_path: __rye::module_path!(),
+                                name: __rye::test_name!(#ident),
                                 location: #location,
                                 sections: __rye::declare_section! { #( #section_map_entries )* },
                                 leaf_sections: &[ #( #leaf_section_ids ),* ],
                             },
-                            __rye::#test_fn_id!(#ident)
+                            __rye::#test_fn_id!(Self::__body)
                         )?;
                         __rye::Result::Ok(())
                     }
                 }
-
-                __rye::cfg_frameworks! {
-                    #[test_case]
-                    static __TESTS: &dyn __rye::TestSet = &__tests::new();
-                }
-            }
+            };
         }]);
+
+        //
+        let crate_path = &self.params.crate_path;
+        let test_case_id = format_ident!("__TEST_CASE__{}", ident);
+        tokens.append_all(Some(quote! {
+            #crate_path::_internal::cfg_frameworks! {
+                #[test_case]
+                static #test_case_id: &dyn #crate_path::_internal::TestSet = &#ident::__new();
+            }
+        }));
     }
 }
 

@@ -56,22 +56,16 @@ fn expand_use_tree(
 ) {
     match tree {
         UseTree::Name(UseName { ident }) => {
-            #[allow(nonstandard_style)]
-            let __tests = syn::Ident::new("__tests", Span::call_site());
-            let path: Punctuated<&Ident, Token![::]> = ancestors
-                .iter()
-                .copied()
-                .chain(Some(ident))
-                .chain(Some(&__tests))
-                .collect();
-            test_cases.push(syn::parse_quote!(#path::new()));
+            let path: Punctuated<&Ident, Token![::]> =
+                ancestors.iter().copied().chain(Some(ident)).collect();
+            test_cases.push(syn::parse_quote!(#path::__new()));
         }
         UseTree::Glob(..) => {
             #[allow(nonstandard_style)]
             let __tests = syn::Ident::new("__tests", Span::call_site());
             let path: Punctuated<&Ident, Token![::]> =
                 ancestors.iter().copied().chain(Some(&__tests)).collect();
-            test_cases.push(syn::parse_quote!(#path::new()));
+            test_cases.push(syn::parse_quote!(#path::__new()));
         }
         UseTree::Path(UsePath { ident, tree, .. }) => {
             let ancestors: Vec<_> = ancestors.iter().copied().chain(Some(ident)).collect();

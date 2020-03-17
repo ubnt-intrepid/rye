@@ -1,53 +1,50 @@
-fn multi_section_in_scope() {
+#[allow(non_camel_case_types)]
+struct multi_section_in_scope(());
+
+#[allow(non_upper_case_globals)]
+const __SCOPE_FOR__multi_section_in_scope: () = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    __rye::enter_section!(0u64, {
-        assert!(1 + 1 == 2);
-    });
-
-    __rye::enter_section!(1u64, {
-        assert!(1 + 1 == 2);
-
-        __rye::enter_section!(2u64, {
-            assert!(true);
-
-            __rye::enter_section!(3u64, {
-                assert!(true);
-            });
-        });
-
-        __rye::enter_section!(4u64, {
-            assert!(true);
-        });
-
-        assert!(1 + 2 == 3);
-    });
-
-    __rye::enter_section!(5u64, {
-        assert!(false);
-    });
-}
-
-pub(crate) mod multi_section_in_scope {
-    use super::*;
-    #[allow(unused_imports)]
-    use ::rye::_internal as __rye;
-
-    #[allow(non_camel_case_types)]
-    pub(crate) struct __tests(());
-
-    impl __tests {
-        pub(crate) const fn new() -> Self {
+    impl multi_section_in_scope {
+        const fn __new() -> Self {
             Self(())
+        }
+
+        fn __body() {
+            __rye::enter_section!(0u64, {
+                assert!(1 + 1 == 2);
+            });
+
+            __rye::enter_section!(1u64, {
+                assert!(1 + 1 == 2);
+
+                __rye::enter_section!(2u64, {
+                    assert!(true);
+
+                    __rye::enter_section!(3u64, {
+                        assert!(true);
+                    });
+                });
+
+                __rye::enter_section!(4u64, {
+                    assert!(true);
+                });
+
+                assert!(1 + 2 == 3);
+            });
+
+            __rye::enter_section!(5u64, {
+                assert!(false);
+            });
         }
     }
 
-    impl __rye::TestSet for __tests {
+    impl __rye::TestSet for multi_section_in_scope {
         fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
             __registry.add_test(
                 __rye::TestDesc {
-                    module_path: __rye::module_path!(),
+                    name: __rye::test_name!(multi_section_in_scope),
                     location: __rye::location!(),
                     sections: __rye::declare_section! {
                         0u64 => ("section1"     , {});
@@ -59,14 +56,14 @@ pub(crate) mod multi_section_in_scope {
                     },
                     leaf_sections: &[ 0u64, 3u64, 4u64, 5u64 ],
                 },
-                __rye::blocking_test_fn!(multi_section_in_scope)
+                __rye::blocking_test_fn!(Self::__body)
             )?;
             __rye::Result::Ok(())
         }
     }
+};
 
-    __rye::cfg_frameworks! {
-        #[test_case]
-        static __TESTS: &dyn __rye::TestSet = &__tests::new();
-    }
+::rye::_internal::cfg_frameworks! {
+    #[test_case]
+    static __TEST_CASE__multi_section_in_scope: &dyn ::rye::_internal::TestSet = &multi_section_in_scope::__new();
 }

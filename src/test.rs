@@ -1,7 +1,7 @@
 //! Registration of test cases.
 
 use self::imp::{Section, SectionId, TestFn};
-use std::{collections::HashMap, error, fmt, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, error, fmt, sync::Arc};
 
 #[doc(hidden)] // private API.
 #[derive(Debug)]
@@ -68,7 +68,7 @@ impl Test {
 #[derive(Debug)]
 pub struct TestDesc {
     #[doc(hidden)]
-    pub module_path: &'static str,
+    pub name: Cow<'static, str>,
     #[doc(hidden)]
     pub location: Location,
     #[doc(hidden)]
@@ -84,10 +84,7 @@ impl TestDesc {
     /// the root module.
     #[inline]
     pub fn name(&self) -> &str {
-        self.module_path
-            .splitn(2, "::")
-            .nth(1)
-            .unwrap_or("<unknown>")
+        &*self.name
     }
 
     /// Return the iterator over the section ids to be enabled.
