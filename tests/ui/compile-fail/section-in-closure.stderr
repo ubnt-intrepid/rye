@@ -1,4 +1,4 @@
-error: section cannot be described in a closure
+error: section cannot be described at here
  --> $DIR/section-in-closure.rs:6:9
   |
 6 | /         section!("section", {

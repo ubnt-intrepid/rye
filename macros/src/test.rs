@@ -176,9 +176,7 @@ fn expand_sections(item: &mut ItemFn) -> Vec<Section> {
         sections: IndexMap::new(),
         next_section_id: 0,
         parent: None,
-        in_loop: false,
-        in_closure: false,
-        in_async_block: false,
+        forbidden_sections: false,
     };
     expand.visit_block_mut(&mut *item.block);
     expand.sections.into_iter().map(|(_k, v)| v).collect()
@@ -188,29 +186,15 @@ struct ExpandSections {
     sections: IndexMap<SectionId, Section>,
     next_section_id: SectionId,
     parent: Option<SectionId>,
-    in_loop: bool,
-    in_closure: bool,
-    in_async_block: bool,
+    forbidden_sections: bool,
 }
 
 impl ExpandSections {
     fn expand_section_macro(&mut self, expr: &ExprMacro) -> Result<Stmt> {
-        if self.in_loop {
+        if self.forbidden_sections {
             return Err(Error::new_spanned(
                 expr,
-                "section cannot be described in a loop",
-            ));
-        }
-        if self.in_closure {
-            return Err(Error::new_spanned(
-                expr,
-                "section cannot be described in a closure",
-            ));
-        }
-        if self.in_async_block {
-            return Err(Error::new_spanned(
-                expr,
-                "section cannot be described in an async block",
+                "section cannot be described at here",
             ));
         }
 
@@ -267,48 +251,38 @@ impl ExpandSections {
 }
 
 impl VisitMut for ExpandSections {
-    fn visit_stmt_mut(&mut self, item: &mut Stmt) {
-        match item {
+    fn visit_stmt_mut(&mut self, stmt: &mut Stmt) {
+        match stmt {
+            Stmt::Item(Item::Macro(item_macro)) if item_macro.mac.path.is_ident("section") => {
+                // FIXME: expand ItemMacro
+                let err = Error::new_spanned(
+                    item_macro,
+                    "section!{} at the item position has not been implemented yet",
+                )
+                .to_compile_error();
+                mem::replace(stmt, syn::parse_quote!(#err));
+            }
+            Stmt::Item(..) => {
+                // ignore inner items
+            }
             Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _)
                 if expr_macro.mac.path.is_ident("section") =>
             {
-                let stmt = match self.expand_section_macro(&*expr_macro) {
+                let expanded = match self.expand_section_macro(&*expr_macro) {
                     Ok(expanded) => expanded,
                     Err(err) => {
                         let err = err.to_compile_error();
                         syn::parse_quote!(#err)
                     }
                 };
-                mem::replace(item, stmt);
+                mem::replace(stmt, expanded);
             }
-            _ => visit_mut::visit_stmt_mut(self, item),
+            _ => {
+                let prev = mem::replace(&mut self.forbidden_sections, true);
+                visit_mut::visit_stmt_mut(self, stmt);
+                self.forbidden_sections = prev;
+            }
         }
-    }
-
-    fn visit_expr_mut(&mut self, node: &mut syn::Expr) {
-        let mut in_loop = self.in_loop;
-        let mut in_closure = self.in_closure;
-        let mut in_async_block = self.in_async_block;
-        match node {
-            Expr::ForLoop(..) | Expr::Loop(..) | Expr::While(..) => in_loop = true,
-            Expr::Closure(..) => in_closure = true,
-            Expr::Async(..) => in_async_block = true,
-            _ => (),
-        }
-
-        let in_loop_prev = mem::replace(&mut self.in_loop, in_loop);
-        let in_closure_prev = mem::replace(&mut self.in_closure, in_closure);
-        let in_async_block_prev = mem::replace(&mut self.in_async_block, in_async_block);
-
-        visit_mut::visit_expr_mut(self, node);
-
-        self.in_loop = in_loop_prev;
-        self.in_closure = in_closure_prev;
-        self.in_async_block = in_async_block_prev;
-    }
-
-    fn visit_item_mut(&mut self, _node: &mut Item) {
-        // ignore inner items.
     }
 }
 

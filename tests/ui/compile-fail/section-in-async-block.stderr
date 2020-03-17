@@ -1,4 +1,4 @@
-error: section cannot be described in an async block
+error: section cannot be described at here
  --> $DIR/section-in-async-block.rs:6:9
   |
 6 | /         section!("section", {
