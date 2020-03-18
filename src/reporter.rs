@@ -6,72 +6,26 @@ mod log;
 pub use self::{console::ConsoleReporter, log::LogReporter};
 
 use crate::test::{Location, Test, TestDesc};
-use std::{any::Any, error, sync::Arc};
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub(crate) enum Status {
-    Passed,
-    Failed,
-    Skipped,
-}
+use std::{any::Any, sync::Arc};
 
 #[derive(Debug)]
-enum Failure {
-    Unwind {
+pub(crate) enum Outcome {
+    Passed,
+    Errored(anyhow::Error),
+    Panicked {
         payload: Box<dyn Any + Send + 'static>,
         location: Location,
     },
-    Error(Box<dyn error::Error + Send + Sync + 'static>),
+    Skipped {
+        reason: String,
+    },
 }
 
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub struct TestCaseSummary {
-    desc: Arc<TestDesc>,
-    status: Status,
-    skip_reason: Option<String>,
-    failures: Vec<Failure>,
-}
-
-impl TestCaseSummary {
-    pub(crate) fn new(desc: Arc<TestDesc>) -> Self {
-        Self {
-            desc,
-            status: Status::Passed,
-            skip_reason: None,
-            failures: vec![],
-        }
-    }
-
-    pub(crate) fn status(&self) -> Status {
-        self.status
-    }
-
-    pub(crate) fn should_terminate(&self) -> bool {
-        match self.status() {
-            Status::Passed => false,
-            Status::Failed | Status::Skipped => true,
-        }
-    }
-
-    pub(crate) fn mark_skipped(&mut self, reason: String) {
-        self.status = Status::Skipped;
-        self.skip_reason.replace(reason);
-    }
-
-    pub(crate) fn mark_errored(&mut self, err: Box<dyn error::Error + Send + Sync + 'static>) {
-        self.status = Status::Failed;
-        self.failures.push(Failure::Error(err));
-    }
-
-    pub(crate) fn mark_panicked(
-        &mut self,
-        payload: Box<dyn Any + Send + 'static>,
-        location: Location,
-    ) {
-        self.status = Status::Failed;
-        self.failures.push(Failure::Unwind { payload, location });
-    }
+    pub(crate) desc: Arc<TestDesc>,
+    pub(crate) outcome: Outcome,
 }
 
 #[allow(missing_docs)]
@@ -99,10 +53,10 @@ impl Summary {
     }
 
     pub(crate) fn append(&mut self, result: TestCaseSummary) {
-        match result.status() {
-            Status::Passed => self.passed.push(result),
-            Status::Failed => self.failed.push(result),
-            Status::Skipped => self.skipped.push(result),
+        match result.outcome {
+            Outcome::Passed => self.passed.push(result),
+            Outcome::Errored(..) | Outcome::Panicked { .. } => self.failed.push(result),
+            Outcome::Skipped { .. } => self.skipped.push(result),
         }
     }
 }

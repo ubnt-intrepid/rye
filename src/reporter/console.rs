@@ -1,4 +1,4 @@
-use super::{Failure, Reporter, Status, Summary, TestCaseSummary};
+use super::{Outcome, Reporter, Summary, TestCaseSummary};
 use crate::{
     cli::args::{Args, ColorConfig},
     test::{Test, TestDesc},
@@ -62,10 +62,10 @@ impl ConsoleReporter {
         w: &mut StandardStreamLock<'_>,
         summary: &TestCaseSummary,
     ) -> io::Result<()> {
-        let status = match summary.status() {
-            Status::Passed => colored("ok").fg(Color::Green),
-            Status::Failed => colored("FAILED").fg(Color::Red),
-            Status::Skipped => colored("skipped").fg(Color::Yellow),
+        let status = match summary.outcome {
+            Outcome::Passed => colored("ok").fg(Color::Green),
+            Outcome::Errored(..) | Outcome::Panicked { .. } => colored("FAILED").fg(Color::Red),
+            Outcome::Skipped { .. } => colored("skipped").fg(Color::Yellow),
         };
         write!(w, "test {} ... ", summary.desc.name(),)?;
         status.fmt_colored(w)?;
@@ -84,22 +84,24 @@ impl ConsoleReporter {
                     result.desc.name(),
                     result.desc.location
                 )?;
-                for failure in &result.failures {
-                    match failure {
-                        Failure::Unwind {
-                            ref payload,
-                            ref location,
-                        } => {
-                            let payload = &**payload;
-                            let payload_str = payload
-                                .downcast_ref::<&str>()
-                                .copied()
-                                .or_else(|| payload.downcast_ref::<String>().map(|s| s.as_str()))
-                                .unwrap_or("Box<dyn Any>");
-                            writeln!(w, "{} {}", location, payload_str)?
-                        }
-                        Failure::Error(ref err) => writeln!(w, "{}", &**err)?,
+
+                match result.outcome {
+                    Outcome::Panicked {
+                        ref payload,
+                        ref location,
+                    } => {
+                        let payload = &**payload;
+                        let payload_str = payload
+                            .downcast_ref::<&str>()
+                            .copied()
+                            .or_else(|| payload.downcast_ref::<String>().map(|s| s.as_str()))
+                            .unwrap_or("Box<dyn Any>");
+                        writeln!(w, "{} {}", location, payload_str)?;
                     }
+                    Outcome::Errored(ref err) => {
+                        writeln!(w, "{:?}", err)?;
+                    }
+                    _ => unreachable!(),
                 }
                 writeln!(w)?;
             }

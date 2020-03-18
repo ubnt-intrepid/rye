@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use super::{Reporter, Status, Summary, TestCaseSummary};
+use super::{Outcome, Reporter, Summary, TestCaseSummary};
 use crate::test::{Test, TestDesc};
 
 #[derive(Debug, Clone)]
@@ -37,10 +37,12 @@ impl Reporter for LogReporter {
     }
 
     fn test_case_ended(&self, summary: &TestCaseSummary) {
-        match summary.status() {
-            Status::Passed => log::info!("{}: ok", summary.desc.name()),
-            Status::Failed => log::error!("{}: FAILED", summary.desc.name()),
-            Status::Skipped => log::info!("{}: skipped", summary.desc.name()),
+        match summary.outcome {
+            Outcome::Passed => log::info!("{}: ok", summary.desc.name()),
+            Outcome::Errored(..) | Outcome::Panicked { .. } => {
+                log::error!("{}: FAILED", summary.desc.name())
+            }
+            Outcome::Skipped { .. } => log::info!("{}: skipped", summary.desc.name()),
         }
     }
 }

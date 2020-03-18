@@ -132,7 +132,7 @@ fn return_result() -> anyhow::Result<()> {
         ($e:expr) => {
             anyhow::ensure!(
                 $e,
-                "[{}:{}:{}] assertion failed: {}",
+                "assertion failed at {}:{}:{}: {}",
                 file!(),
                 line!(),
                 column!(),

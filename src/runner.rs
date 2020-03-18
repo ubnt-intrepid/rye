@@ -1,7 +1,7 @@
 //! Abstraction of test execution in the rye.
 
 use crate::{
-    reporter::{Reporter, TestCaseSummary},
+    reporter::{Outcome, Reporter, TestCaseSummary},
     test::{
         imp::{SectionId, TestFn, TestFuture},
         Fallible, Location, Test, TestDesc,
@@ -220,56 +220,69 @@ impl TestInner {
     {
         self.start_test_case();
 
-        let mut summary = TestCaseSummary::new(self.desc.clone());
+        let mut outcome = Outcome::Passed;
         for section in self.desc.target_sections() {
-            Context::new(&self.desc, &mut summary, &mut *self.reporter, section)
+            if let Some(o) = {
+                Context::new(
+                    &self.desc, //
+                    &mut *self.reporter,
+                    section,
+                )
                 .run_async(f, &conv)
-                .await;
-            if summary.should_terminate() {
+                .await
+            } {
+                outcome = o;
                 break;
             }
         }
 
-        self.end_test_case(&summary);
-        summary
+        self.end_test_case(outcome)
     }
 
     fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) -> TestCaseSummary {
         self.start_test_case();
 
-        let mut summary = TestCaseSummary::new(self.desc.clone());
+        let mut outcome = Outcome::Passed;
         for section in self.desc.target_sections() {
-            Context::new(&self.desc, &mut summary, &mut *self.reporter, section).run_blocking(f);
-            if summary.should_terminate() {
+            if let Some(o) = {
+                Context::new(
+                    &self.desc, //
+                    &mut *self.reporter,
+                    section,
+                )
+                .run_blocking(f)
+            } {
+                outcome = o;
                 break;
             }
         }
 
-        self.end_test_case(&summary);
-        summary
+        self.end_test_case(outcome)
     }
 
     fn start_test_case(&mut self) {
         self.reporter.test_case_starting(&self.desc);
     }
 
-    fn end_test_case(&mut self, summary: &TestCaseSummary) {
+    fn end_test_case(&mut self, outcome: Outcome) -> TestCaseSummary {
+        let summary = TestCaseSummary {
+            desc: self.desc.clone(),
+            outcome,
+        };
         self.reporter.test_case_ended(&summary);
+        summary
     }
 }
 
 #[derive(Debug)]
 enum TerminationReason {
-    Skipped(String),
-    Unwinded(Option<Location>),
+    Skipped { reason: String },
+    Panicked { location: Option<Location> },
 }
-
-type Outcome = Result<Box<dyn Fallible>, Box<dyn std::any::Any + Send + 'static>>;
 
 /// Context values while running the test case.
 pub struct Context<'a> {
     desc: &'a TestDesc,
-    summary: &'a mut TestCaseSummary,
     termination_reason: Option<TerminationReason>,
     target_section: Option<SectionId>,
     current_section: Option<SectionId>,
@@ -293,13 +306,11 @@ impl Drop for Guard {
 impl<'a> Context<'a> {
     fn new(
         desc: &'a TestDesc,
-        summary: &'a mut TestCaseSummary,
         reporter: &'a mut (dyn Reporter + Send),
         target_section: Option<SectionId>,
     ) -> Self {
         Self {
             desc,
-            summary,
             termination_reason: None,
             target_section,
             current_section: None,
@@ -405,7 +416,7 @@ impl<'a> Context<'a> {
         self.current_section = enter.last_section;
     }
 
-    async fn run_async<F, Fut>(&mut self, f: fn() -> TestFuture, conv: F)
+    async fn run_async<F, Fut>(&mut self, f: fn() -> TestFuture, conv: F) -> Option<Outcome>
     where
         F: FnOnce(TestFuture) -> Fut,
         Fut: Future<Output = Box<dyn Fallible>>,
@@ -415,27 +426,26 @@ impl<'a> Context<'a> {
         self.check_outcome(outcome)
     }
 
-    fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) {
+    fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) -> Option<Outcome> {
         let outcome = self.scope(|| std::panic::catch_unwind(f));
         self.check_outcome(outcome)
     }
 
-    fn check_outcome(&mut self, outcome: Outcome) {
-        match outcome {
+    fn check_outcome(
+        &mut self,
+        result: Result<Box<dyn Fallible>, Box<dyn std::any::Any + Send>>,
+    ) -> Option<Outcome> {
+        match result {
             Ok(fallible) => match fallible.into_result() {
-                Ok(()) => (),
-                Err(err) => {
-                    self.summary.mark_errored(err);
-                }
+                Ok(()) => None,
+                Err(err) => Some(Outcome::Errored(err)),
             },
-            Err(payload) => match self.termination_reason.take() {
-                Some(TerminationReason::Skipped(reason)) => {
-                    self.summary.mark_skipped(reason);
-                }
-                Some(TerminationReason::Unwinded(loc)) => {
-                    self.summary
-                        .mark_panicked(payload, loc.expect("location cannot be captured"));
-                }
+            Err(panic_payload) => match self.termination_reason.take() {
+                Some(TerminationReason::Skipped { reason }) => Some(Outcome::Skipped { reason }),
+                Some(TerminationReason::Panicked { location }) => Some(Outcome::Panicked {
+                    payload: panic_payload,
+                    location: location.expect("the panic location is not available"),
+                }),
                 None => unreachable!("unexpected termination reason"),
             },
         }
@@ -443,16 +453,17 @@ impl<'a> Context<'a> {
 
     pub(crate) fn capture_panic_info(&mut self, info: &PanicInfo) {
         self.termination_reason
-            .get_or_insert(TerminationReason::Unwinded(
-                info.location().map(|loc| Location::from_std(loc)),
-            ));
+            .get_or_insert(TerminationReason::Panicked {
+                location: info.location().map(|loc| Location::from_std(loc)),
+            });
     }
 
     #[inline]
     pub(crate) fn mark_skipped(&mut self, reason: fmt::Arguments<'_>) {
         debug_assert!(self.termination_reason.is_none());
-        self.termination_reason
-            .replace(TerminationReason::Skipped(reason.to_string()));
+        self.termination_reason.replace(TerminationReason::Skipped {
+            reason: reason.to_string(),
+        });
     }
 }
 

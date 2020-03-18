@@ -128,7 +128,7 @@ pub trait Fallible: imp::FallibleImp {}
 
 impl Fallible for () {}
 
-impl<E> Fallible for Result<(), E> where E: Into<Box<dyn error::Error + Send + Sync + 'static>> {}
+impl<E> Fallible for Result<(), E> where E: Into<anyhow::Error> {}
 
 /// A collection of one or more test cases.
 pub trait TestSet: Send + Sync {
@@ -218,11 +218,11 @@ pub(crate) mod imp {
         task::{self, FutureObj, Poll},
     };
     use pin_project::pin_project;
-    use std::{collections::HashSet, error, pin::Pin};
+    use std::{collections::HashSet, pin::Pin};
 
     pub trait FallibleImp {
         fn is_ok(&self) -> bool;
-        fn into_result(self: Box<Self>) -> Result<(), Box<dyn error::Error + Send + Sync>>;
+        fn into_result(self: Box<Self>) -> anyhow::Result<()>;
     }
 
     impl FallibleImp for () {
@@ -230,20 +230,20 @@ pub(crate) mod imp {
             true
         }
 
-        fn into_result(self: Box<Self>) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        fn into_result(self: Box<Self>) -> anyhow::Result<()> {
             Ok(())
         }
     }
 
     impl<E> FallibleImp for Result<(), E>
     where
-        E: Into<Box<dyn error::Error + Send + Sync + 'static>>,
+        E: Into<anyhow::Error>,
     {
         fn is_ok(&self) -> bool {
             self.is_ok()
         }
 
-        fn into_result(self: Box<Self>) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        fn into_result(self: Box<Self>) -> anyhow::Result<()> {
             (*self).map_err(|e| e.into())
         }
     }
