@@ -611,8 +611,6 @@ mod tests {
                 append_history("section1:teardown");
             });
 
-            append_history("test");
-
             section!("section4", {
                 append_history("section4");
             });
@@ -629,18 +627,15 @@ mod tests {
                 ("section1:setup", Some("section1")),
                 ("section2", Some("section2")),
                 ("section1:teardown", Some("section1")),
-                ("test", None),
                 ("teardown", None),
                 // phase 2
                 ("setup", None),
                 ("section1:setup", Some("section1")),
                 ("section3", Some("section3")),
                 ("section1:teardown", Some("section1")),
-                ("test", None),
                 ("teardown", None),
                 // phase 3
                 ("setup", None),
-                ("test", None),
                 ("section4", Some("section4")),
                 ("teardown", None),
             ]
@@ -675,9 +670,6 @@ mod tests {
                 append_history("section1:teardown");
             });
 
-            append_history("test");
-            async {}.pending_once().await;
-
             section!("section4", {
                 async {}.pending_once().await;
                 append_history("section4");
@@ -696,18 +688,15 @@ mod tests {
                 ("section1:setup", Some("section1")),
                 ("section2", Some("section2")),
                 ("section1:teardown", Some("section1")),
-                ("test", None),
                 ("teardown", None),
                 // phase 2
                 ("setup", None),
                 ("section1:setup", Some("section1")),
                 ("section3", Some("section3")),
                 ("section1:teardown", Some("section1")),
-                ("test", None),
                 ("teardown", None),
                 // phase 3
                 ("setup", None),
-                ("test", None),
                 ("section4", Some("section4")),
                 ("teardown", None),
             ]

@@ -251,26 +251,67 @@ impl ExpandSections {
         self.parent = prev;
         res
     }
+
+    fn forbid_sections<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let prev = mem::replace(&mut self.forbidden_sections, true);
+        let res = f(self);
+        self.forbidden_sections = prev;
+        res
+    }
 }
 
 impl VisitMut for ExpandSections {
-    fn visit_stmt_mut(&mut self, stmt: &mut Stmt) {
-        match stmt {
-            Stmt::Expr(Expr::Macro(expr)) | Stmt::Semi(Expr::Macro(expr), _)
-                if expr.mac.path.is_ident("section") =>
-            {
-                *stmt = self.expand_section(&expr.attrs[..], &expr.mac);
-            }
-            Stmt::Item(Item::Macro(item)) if item.mac.path.is_ident("section") => {
-                *stmt = self.expand_section(&item.attrs[..], &item.mac);
-            }
-            Stmt::Item(..) => {
-                // ignore inner items
-            }
-            _ => {
-                let prev = mem::replace(&mut self.forbidden_sections, true);
-                visit_mut::visit_stmt_mut(self, stmt);
-                self.forbidden_sections = prev;
+    fn visit_block_mut(&mut self, block: &mut Block) {
+        enum State {
+            Setup,
+            Sections,
+            Teardown,
+        }
+
+        let mut state = State::Setup;
+        let err_section_after_teardown = |stmt: &Stmt| -> Stmt {
+            let err = Error::new_spanned(stmt, "section cannot be described after teardown")
+                .to_compile_error();
+            syn::parse_quote!(#err)
+        };
+
+        for stmt in &mut block.stmts {
+            match stmt {
+                Stmt::Expr(Expr::Macro(expr)) | Stmt::Semi(Expr::Macro(expr), _)
+                    if expr.mac.path.is_ident("section") =>
+                {
+                    *stmt = match state {
+                        State::Setup | State::Sections => {
+                            state = State::Sections;
+                            self.expand_section(&expr.attrs[..], &expr.mac)
+                        }
+                        State::Teardown => err_section_after_teardown(&stmt),
+                    };
+                }
+                Stmt::Item(Item::Macro(item)) if item.mac.path.is_ident("section") => {
+                    *stmt = match state {
+                        State::Setup | State::Sections => {
+                            state = State::Sections;
+                            self.expand_section(&item.attrs[..], &item.mac)
+                        }
+                        State::Teardown => err_section_after_teardown(&stmt),
+                    };
+                }
+                Stmt::Item(..) => {
+                    // ignore inner items
+                }
+                _ => {
+                    match state {
+                        State::Setup | State::Teardown => (),
+                        State::Sections => state = State::Teardown,
+                    }
+                    self.forbid_sections(|me| {
+                        visit_mut::visit_stmt_mut(me, stmt);
+                    });
+                }
             }
         }
     }
