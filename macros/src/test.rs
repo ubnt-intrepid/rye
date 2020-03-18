@@ -7,7 +7,7 @@ use syn::{
     parse::{Error, Parse, ParseStream, Parser as _, Result},
     spanned::Spanned as _,
     visit_mut::{self, VisitMut},
-    Attribute, Block, Expr, ExprMacro, Ident, Item, ItemFn, Stmt, Token,
+    Attribute, Block, Expr, Ident, Item, ItemFn, Macro, Stmt, Token,
 };
 
 macro_rules! try_quote {
@@ -190,24 +190,20 @@ struct ExpandSections {
 }
 
 impl ExpandSections {
-    fn expand_section_macro(&mut self, expr: &ExprMacro) -> Result<Stmt> {
+    fn try_expand_section(&mut self, attrs: &[Attribute], mac: &Macro) -> Result<Stmt> {
         if self.forbidden_sections {
             return Err(Error::new_spanned(
-                expr,
+                mac,
                 "section cannot be described at here",
             ));
         }
 
-        let attrs = &expr.attrs;
-
-        let (name, mut block) =
-            expr.mac
-                .parse_body_with(|input: ParseStream<'_>| -> Result<_> {
-                    let name: Expr = input.parse()?;
-                    let _: Token![,] = input.parse()?;
-                    let block: Box<Block> = input.parse()?;
-                    Ok((name, block))
-                })?;
+        let (name, mut block) = mac.parse_body_with(|input: ParseStream<'_>| -> Result<_> {
+            let name: Expr = input.parse()?;
+            let _: Token![,] = input.parse()?;
+            let block: Box<Block> = input.parse()?;
+            Ok((name, block))
+        })?;
 
         let section_id = self.next_section_id;
         let ancestors = if let Some(parent) = self.parent {
@@ -234,8 +230,15 @@ impl ExpandSections {
             me.visit_block_mut(&mut *block);
         });
 
-        Stmt::parse.parse2(quote_spanned! { expr.mac.span() =>
+        Stmt::parse.parse2(quote_spanned! { mac.span() =>
             __rye::enter_section!(#section_id, #(#attrs)* #block);
+        })
+    }
+
+    fn expand_section(&mut self, attrs: &[Attribute], mac: &Macro) -> Stmt {
+        self.try_expand_section(attrs, mac).unwrap_or_else(|err| {
+            let err = err.to_compile_error();
+            syn::parse_quote!(#err)
         })
     }
 
@@ -253,29 +256,16 @@ impl ExpandSections {
 impl VisitMut for ExpandSections {
     fn visit_stmt_mut(&mut self, stmt: &mut Stmt) {
         match stmt {
-            Stmt::Item(Item::Macro(item_macro)) if item_macro.mac.path.is_ident("section") => {
-                // FIXME: expand ItemMacro
-                let err = Error::new_spanned(
-                    item_macro,
-                    "section!{} at the item position has not been implemented yet",
-                )
-                .to_compile_error();
-                mem::replace(stmt, syn::parse_quote!(#err));
+            Stmt::Expr(Expr::Macro(expr)) | Stmt::Semi(Expr::Macro(expr), _)
+                if expr.mac.path.is_ident("section") =>
+            {
+                *stmt = self.expand_section(&expr.attrs[..], &expr.mac);
+            }
+            Stmt::Item(Item::Macro(item)) if item.mac.path.is_ident("section") => {
+                *stmt = self.expand_section(&item.attrs[..], &item.mac);
             }
             Stmt::Item(..) => {
                 // ignore inner items
-            }
-            Stmt::Expr(Expr::Macro(expr_macro)) | Stmt::Semi(Expr::Macro(expr_macro), _)
-                if expr_macro.mac.path.is_ident("section") =>
-            {
-                let expanded = match self.expand_section_macro(&*expr_macro) {
-                    Ok(expanded) => expanded,
-                    Err(err) => {
-                        let err = err.to_compile_error();
-                        syn::parse_quote!(#err)
-                    }
-                };
-                mem::replace(stmt, expanded);
             }
             _ => {
                 let prev = mem::replace(&mut self.forbidden_sections, true);
