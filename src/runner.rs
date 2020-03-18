@@ -4,14 +4,13 @@ use crate::{
     reporter::{Reporter, TestCaseSummary},
     test::{
         imp::{SectionId, TestFn, TestFuture},
-        Fallible, Test, TestDesc,
+        Fallible, Location, Test, TestDesc,
     },
 };
 use futures::{
-    future::Future,
+    future::{Future, FutureExt as _},
     task::{self, Poll},
 };
-use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _};
 use pin_project::pin_project;
 use std::{
     cell::Cell,
@@ -259,11 +258,19 @@ impl TestInner {
     }
 }
 
+#[derive(Debug)]
+enum TerminationReason {
+    Skipped(String),
+    Unwinded(Option<Location>),
+}
+
+type Outcome = Result<Box<dyn Fallible>, Box<dyn std::any::Any + Send + 'static>>;
+
 /// Context values while running the test case.
 pub struct Context<'a> {
     desc: &'a TestDesc,
     summary: &'a mut TestCaseSummary,
-    skip_reason: Option<String>,
+    termination_reason: Option<TerminationReason>,
     target_section: Option<SectionId>,
     current_section: Option<SectionId>,
     #[allow(dead_code)]
@@ -293,7 +300,7 @@ impl<'a> Context<'a> {
         Self {
             desc,
             summary,
-            skip_reason: None,
+            termination_reason: None,
             target_section,
             current_section: None,
             reporter,
@@ -404,31 +411,48 @@ impl<'a> Context<'a> {
         Fut: Future<Output = Box<dyn Fallible>>,
     {
         let fut = conv(f());
-        let result = AssertUnwindSafe(self.scope_async(fut)).maybe_unwind().await;
-        if let Some(reason) = self.skip_reason.take() {
-            self.summary.mark_skipped(reason);
-        } else {
-            self.summary.check_result(result);
-        }
+        let outcome = self.scope_async(AssertUnwindSafe(fut).catch_unwind()).await;
+        self.check_outcome(outcome)
     }
 
     fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) {
-        let result = maybe_unwind(AssertUnwindSafe(|| self.scope(f)));
-        if let Some(reason) = self.skip_reason.take() {
-            self.summary.mark_skipped(reason);
-        } else {
-            self.summary.check_result(result);
+        let outcome = self.scope(|| std::panic::catch_unwind(f));
+        self.check_outcome(outcome)
+    }
+
+    fn check_outcome(&mut self, outcome: Outcome) {
+        match outcome {
+            Ok(fallible) => match fallible.into_result() {
+                Ok(()) => (),
+                Err(err) => {
+                    self.summary.mark_errored(err);
+                }
+            },
+            Err(payload) => match self.termination_reason.take() {
+                Some(TerminationReason::Skipped(reason)) => {
+                    self.summary.mark_skipped(reason);
+                }
+                Some(TerminationReason::Unwinded(loc)) => {
+                    self.summary
+                        .mark_panicked(payload, loc.expect("location cannot be captured"));
+                }
+                None => unreachable!("unexpected termination reason"),
+            },
         }
     }
 
     pub(crate) fn capture_panic_info(&mut self, info: &PanicInfo) {
-        maybe_unwind::capture_panic_info(info);
+        self.termination_reason
+            .get_or_insert(TerminationReason::Unwinded(
+                info.location().map(|loc| Location::from_std(loc)),
+            ));
     }
 
     #[inline]
     pub(crate) fn mark_skipped(&mut self, reason: fmt::Arguments<'_>) {
-        debug_assert!(self.skip_reason.is_none());
-        self.skip_reason.replace(reason.to_string());
+        debug_assert!(self.termination_reason.is_none());
+        self.termination_reason
+            .replace(TerminationReason::Skipped(reason.to_string()));
     }
 }
 

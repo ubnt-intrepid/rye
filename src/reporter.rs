@@ -5,9 +5,8 @@ mod log;
 
 pub use self::{console::ConsoleReporter, log::LogReporter};
 
-use crate::test::{Fallible, Test, TestDesc};
-use maybe_unwind::Unwind;
-use std::{error, sync::Arc};
+use crate::test::{Location, Test, TestDesc};
+use std::{any::Any, error, sync::Arc};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) enum Status {
@@ -18,7 +17,10 @@ pub(crate) enum Status {
 
 #[derive(Debug)]
 enum Failure {
-    Unwind(Unwind),
+    Unwind {
+        payload: Box<dyn Any + Send + 'static>,
+        location: Location,
+    },
     Error(Box<dyn error::Error + Send + Sync + 'static>),
 }
 
@@ -57,19 +59,18 @@ impl TestCaseSummary {
         self.skip_reason.replace(reason);
     }
 
-    pub(crate) fn check_result(&mut self, result: Result<Box<dyn Fallible>, Unwind>) {
-        match result {
-            Ok(result) => {
-                if let Err(err) = result.into_result() {
-                    self.status = Status::Failed;
-                    self.failures.push(Failure::Error(err));
-                }
-            }
-            Err(unwind) => {
-                self.status = Status::Failed;
-                self.failures.push(Failure::Unwind(unwind));
-            }
-        }
+    pub(crate) fn mark_errored(&mut self, err: Box<dyn error::Error + Send + Sync + 'static>) {
+        self.status = Status::Failed;
+        self.failures.push(Failure::Error(err));
+    }
+
+    pub(crate) fn mark_panicked(
+        &mut self,
+        payload: Box<dyn Any + Send + 'static>,
+        location: Location,
+    ) {
+        self.status = Status::Failed;
+        self.failures.push(Failure::Unwind { payload, location });
     }
 }
 

@@ -86,7 +86,18 @@ impl ConsoleReporter {
                 )?;
                 for failure in &result.failures {
                     match failure {
-                        Failure::Unwind(ref unwind) => writeln!(w, "{}", unwind)?,
+                        Failure::Unwind {
+                            ref payload,
+                            ref location,
+                        } => {
+                            let payload = &**payload;
+                            let payload_str = payload
+                                .downcast_ref::<&str>()
+                                .copied()
+                                .or_else(|| payload.downcast_ref::<String>().map(|s| s.as_str()))
+                                .unwrap_or("Box<dyn Any>");
+                            writeln!(w, "{} {}", location, payload_str)?
+                        }
                         Failure::Error(ref err) => writeln!(w, "{}", &**err)?,
                     }
                 }

@@ -1,14 +1,25 @@
 //! Registration of test cases.
 
 use self::imp::{Section, SectionId, TestFn};
-use std::{borrow::Cow, collections::HashMap, error, fmt, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, error, fmt, panic, sync::Arc};
 
 #[doc(hidden)] // private API.
 #[derive(Debug)]
 pub struct Location {
-    pub file: &'static str,
+    pub file: Cow<'static, str>,
     pub line: u32,
     pub column: u32,
+}
+
+impl Location {
+    #[inline]
+    pub(crate) fn from_std(loc: &panic::Location<'_>) -> Self {
+        Self {
+            file: loc.file().to_string().into(),
+            line: loc.line(),
+            column: loc.column(),
+        }
+    }
 }
 
 impl fmt::Display for Location {
@@ -22,7 +33,7 @@ impl fmt::Display for Location {
 macro_rules! __location {
     () => {
         $crate::test::Location {
-            file: file!(),
+            file: file!().into(),
             line: line!(),
             column: column!(),
         }
