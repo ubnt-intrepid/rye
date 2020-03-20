@@ -24,8 +24,8 @@ use std::{
     sync::Arc,
 };
 
-/// The runner of test cases.
-pub trait TestRunner {
+/// The executor of test cases.
+pub trait TestExecutor {
     /// Future for awaiting a result of test execution.
     type Handle: Future<Output = TestCaseSummary>;
 
@@ -44,9 +44,9 @@ pub trait TestRunner {
         Fut: Future<Output = ()>;
 }
 
-impl<T: ?Sized> TestRunner for &mut T
+impl<T: ?Sized> TestExecutor for &mut T
 where
-    T: TestRunner,
+    T: TestExecutor,
 {
     type Handle = T::Handle;
 
@@ -74,9 +74,9 @@ where
     }
 }
 
-impl<T: ?Sized> TestRunner for Box<T>
+impl<T: ?Sized> TestExecutor for Box<T>
 where
-    T: TestRunner,
+    T: TestExecutor,
 {
     type Handle = T::Handle;
 
@@ -104,7 +104,7 @@ where
     }
 }
 
-pub(crate) trait TestRunnerExt: TestRunner {
+pub(crate) trait TestExecutorExt: TestExecutor {
     fn spawn_test<R>(&mut self, test: &Test, reporter: R) -> Self::Handle
     where
         R: Reporter + Send + 'static,
@@ -138,7 +138,7 @@ pub(crate) trait TestRunnerExt: TestRunner {
     }
 }
 
-impl<E: TestRunner + ?Sized> TestRunnerExt for E {}
+impl<E: TestExecutor + ?Sized> TestExecutorExt for E {}
 
 /// Blocking test function.
 pub struct BlockingTest {

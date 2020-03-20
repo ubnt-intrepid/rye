@@ -5,15 +5,15 @@ use futures::{
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
 use rye::{
-    cli::{Args, Session},
+    executor::{AsyncTest, BlockingTest, LocalAsyncTest, TestExecutor},
     reporter::{ConsoleReporter, TestCaseSummary},
-    runner::{AsyncTest, BlockingTest, LocalAsyncTest, TestRunner},
     test::TestSet,
+    Args, Session,
 };
 use std::{io, sync::Arc, thread};
 
 pub(crate) fn run_tests(tests: &[&dyn TestSet]) {
-    rye::cli::install();
+    rye::install();
 
     let args = Args::from_env().unwrap_or_else(|st| st.exit());
     let mut session = Session::new(&args);
@@ -43,7 +43,7 @@ impl FuturesTestRunner {
     }
 }
 
-impl TestRunner for FuturesTestRunner {
+impl TestExecutor for FuturesTestRunner {
     type Handle = RemoteHandle<TestCaseSummary>;
 
     fn spawn(&mut self, mut test: AsyncTest) -> Self::Handle {

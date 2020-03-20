@@ -1,7 +1,9 @@
 #![allow(missing_docs)]
 
-use super::{Outcome, Reporter, Summary, TestCaseSummary};
-use crate::test::{Test, TestDesc};
+use crate::{
+    reporter::{Outcome, Reporter, Summary, TestCaseSummary},
+    test::{Test, TestDesc},
+};
 
 #[derive(Debug, Clone)]
 pub struct LogReporter {

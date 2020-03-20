@@ -1,17 +1,17 @@
 //! Definition of command line interface.
 
-use crate::cli::exit_status::ExitStatus;
+use crate::exit_status::ExitStatus;
 use getopts::Options;
 use std::{path::Path, str::FromStr};
 
 /// Command line arguments.
 #[derive(Debug)]
 pub struct Args {
-    pub list_tests: bool,
-    pub filter_pattern: Option<String>,
-    pub filter_exact: bool,
-    pub color: ColorConfig,
-    pub skip_patterns: Vec<String>,
+    pub(crate) list_tests: bool,
+    pub(crate) filter_pattern: Option<String>,
+    pub(crate) filter_exact: bool,
+    pub(crate) color: ColorConfig,
+    pub(crate) skip_patterns: Vec<String>,
 }
 
 impl Args {

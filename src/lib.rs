@@ -186,12 +186,85 @@ mod sub {
 #![deny(missing_docs)]
 #![forbid(clippy::unimplemented, clippy::todo)]
 
-pub mod cli;
+pub mod executor;
 pub mod reporter;
-pub mod runner;
 pub mod test;
 
+mod args;
+mod exit_status;
 mod global;
+mod session;
+
+pub use crate::{args::Args, exit_status::ExitStatus, session::Session};
+
+#[allow(missing_docs)]
+pub fn install() {
+    crate::global::install();
+}
+
+/// Generate a single test case.
+pub use rye_macros::test;
+
+/// Generate the main function for running the test cases.
+pub use rye_macros::test_harness;
+
+/// Define a set of test cases onto the current module.
+///
+/// # Example
+///
+/// ```ignore
+/// rye::test_harness! {
+///     #![test_runner(path::to::runner)]
+///     #![test_cases(case1, sub1)]
+/// }
+///
+/// #[rye::test]
+/// fn case1() {
+///     // ...
+/// }
+///
+/// mod sub1 {
+///     rye::test_module! {
+///         #![test_cases(case2, case3, sub2)]
+///     }
+///
+///     #[rye::test]
+///     fn case2() {
+///         // ...
+///     }
+///
+///     #[rye::test]
+///     fn case3() {
+///         // ...
+///     }
+///
+///     #[path = "sub2.rs"]
+///     mod sub2;
+/// }
+/// ```
+///
+/// ```ignore
+/// // sub2.rs
+///
+/// rye::test_module! {
+///     #![test_cases(case4)]
+/// }
+///
+/// #[rye::test]
+/// fn case4() {
+///     // ...
+/// }
+/// ```
+pub use rye_macros::test_module;
+
+/// Mark the current test case as having been skipped and terminate its execution.
+#[macro_export]
+macro_rules! skip {
+    () => ( $crate::skip!("explicitly skipped") );
+    ($($arg:tt)+) => {
+        $crate::_internal::skip(format_args!($($arg)+))
+    };
+}
 
 #[doc(hidden)] // private API.
 pub mod _internal {
@@ -213,7 +286,7 @@ pub mod _internal {
     pub use std::{module_path, result::Result, stringify};
 
     use crate::{
-        runner::{Context, EnterSection},
+        executor::{Context, EnterSection},
         test::{imp::SectionId, Fallible},
     };
     use std::{borrow::Cow, fmt};
@@ -337,68 +410,4 @@ pub mod _internal {
     macro_rules! __cfg_frameworks {
         ($($t:tt)*) => ( $($t)* );
     }
-}
-
-/// Generate a single test case.
-pub use rye_macros::test;
-
-/// Generate the main function for running the test cases.
-pub use rye_macros::test_harness;
-
-/// Define a set of test cases onto the current module.
-///
-/// # Example
-///
-/// ```ignore
-/// rye::test_harness! {
-///     #![test_runner(path::to::runner)]
-///     #![test_cases(case1, sub1)]
-/// }
-///
-/// #[rye::test]
-/// fn case1() {
-///     // ...
-/// }
-///
-/// mod sub1 {
-///     rye::test_module! {
-///         #![test_cases(case2, case3, sub2)]
-///     }
-///
-///     #[rye::test]
-///     fn case2() {
-///         // ...
-///     }
-///
-///     #[rye::test]
-///     fn case3() {
-///         // ...
-///     }
-///
-///     #[path = "sub2.rs"]
-///     mod sub2;
-/// }
-/// ```
-///
-/// ```ignore
-/// // sub2.rs
-///
-/// rye::test_module! {
-///     #![test_cases(case4)]
-/// }
-///
-/// #[rye::test]
-/// fn case4() {
-///     // ...
-/// }
-/// ```
-pub use rye_macros::test_module;
-
-/// Mark the current test case as having been skipped and terminate its execution.
-#[macro_export]
-macro_rules! skip {
-    () => ( $crate::skip!("explicitly skipped") );
-    ($($arg:tt)+) => {
-        $crate::_internal::skip(format_args!($($arg)+))
-    };
 }

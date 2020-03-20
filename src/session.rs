@@ -1,7 +1,10 @@
+#![allow(missing_docs)]
+
 use crate::{
-    cli::{args::Args, exit_status::ExitStatus},
+    args::Args,
+    executor::{TestExecutor, TestExecutorExt as _},
+    exit_status::ExitStatus,
     reporter::{Reporter, Summary},
-    runner::{TestRunner, TestRunnerExt as _},
     test::{imp::TestFn, Registry, RegistryError, Test, TestDesc, TestSet},
 };
 use std::{
@@ -64,7 +67,7 @@ impl<'sess> Session<'sess> {
         reporter: &R,
     ) -> ExitStatus
     where
-        T: TestRunner,
+        T: TestExecutor,
         R: Reporter + Send + Clone + 'static,
     {
         let res = tests.register(&mut MainRegistry { session: self });

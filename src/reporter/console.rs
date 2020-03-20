@@ -1,6 +1,6 @@
-use super::{Outcome, Reporter, Summary, TestCaseSummary};
 use crate::{
-    cli::args::{Args, ColorConfig},
+    args::{Args, ColorConfig},
+    reporter::{Outcome, Reporter, Summary, TestCaseSummary},
     test::{Test, TestDesc},
 };
 use std::{
