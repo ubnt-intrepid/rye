@@ -38,7 +38,5 @@ const __SCOPE_FOR__ignore_inner_items: () = {
     }
 };
 
-::rye::_internal::cfg_frameworks! {
-    #[test_case]
-    static __TEST_CASE__ignore_inner_items: &dyn ::rye::_internal::TestSet = &ignore_inner_items::__new();
-}
+#[cfg(any(test, trybuild))]
+::rye::_internal::register_test_case!(ignore_inner_items);

@@ -11,6 +11,7 @@ env:
   CARGO_TERM_VERBOSE: true
   CARGO_NET_OFFLINE: true
   RUST_BACKTRACE: full
+  RUSTFLAGS: "--cfg docs"
 
 jobs:
   DeployMasterDoc:
@@ -56,11 +57,16 @@ jobs:
     # TODO:
     # * restrict network access during building docs.
     # * restrict all write access expect target/
+    - name: Build API docs (macros)
+      uses: actions-rs/cargo@v1
+      with:
+        command: doc
+        args: -p rye-macros --no-deps
     - name: Build API docs
       uses: actions-rs/cargo@v1
       with:
         command: doc
-        args: --no-deps --workspace
+        args: -p rye --no-deps --all-features
     - run: rm -fv target/doc/.lock
 
     - name: Upload artifact

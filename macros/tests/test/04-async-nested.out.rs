@@ -51,7 +51,5 @@ const __SCOPE_FOR__case_async_nested: () = {
     }
 };
 
-::rye::_internal::cfg_frameworks! {
-    #[test_case]
-    static __TEST_CASE__case_async_nested: &dyn ::rye::_internal::TestSet = &case_async_nested::__new();
-}
+#[cfg(any(test, trybuild))]
+::rye::_internal::register_test_case!(case_async_nested);

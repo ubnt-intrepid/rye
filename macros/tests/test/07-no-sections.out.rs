@@ -36,7 +36,5 @@ const __SCOPE_FOR__no_sections: () = {
     }
 };
 
-::rye::_internal::cfg_frameworks! {
-    #[test_case]
-    static __TEST_CASE__no_sections: &dyn ::rye::_internal::TestSet = &no_sections::__new();
-}
+#[cfg(any(test, trybuild))]
+::rye::_internal::register_test_case!(no_sections);

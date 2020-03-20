@@ -1,14 +1,5 @@
 rye::test_harness! {
     #![test_runner(crate::runner::run_tests)]
-    #![test_cases(
-        case_sync,
-        case_async_nosend,
-        nested,
-        case_async,
-        return_result,
-        expensive_test,
-        sub::*,
-    )]
 }
 
 mod runner;
@@ -85,13 +76,6 @@ async fn case_async_nosend() {
 }
 
 mod sub {
-    rye::test_module! {
-        #![test_cases(
-            sub_test,
-            modified_rye_path,
-        )]
-    }
-
     #[rye::test]
     fn sub_test() {
         let mut vec = vec![0usize; 5];
