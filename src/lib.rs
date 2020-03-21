@@ -133,7 +133,6 @@ teardown
 #![doc(html_root_url = "https://docs.rs/rye/0.1.0-dev")]
 #![deny(missing_docs)]
 #![forbid(clippy::unimplemented, clippy::todo)]
-#![cfg_attr(docs, feature(doc_cfg))]
 
 pub mod executor;
 pub mod reporter;
@@ -151,12 +150,9 @@ pub fn install() {
     crate::global::install();
 }
 
-/// Generate a single test case.
 pub use rye_macros::test;
 
-/// Generate the main function for running the test cases.
 #[cfg(feature = "harness")]
-#[cfg_attr(docs, doc(cfg(feature = "harness")))]
 pub use rye_macros::test_harness;
 
 /// Mark the current test case as having been skipped and terminate its execution.
