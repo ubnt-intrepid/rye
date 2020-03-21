@@ -48,8 +48,8 @@ features = [ "user-hooks" ]
 default-features = false
 
 [[test]]
-name = "test_integration"
-path = "tests/test_integration.rs"
+name = "test_harness"
+path = "tests/test_harness.rs"
 harness = false
 required-features = [ "harness" ]
 
