@@ -12,7 +12,8 @@ readme = "README.md"
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docs"]
+rustdoc-args = [ "--cfg", "docs" ]
+targets = [ "x86_64-unknown-linux-gnu" ]
 
 [features]
 default = [ "harness" ]

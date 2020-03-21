@@ -9,6 +9,11 @@ authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ubnt-intrepid/rye.git"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [ "--cfg", "docs" ]
+targets = [ "x86_64-unknown-linux-gnu" ]
+
 [lib]
 proc-macro = true
 
