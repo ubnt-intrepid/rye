@@ -402,14 +402,10 @@ impl ToTokens for Generated<'_> {
             };
         }]);
 
-        //
         let crate_path = &self.params.crate_path;
-        let test_case_id = format_ident!("__TEST_CASE__{}", ident);
         tokens.append_all(Some(quote! {
-            #crate_path::_internal::cfg_frameworks! {
-                #[test_case]
-                static #test_case_id: &dyn #crate_path::_internal::TestSet = &#ident::__new();
-            }
+            #[cfg(any(test, trybuild))]
+            #crate_path::_internal::register_test_case!(#ident);
         }));
     }
 }

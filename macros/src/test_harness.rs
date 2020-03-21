@@ -1,6 +1,5 @@
-use crate::common::TestCases;
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::{
     parse::{Error, Parse, ParseStream, Parser, Result},
     Attribute, Ident, Path, Token,
@@ -8,7 +7,6 @@ use syn::{
 
 struct Input {
     test_runner: Path,
-    test_cases: TestCases,
     reexport_test_harness_main: Option<Ident>,
 }
 
@@ -17,15 +15,11 @@ impl Parse for Input {
         let attrs = Attribute::parse_inner(input)?;
 
         let mut test_runner = None;
-        let mut test_cases = TestCases::default();
         let mut reexport_test_harness_main = None;
         for attr in attrs {
             match attr.path.get_ident() {
                 Some(id) if id == "test_runner" => {
                     test_runner.replace(attr.parse_args()?);
-                }
-                Some(id) if id == "test_cases" => {
-                    test_cases.append_cases(&attr)?;
                 }
                 Some(id) if id == "reexport_test_harness_main" => {
                     fn parse(input: ParseStream<'_>) -> Result<Ident> {
@@ -47,7 +41,6 @@ impl Parse for Input {
                     "missing attribute: #![test_runner(path::to::runner)]",
                 )
             })?,
-            test_cases,
             reexport_test_harness_main,
         })
     }
@@ -59,23 +52,15 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error(),
     };
 
-    let test_runner = &input.test_runner;
-    let test_cases = match input.test_cases.extract_test_cases() {
-        Ok(cases) => cases,
-        Err(err) => return err.to_compile_error(),
-    };
-
-    let main_id = match input.reexport_test_harness_main {
-        Some(id) => id,
-        None => Ident::new("main", Span::call_site()),
-    };
+    let test_runner = input.test_runner;
+    let main_id = input
+        .reexport_test_harness_main
+        .unwrap_or_else(|| format_ident!("main"));
 
     quote! {
         #[cfg(any(test, trybuild))]
         fn #main_id () {
-            #test_runner(&[ #(
-                &#test_cases as &dyn ::rye::_internal::TestSet,
-            )* ]);
+            #test_runner(&::rye::_internal::TEST_CASES[..]);
         }
     }
 }

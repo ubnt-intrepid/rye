@@ -47,7 +47,5 @@ const __SCOPE_FOR__attributes: () = {
     }
 };
 
-path::to::rye::_internal::cfg_frameworks! {
-    #[test_case]
-    static __TEST_CASE__attributes: &dyn path::to::rye::_internal::TestSet = &attributes::__new();
-}
+#[cfg(any(test, trybuild))]
+path::to::rye::_internal::register_test_case!(attributes);

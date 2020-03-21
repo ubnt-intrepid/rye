@@ -44,7 +44,5 @@ const __SCOPE_FOR__case_sync: () = {
     }
 };
 
-::rye::_internal::cfg_frameworks! {
-    #[test_case]
-    static __TEST_CASE__case_sync: &dyn ::rye::_internal::TestSet = &case_sync::__new();
-}
+#[cfg(any(test, trybuild))]
+::rye::_internal::register_test_case!(case_sync);

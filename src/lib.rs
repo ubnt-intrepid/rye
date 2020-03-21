@@ -128,58 +128,6 @@ section 2
 teardown
 ```
 
-# Generating Test Harness
-
-On the current stable compiler, test cases annotated by `#[rye::test]` attribute are not
-implicitly registered for the execution.
-Therefore, the test applications must explicitly specify the test cases to be executed
-and call the test runner to running them by disabling the default test harness.
-
-```toml
-[[test]]
-name = "tests"
-harness = false
-```
-
-```
-# fn main() {}
-# mod inner {
-#[rye::test]
-fn case1() {
-    // ...
-}
-
-rye::test_harness! {
-    #![test_runner(path::to::runner)]
-    #![test_cases(case1)]
-}
-# mod path { pub mod to { pub fn runner(_: &[&dyn rye::test::TestSet]) {} } }
-# }
-```
-
-## (Advanced) Using `custom_test_frameworks` Feature
-
-If you are a nightly pioneer, the unstable feature `custom_test_frameworks` can be used
-to automate the registration of test cases.
-
-```toml
-[dev-dependencies]
-rye = { ..., features = [ "frameworks" ] }
-```
-
-```ignore
-#![feature(custom_test_frameworks)]
-#![test_runner(path::to::runner)]
-
-#[rye::test]
-fn case1() { ... }
-
-mod sub {
-    #[rye::test]
-    fn case2() { ... }
-}
-```
-
 !*/
 
 #![doc(html_root_url = "https://docs.rs/rye/0.1.0-dev")]
@@ -202,60 +150,10 @@ pub fn install() {
     crate::global::install();
 }
 
-/// Generate a single test case.
 pub use rye_macros::test;
 
-/// Generate the main function for running the test cases.
+#[cfg(feature = "harness")]
 pub use rye_macros::test_harness;
-
-/// Define a set of test cases onto the current module.
-///
-/// # Example
-///
-/// ```ignore
-/// rye::test_harness! {
-///     #![test_runner(path::to::runner)]
-///     #![test_cases(case1, sub1)]
-/// }
-///
-/// #[rye::test]
-/// fn case1() {
-///     // ...
-/// }
-///
-/// mod sub1 {
-///     rye::test_module! {
-///         #![test_cases(case2, case3, sub2)]
-///     }
-///
-///     #[rye::test]
-///     fn case2() {
-///         // ...
-///     }
-///
-///     #[rye::test]
-///     fn case3() {
-///         // ...
-///     }
-///
-///     #[path = "sub2.rs"]
-///     mod sub2;
-/// }
-/// ```
-///
-/// ```ignore
-/// // sub2.rs
-///
-/// rye::test_module! {
-///     #![test_cases(case4)]
-/// }
-///
-/// #[rye::test]
-/// fn case4() {
-///     // ...
-/// }
-/// ```
-pub use rye_macros::test_module;
 
 /// Mark the current test case as having been skipped and terminate its execution.
 #[macro_export]
@@ -273,9 +171,11 @@ pub mod _internal {
         __async_test_fn as async_test_fn,
         __blocking_test_fn as blocking_test_fn,
         __cfg_frameworks as cfg_frameworks,
+        __cfg_harness as cfg_harness,
         __declare_section as declare_section,
         __enter_section as enter_section,
         __location as location,
+        __register_test_case as register_test_case,
         __test_name as test_name,
         test::{
             imp::{Section, TestFn, TestFuture},
@@ -283,7 +183,11 @@ pub mod _internal {
         },
     };
     pub use maplit::hashset;
+    pub use paste;
     pub use std::{module_path, result::Result, stringify};
+
+    #[cfg(feature = "harness")]
+    pub use linkme;
 
     use crate::{
         executor::{Context, EnterSection},
@@ -314,6 +218,10 @@ pub mod _internal {
             .nth(1)
             .map_or(name.into(), |m| format!("{}::{}", m, name).into())
     }
+
+    #[cfg(feature = "harness")]
+    #[linkme::distributed_slice]
+    pub static TEST_CASES: [&'static dyn TestSet] = [..];
 
     #[doc(hidden)] // private API.
     #[macro_export]
@@ -398,16 +306,49 @@ pub mod _internal {
     }
 
     #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __register_test_case {
+        ($target:ident) => {
+            $crate::_internal::paste::item! {
+                $crate::_internal::cfg_harness! {
+                    #[$crate::_internal::linkme::distributed_slice($crate::_internal::TEST_CASES)]
+                    #[linkme_crate_path($crate::_internal::linkme)]
+                    #[allow(non_upper_case_globals)]
+                    static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestSet = &$target::__new();
+                }
+                $crate::_internal::cfg_frameworks! {
+                    #[test_case]
+                    static [< __TEST_CASE_FRAMEWORKS__ $target >]: &dyn $crate::_internal::TestSet = &$target::__new();
+                }
+            }
+        };
+    }
+
+    #[doc(hidden)] // private API.
+    #[cfg(not(feature = "harness"))]
+    #[macro_export]
+    macro_rules! __cfg_harness {
+        ($($item:item)*) => {};
+    }
+
+    #[doc(hidden)] // private API.
+    #[cfg(feature = "harness")]
+    #[macro_export]
+    macro_rules! __cfg_harness {
+        ($($item:item)*) => ( $($item)* );
+    }
+
+    #[doc(hidden)] // private API.
     #[cfg(not(feature = "frameworks"))]
     #[macro_export]
     macro_rules! __cfg_frameworks {
-        ($($t:tt)*) => {};
+        ($($item:item)*) => {};
     }
 
     #[doc(hidden)] // private API.
     #[cfg(feature = "frameworks")]
     #[macro_export]
     macro_rules! __cfg_frameworks {
-        ($($t:tt)*) => ( $($t)* );
+        ($($item:item)*) => ( $($item)* );
     }
 }

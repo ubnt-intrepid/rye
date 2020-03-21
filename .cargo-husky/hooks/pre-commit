@@ -19,5 +19,5 @@ fi
 (set -x; cargo test --workspace)
 
 if cargo +nightly --version >/dev/null; then
-    (set -x; cargo +nightly test --features frameworks --test test_frameworks)
+    (set -x; cargo +nightly test --no-default-features --features frameworks --test test_frameworks)
 fi

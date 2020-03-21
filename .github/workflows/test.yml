@@ -82,5 +82,5 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --features frameworks --test test_frameworks
+        args: --no-default-features --features frameworks --test test_frameworks
       if: contains(matrix.conf.toolchain, 'nightly')

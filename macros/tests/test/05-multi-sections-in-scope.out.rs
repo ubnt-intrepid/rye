@@ -65,7 +65,5 @@ const __SCOPE_FOR__multi_section_in_scope: () = {
     }
 };
 
-::rye::_internal::cfg_frameworks! {
-    #[test_case]
-    static __TEST_CASE__multi_section_in_scope: &dyn ::rye::_internal::TestSet = &multi_section_in_scope::__new();
-}
+#[cfg(any(test, trybuild))]
+::rye::_internal::register_test_case!(multi_section_in_scope);

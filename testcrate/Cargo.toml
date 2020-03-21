@@ -6,13 +6,11 @@ edition = "2018"
 
 [workspace]
 
-[lib]
-harness = false
-
 [[test]]
-name = "stable"
-path = "tests/stable.rs"
+name = "harness"
+path = "tests/harness.rs"
 harness = false
+required-features = [ "harness" ]
 
 [[test]]
 name = "frameworks"
@@ -20,7 +18,8 @@ path = "tests/frameworks.rs"
 required-features = [ "frameworks" ]
 
 [dependencies]
-rye = { path = ".." }
+rye = { path = "..", default-features = false }
 
 [features]
+harness = [ "rye/harness" ]
 frameworks = [ "rye/frameworks" ]
