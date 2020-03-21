@@ -32,7 +32,7 @@ fn fallible() -> std::io::Result<()> {
 # fn main() {}
 ```
 
-```compile_fail
+```ignore
 #[rye::test] //~ ERROR E0277
 fn return_int() -> i32 {
     0

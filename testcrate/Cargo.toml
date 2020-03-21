@@ -1,0 +1,26 @@
+[package]
+name = "testcrate"
+version = "0.1.0"
+publish = false
+edition = "2018"
+
+[workspace]
+
+[lib]
+harness = false
+
+[[test]]
+name = "stable"
+path = "tests/stable.rs"
+harness = false
+
+[[test]]
+name = "frameworks"
+path = "tests/frameworks.rs"
+required-features = [ "frameworks" ]
+
+[dependencies]
+rye = { path = ".." }
+
+[features]
+frameworks = [ "rye/frameworks" ]

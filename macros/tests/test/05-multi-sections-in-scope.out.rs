@@ -1,6 +1,8 @@
+#[cfg(any(test, trybuild))]
 #[allow(non_camel_case_types)]
 struct multi_section_in_scope(());
 
+#[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
 const __SCOPE_FOR__multi_section_in_scope: () = {
     #[allow(unused_imports)]

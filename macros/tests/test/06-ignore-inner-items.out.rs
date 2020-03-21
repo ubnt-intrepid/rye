@@ -1,6 +1,8 @@
+#[cfg(any(test, trybuild))]
 #[allow(non_camel_case_types)]
 struct ignore_inner_items(());
 
+#[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
 const __SCOPE_FOR__ignore_inner_items: () = {
     #[allow(unused_imports)]

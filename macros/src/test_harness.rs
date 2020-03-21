@@ -71,6 +71,7 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
     };
 
     quote! {
+        #[cfg(any(test, trybuild))]
         fn #main_id () {
             #test_runner(&[ #(
                 &#test_cases as &dyn ::rye::_internal::TestSet,

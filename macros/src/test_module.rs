@@ -38,14 +38,17 @@ pub(crate) fn test_module(input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error(),
     };
     quote! {
+        #[cfg(any(test, trybuild))]
         pub(crate) struct __tests(());
 
+        #[cfg(any(test, trybuild))]
         impl __tests {
             pub(crate) const fn __new() -> Self {
                 Self(())
             }
         }
 
+        #[cfg(any(test, trybuild))]
         impl ::rye::_internal::TestSet for __tests {
             fn register(&self, __registry: &mut dyn ::rye::_internal::Registry) -> Result<(), ::rye::_internal::RegistryError> {
                 #(

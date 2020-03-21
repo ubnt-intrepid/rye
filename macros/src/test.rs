@@ -371,9 +371,11 @@ impl ToTokens for Generated<'_> {
         };
 
         tokens.append_all(vec![quote! {
+            #[cfg(any(test, trybuild))]
             #[allow(non_camel_case_types)]
             #vis struct #ident(());
 
+            #[cfg(any(test, trybuild))]
             #[allow(non_upper_case_globals)]
             const #scope_for_id: () = {
                 #rye_reexport

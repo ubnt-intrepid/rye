@@ -1,6 +1,8 @@
+#[cfg(any(test, trybuild))]
 #[allow(non_camel_case_types)]
 struct case_sync(());
 
+#[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
 const __SCOPE_FOR__case_sync: () = {
     #[allow(unused_imports)]
