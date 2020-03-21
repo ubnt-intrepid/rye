@@ -182,7 +182,7 @@ pub mod _internal {
             Registry, RegistryError, TestDesc, TestSet,
         },
     };
-    pub use maplit::hashset;
+    pub use hashbrown::{HashMap, HashSet};
     pub use paste;
     pub use std::{module_path, result::Result, stringify};
 
@@ -261,11 +261,19 @@ pub mod _internal {
             {
                 let _cap = $crate::__declare_section!(@count $($key),*);
                 #[allow(clippy::let_and_return)]
-                let mut _map = ::std::collections::HashMap::with_capacity(_cap);
+                let mut _map = $crate::_internal::HashMap::with_capacity(_cap);
                 $(
                     let _ = _map.insert($key, $crate::_internal::Section {
                         name: $name,
-                        ancestors: $crate::_internal::hashset!($($ancestors)*),
+                        ancestors: {
+                            let _cap = $crate::__declare_section!(@count $($ancestors),*);
+                            #[allow(clippy::let_and_return)]
+                            let mut _set = $crate::_internal::HashSet::with_capacity(_cap);
+                            $(
+                                _set.insert($ancestors);
+                            )*
+                            _set
+                        },
                     });
                 )*
                 _map

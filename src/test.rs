@@ -1,7 +1,8 @@
 //! Registration of test cases.
 
 use self::imp::{Section, SectionId, TestFn};
-use std::{borrow::Cow, collections::HashMap, error, fmt, panic, sync::Arc};
+use hashbrown::HashMap;
+use std::{borrow::Cow, error, fmt, panic, sync::Arc};
 
 #[doc(hidden)] // private API.
 #[derive(Debug)]
@@ -217,8 +218,9 @@ pub(crate) mod imp {
         future::{Future, LocalFutureObj},
         task::{self, FutureObj, Poll},
     };
+    use hashbrown::HashSet;
     use pin_project::pin_project;
-    use std::{collections::HashSet, pin::Pin};
+    use std::pin::Pin;
 
     pub trait FallibleImp {
         fn is_ok(&self) -> bool;
