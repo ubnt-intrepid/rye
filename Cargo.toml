@@ -26,16 +26,12 @@ anyhow = "1"
 futures = "0.3"
 getopts = "0.2"
 hashbrown = "0.7"
+linkme = { version = "0.2", optional = true }
 log = "0.4"
 paste = "0.1"
 pin-project = "0.4"
 termcolor = "1"
 thiserror = "1"
-
-[dependencies.linkme]
-git = "https://github.com/ubnt-intrepid/linkme.git"
-branch = "custom-crate-path"
-optional = true
 
 [dev-dependencies]
 futures = { version = "0.3", features = [ "thread-pool" ] }

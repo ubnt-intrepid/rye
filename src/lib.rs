@@ -320,7 +320,7 @@ pub mod _internal {
             $crate::_internal::paste::item! {
                 $crate::_internal::cfg_harness! {
                     #[$crate::_internal::linkme::distributed_slice($crate::_internal::TEST_CASES)]
-                    #[linkme_crate_path($crate::_internal::linkme)]
+                    #[linkme(crate = $crate::_internal::linkme)]
                     #[allow(non_upper_case_globals)]
                     static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestSet = &$target::__new();
                 }
