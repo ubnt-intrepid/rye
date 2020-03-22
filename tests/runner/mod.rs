@@ -4,25 +4,18 @@ use futures::{
     future::{Future, FutureExt as _, RemoteHandle},
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
-use rye::{
-    reporter::{ConsoleReporter, TestCaseSummary},
-    Args, Session, TestCase, TestExecutor,
-};
-use std::{io, sync::Arc, thread};
+use rye::{reporter::TestCaseSummary, TestCase, TestExecutor, TestRunner};
+use std::{io, thread};
 
-pub(crate) fn run_tests(tests: &[&dyn TestCase]) {
-    rye::install();
-
-    let args = Args::from_env().unwrap_or_else(|st| st.exit());
-    let mut session = Session::new(&args);
+pub(crate) fn runner(tests: &[&dyn TestCase]) {
+    let mut runner = TestRunner::new();
+    runner.install_hook();
 
     let mut local_pool = LocalPool::new();
-    let mut runner = FuturesTestRunner::new(local_pool.spawner()).unwrap();
-
-    let reporter = Arc::new(ConsoleReporter::new(&args));
-    let st = local_pool.run_until(session.run(tests, &mut runner, &reporter));
-
-    st.exit();
+    let mut executor = FuturesTestRunner::new(local_pool.spawner()).unwrap();
+    local_pool
+        .run_until(runner.run(tests, &mut executor))
+        .unwrap();
 }
 
 struct FuturesTestRunner {

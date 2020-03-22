@@ -1,5 +1,5 @@
 rye::test_harness! {
-    #![test_runner(crate::runner::run_tests)]
+    #![test_runner(crate::runner::runner)]
 }
 
 mod runner;

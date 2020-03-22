@@ -136,27 +136,17 @@ teardown
 
 pub mod reporter;
 
-mod args;
 mod executor;
-mod exit_status;
-mod global;
-mod session;
+mod runner;
 mod termination;
 mod test;
 
 pub use crate::{
-    args::Args,
     executor::TestExecutor,
-    exit_status::ExitStatus,
-    session::Session,
+    runner::TestRunner,
     termination::Termination,
     test::{TestCase, TestDesc},
 };
-
-#[allow(missing_docs)]
-pub fn install() {
-    crate::global::install();
-}
 
 pub use rye_macros::test;
 

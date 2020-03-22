@@ -1,9 +1,6 @@
 #![allow(missing_docs)]
 
-mod console;
-mod log;
-
-pub use self::{console::ConsoleReporter, log::LogReporter};
+pub(crate) mod console;
 
 use crate::test::{Location, TestCase, TestDesc};
 use std::{any::Any, sync::Arc};

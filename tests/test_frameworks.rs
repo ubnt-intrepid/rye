@@ -1,5 +1,5 @@
 #![feature(custom_test_frameworks)]
-#![test_runner(crate::runner::run_tests)]
+#![test_runner(crate::runner::runner)]
 
 mod runner;
 

@@ -1,5 +1,4 @@
 use crate::{
-    args::{Args, ColorConfig},
     reporter::{Outcome, Reporter, Summary, TestCaseSummary},
     test::{TestCase, TestDesc},
 };
@@ -47,13 +46,9 @@ pub struct ConsoleReporter {
 }
 
 impl ConsoleReporter {
-    pub fn new(args: &Args) -> Self {
+    pub(crate) fn new(choice: ColorChoice) -> Self {
         Self {
-            stream: StandardStream::stdout(match args.color {
-                ColorConfig::Auto => ColorChoice::Auto,
-                ColorConfig::Always => ColorChoice::Always,
-                ColorConfig::Never => ColorChoice::Never,
-            }),
+            stream: StandardStream::stdout(choice),
         }
     }
 
