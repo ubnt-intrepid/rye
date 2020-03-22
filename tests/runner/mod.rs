@@ -7,8 +7,7 @@ use futures::{
 use rye::{
     executor::{AsyncTest, BlockingTest, LocalAsyncTest, TestExecutor},
     reporter::{ConsoleReporter, TestCaseSummary},
-    test::TestCase,
-    Args, Session,
+    Args, Session, TestCase,
 };
 use std::{io, sync::Arc, thread};
 

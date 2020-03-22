@@ -2,10 +2,7 @@
 
 use crate::{
     reporter::{Outcome, Reporter, TestCaseSummary},
-    test::{
-        imp::{Location, SectionId, TestFn},
-        TestCase, TestDesc,
-    },
+    test::{Location, SectionId, TestCase, TestDesc, TestFn},
 };
 use futures::{
     future::{Future, FutureExt as _, LocalFutureObj},
@@ -486,7 +483,7 @@ mod tests {
     use super::*;
     use crate::{
         reporter::Summary,
-        test::{imp::TestFn, TestCase, TestDesc},
+        test::{TestCase, TestDesc, TestFn},
     };
     use scoped_tls_async::{scoped_thread_local, ScopedKeyExt as _};
     use std::cell::RefCell;

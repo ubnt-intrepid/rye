@@ -136,15 +136,21 @@ teardown
 
 pub mod executor;
 pub mod reporter;
-pub mod test;
 
 mod args;
 mod exit_status;
 mod global;
 mod session;
 mod termination;
+mod test;
 
-pub use crate::{args::Args, exit_status::ExitStatus, session::Session, termination::Termination};
+pub use crate::{
+    args::Args,
+    exit_status::ExitStatus,
+    session::Session,
+    termination::Termination,
+    test::{TestCase, TestDesc},
+};
 
 #[allow(missing_docs)]
 pub fn install() {
@@ -179,10 +185,7 @@ pub mod _internal {
         __sections as sections,
         __test_name as test_name,
         termination::Termination,
-        test::{
-            imp::{test_name, Location, Section, TestFn},
-            TestCase, TestDesc,
-        },
+        test::{test_name, Location, Section, TestCase, TestDesc, TestFn},
     };
     pub use futures::task::{FutureObj, LocalFutureObj};
     pub use hashbrown::{HashMap, HashSet};
@@ -191,7 +194,7 @@ pub mod _internal {
 
     use crate::{
         executor::{Context, EnterSection},
-        test::imp::SectionId,
+        test::SectionId,
     };
     use std::fmt;
 
