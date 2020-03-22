@@ -59,8 +59,10 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
 
     quote! {
         #[cfg(any(test, trybuild))]
-        fn #main_id () {
-            #test_runner(&::rye::_internal::TEST_CASES[..]);
+        fn #main_id () -> Result<(), impl std::fmt::Debug> {
+            use ::rye::_internal::Fallible;
+            let fallible: Box<dyn Fallible> = Box::new(#test_runner(&::rye::_internal::TEST_CASES[..]));
+            Fallible::into_result(fallible)
         }
     }
 }
