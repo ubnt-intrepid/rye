@@ -1,17 +1,11 @@
-error: expected string literal
+error: expected path
  --> $DIR/params.rs:4:15
   |
 4 | #[rye(crate = 10)]
   |               ^^
 
-error: duplicated parameter
- --> $DIR/params.rs:9:7
-  |
-9 | #[rye(crate = "rye")]
-  |       ^^^^^
-
 error: unknown parameter name
-  --> $DIR/params.rs:13:7
-   |
-13 | #[rye(the_quick_fox = "lazy")]
-   |       ^^^^^^^^^^^^^
+ --> $DIR/params.rs:8:7
+  |
+8 | #[rye(the_quick_fox = "lazy")]
+  |       ^^^^^^^^^^^^^

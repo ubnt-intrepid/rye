@@ -8,6 +8,7 @@ use syn::{
 struct Input {
     test_runner: Path,
     reexport_test_harness_main: Option<Ident>,
+    crate_path: Path,
 }
 
 impl Parse for Input {
@@ -16,6 +17,7 @@ impl Parse for Input {
 
         let mut test_runner = None;
         let mut reexport_test_harness_main = None;
+        let mut crate_path = None;
         for attr in attrs {
             match attr.path.get_ident() {
                 Some(id) if id == "test_runner" => {
@@ -30,6 +32,14 @@ impl Parse for Input {
                     let main_id = parse.parse2(attr.tokens)?;
                     reexport_test_harness_main.replace(main_id);
                 }
+                Some(id) if id == "rye_path" => {
+                    let parser = |input: ParseStream| {
+                        let _: Token![=] = input.parse()?;
+                        input.call(Path::parse_mod_style)
+                    };
+                    let path = parser.parse2(attr.tokens)?;
+                    crate_path.replace(path);
+                }
                 _ => return Err(Error::new_spanned(&attr.path, "unsupported attribute")),
             }
         }
@@ -42,6 +52,7 @@ impl Parse for Input {
                 )
             })?,
             reexport_test_harness_main,
+            crate_path: crate_path.unwrap_or_else(|| syn::parse_quote!(::rye)),
         })
     }
 }
@@ -56,12 +67,13 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
     let main_id = input
         .reexport_test_harness_main
         .unwrap_or_else(|| format_ident!("main"));
+    let crate_path = input.crate_path;
 
     quote! {
         #[cfg(any(test, trybuild))]
         fn #main_id () -> Result<(), impl std::fmt::Debug> {
-            use ::rye::_internal::Fallible;
-            let fallible: Box<dyn Fallible> = Box::new(#test_runner(&::rye::_internal::TEST_CASES[..]));
+            use #crate_path::_internal::Fallible;
+            let fallible: Box<dyn Fallible> = Box::new(#test_runner(&#crate_path::_internal::TEST_CASES[..]));
             Fallible::into_result(fallible)
         }
     }

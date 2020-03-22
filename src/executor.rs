@@ -550,7 +550,7 @@ mod tests {
     #[test]
     fn no_section() {
         #[crate::test]
-        #[rye(crate = "crate")]
+        #[rye(crate = crate)]
         fn test_case() {
             append_history("test");
         }
@@ -562,7 +562,7 @@ mod tests {
     #[test]
     fn one_section() {
         #[crate::test]
-        #[rye(crate = "crate")]
+        #[rye(crate = crate)]
         fn test_case() {
             append_history("setup");
 
@@ -587,7 +587,7 @@ mod tests {
     #[test]
     fn multi_section() {
         #[crate::test]
-        #[rye(crate = "crate")]
+        #[rye(crate = crate)]
         fn test_case() {
             append_history("setup");
 
@@ -621,7 +621,7 @@ mod tests {
     #[test]
     fn nested_section() {
         #[crate::test]
-        #[rye(crate = "crate")]
+        #[rye(crate = crate)]
         fn test_case() {
             append_history("setup");
 
@@ -673,7 +673,7 @@ mod tests {
     #[test]
     fn smoke_async() {
         #[crate::test]
-        #[rye(crate = "crate")]
+        #[rye(crate = crate)]
         async fn test_case() {
             use futures_test::future::FutureTestExt as _;
 

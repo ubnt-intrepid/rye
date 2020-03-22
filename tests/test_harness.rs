@@ -94,7 +94,7 @@ mod sub {
     use rye as catcher_in_the_rye;
 
     #[rye::test]
-    #[rye(crate = "catcher_in_the_rye")]
+    #[rye(crate = catcher_in_the_rye)]
     fn modified_rye_path() {
         let mut vec = vec![0usize; 5];
 

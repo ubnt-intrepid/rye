@@ -7,7 +7,7 @@ use syn::{
     parse::{Error, Parse, ParseStream, Parser as _, Result},
     spanned::Spanned as _,
     visit_mut::{self, VisitMut},
-    Attribute, Block, Expr, Ident, Item, ItemFn, Macro, Stmt, Token,
+    Attribute, Block, Expr, Ident, Item, ItemFn, Macro, Path, Stmt, Token,
 };
 
 macro_rules! try_quote {
@@ -92,7 +92,7 @@ impl Parse for Args {
 }
 
 struct Params {
-    crate_path: syn::Path,
+    crate_path: Path,
 }
 
 impl Params {
@@ -113,13 +113,8 @@ impl Params {
             match input.call(Ident::parse_any)? {
                 id if id == "crate" => {
                     let _: Token![=] = input.parse()?;
-                    let lit: syn::LitStr = input.parse()?;
-
-                    if let Some(..) = crate_path {
-                        return Err(Error::new_spanned(&id, "duplicated parameter"));
-                    }
-
-                    crate_path.replace(lit.parse()?);
+                    let path = input.call(Path::parse_mod_style)?;
+                    crate_path.replace(path);
                     Ok(())
                 }
                 id => Err(Error::new_spanned(id, "unknown parameter name")),
