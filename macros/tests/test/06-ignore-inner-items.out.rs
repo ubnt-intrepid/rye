@@ -22,18 +22,18 @@ const __SCOPE_FOR__ignore_inner_items: () = {
         }
     }
 
-    impl __rye::TestSet for ignore_inner_items {
-        fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(
-                __rye::TestDesc {
-                    name: __rye::test_name!(ignore_inner_items),
-                    location: __rye::location!(),
-                    sections: __rye::sections! {},
-                    leaf_sections: &[],
-                },
-                __rye::blocking_test_fn!(Self::__body)
-            )?;
-            __rye::Result::Ok(())
+    impl __rye::TestCase for ignore_inner_items {
+        fn desc(&self) -> __rye::TestDesc {
+            __rye::TestDesc {
+                name: __rye::test_name!(ignore_inner_items),
+                location: __rye::location!(),
+                sections: __rye::sections! {},
+                leaf_sections: &[],
+            }
+        }
+
+        fn test_fn(&self) -> __rye::TestFn {
+            __rye::blocking_test_fn!(Self::__body)
         }
     }
 };

@@ -20,18 +20,18 @@ const __SCOPE_FOR__no_sections: () = {
         }
     }
 
-    impl __rye::TestSet for no_sections {
-        fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(
-                __rye::TestDesc {
-                    name: __rye::test_name!(no_sections),
-                    location: __rye::location!(),
-                    sections: __rye::sections! {},
-                    leaf_sections: &[],
-                },
-                __rye::blocking_test_fn!(Self::__body)
-            )?;
-            __rye::Result::Ok(())
+    impl __rye::TestCase for no_sections {
+        fn desc(&self) -> __rye::TestDesc {
+            __rye::TestDesc {
+                name: __rye::test_name!(no_sections),
+                location: __rye::location!(),
+                sections: __rye::sections! {},
+                leaf_sections: &[],
+            }
+        }
+
+        fn test_fn(&self) -> __rye::TestFn {
+            __rye::blocking_test_fn!(Self::__body)
         }
     }
 };

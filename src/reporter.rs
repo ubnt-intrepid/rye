@@ -5,7 +5,7 @@ mod log;
 
 pub use self::{console::ConsoleReporter, log::LogReporter};
 
-use crate::test::{imp::Location, Test, TestDesc};
+use crate::test::{imp::Location, TestCase, TestDesc};
 use std::{any::Any, sync::Arc};
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ pub struct Summary {
     pub(crate) passed: Vec<TestCaseSummary>,
     pub(crate) failed: Vec<TestCaseSummary>,
     pub(crate) skipped: Vec<TestCaseSummary>,
-    pub(crate) filtered_out: Vec<Arc<TestDesc>>,
+    pub(crate) filtered_out: Vec<TestDesc>,
 }
 
 impl Summary {
@@ -62,7 +62,7 @@ impl Summary {
 }
 
 pub trait Reporter {
-    fn test_run_starting(&self, tests: &[Test]);
+    fn test_run_starting(&self, tests: &[&dyn TestCase]);
     fn test_run_ended(&self, summary: &Summary);
 
     fn test_case_starting(&self, desc: &TestDesc);
@@ -71,7 +71,7 @@ pub trait Reporter {
 
 macro_rules! impl_reporter_body {
     () => {
-        fn test_run_starting(&self, tests: &[Test]) {
+        fn test_run_starting(&self, tests: &[&dyn TestCase]) {
             (**self).test_run_starting(tests)
         }
 

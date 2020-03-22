@@ -42,25 +42,25 @@ const __SCOPE_FOR__multi_section_in_scope: () = {
         }
     }
 
-    impl __rye::TestSet for multi_section_in_scope {
-        fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(
-                __rye::TestDesc {
-                    name: __rye::test_name!(multi_section_in_scope),
-                    location: __rye::location!(),
-                    sections: __rye::sections! {
-                        0u64 => ("section1"     , {});
-                        1u64 => ("section2"     , {});
-                        2u64 => ("section2-1"   , { 1u64 });
-                        3u64 => ("section2-1-2" , { 1u64, 2u64 });
-                        4u64 => ("section2-2"   , { 1u64 });
-                        5u64 => ("section3"     , {});
-                    },
-                    leaf_sections: &[ 0u64, 3u64, 4u64, 5u64 ],
+    impl __rye::TestCase for multi_section_in_scope {
+        fn desc(&self) -> __rye::TestDesc {
+            __rye::TestDesc {
+                name: __rye::test_name!(multi_section_in_scope),
+                location: __rye::location!(),
+                sections: __rye::sections! {
+                    0u64 => ("section1"     , {});
+                    1u64 => ("section2"     , {});
+                    2u64 => ("section2-1"   , { 1u64 });
+                    3u64 => ("section2-1-2" , { 1u64, 2u64 });
+                    4u64 => ("section2-2"   , { 1u64 });
+                    5u64 => ("section3"     , {});
                 },
-                __rye::blocking_test_fn!(Self::__body)
-            )?;
-            __rye::Result::Ok(())
+                leaf_sections: &[ 0u64, 3u64, 4u64, 5u64 ],
+            }
+        }
+
+        fn test_fn(&self) -> __rye::TestFn {
+            __rye::blocking_test_fn!(Self::__body)
         }
     }
 };

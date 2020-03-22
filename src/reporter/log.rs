@@ -2,7 +2,7 @@
 
 use crate::{
     reporter::{Outcome, Reporter, Summary, TestCaseSummary},
-    test::{Test, TestDesc},
+    test::{TestCase, TestDesc},
 };
 
 #[derive(Debug, Clone)]
@@ -18,7 +18,7 @@ impl LogReporter {
 }
 
 impl Reporter for LogReporter {
-    fn test_run_starting(&self, tests: &[Test]) {
+    fn test_run_starting(&self, tests: &[&dyn TestCase]) {
         let suffix = match tests.len() {
             1 => "",
             _ => "s",

@@ -32,21 +32,21 @@ const __SCOPE_FOR__case_sync_nested: () = {
         }
     }
 
-    impl __rye::TestSet for case_sync_nested {
-        fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(
-                __rye::TestDesc {
-                    name: __rye::test_name!(case_sync_nested),
-                    location: __rye::location!(),
-                    sections: __rye::sections! {
-                        0u64 => ("resizing bigger changes size and capacity", {});
-                        1u64 => ("shrinking smaller does not changes capacity", { 0u64 });
-                    },
-                    leaf_sections: &[ 1u64 ],
+    impl __rye::TestCase for case_sync_nested {
+        fn desc(&self) -> __rye::TestDesc {
+            __rye::TestDesc {
+                name: __rye::test_name!(case_sync_nested),
+                location: __rye::location!(),
+                sections: __rye::sections! {
+                    0u64 => ("resizing bigger changes size and capacity", {});
+                    1u64 => ("shrinking smaller does not changes capacity", { 0u64 });
                 },
-                __rye::blocking_test_fn!(Self::__body)
-            )?;
-            __rye::Result::Ok(())
+                leaf_sections: &[ 1u64 ],
+            }
+        }
+
+        fn test_fn(&self) -> __rye::TestFn {
+            __rye::blocking_test_fn!(Self::__body)
         }
     }
 };

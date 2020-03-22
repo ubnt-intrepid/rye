@@ -26,20 +26,20 @@ const __SCOPE_FOR__case_async: () = {
         }
     }
 
-    impl __rye::TestSet for case_async {
-        fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(
-                __rye::TestDesc {
-                    name: __rye::test_name!(case_async),
-                    location: __rye::location!(),
-                    sections: __rye::sections! {
-                        0u64 => ("resizing bigger changes size and capacity", {});
-                    },
-                    leaf_sections: &[ 0u64 ],
+    impl __rye::TestCase for case_async {
+        fn desc(&self) -> __rye::TestDesc {
+            __rye::TestDesc {
+                name: __rye::test_name!(case_async),
+                location: __rye::location!(),
+                sections: __rye::sections! {
+                    0u64 => ("resizing bigger changes size and capacity", {});
                 },
-                __rye::async_test_fn!(Self::__body)
-            )?;
-            __rye::Result::Ok(())
+                leaf_sections: &[ 0u64 ],
+            }
+        }
+
+        fn test_fn(&self) -> __rye::TestFn {
+            __rye::async_test_fn!(Self::__body)
         }
     }
 };

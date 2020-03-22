@@ -380,18 +380,17 @@ impl ToTokens for Generated<'_> {
                     }
                     #item
                 }
-                impl __rye::TestSet for #ident {
-                    fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-                        __registry.add_test(
-                            __rye::TestDesc {
-                                name: __rye::test_name!(#ident),
-                                location: #location,
-                                sections: __rye::sections! { #( #section_map_entries )* },
-                                leaf_sections: &[ #( #leaf_section_ids ),* ],
-                            },
-                            __rye::#test_fn_id!(Self::__body)
-                        )?;
-                        __rye::Result::Ok(())
+                impl __rye::TestCase for #ident {
+                    fn desc(&self) -> __rye::TestDesc {
+                        __rye::TestDesc {
+                            name: __rye::test_name!(#ident),
+                            location: #location,
+                            sections: __rye::sections! { #( #section_map_entries )* },
+                            leaf_sections: &[ #( #leaf_section_ids ),* ],
+                        }
+                    }
+                    fn test_fn(&self) -> __rye::TestFn {
+                        __rye::#test_fn_id!(Self::__body)
                     }
                 }
             };

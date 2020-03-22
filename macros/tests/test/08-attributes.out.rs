@@ -29,20 +29,20 @@ const __SCOPE_FOR__attributes: () = {
         }
     }
 
-    impl __rye::TestSet for attributes {
-        fn register(&self, __registry: &mut dyn __rye::Registry) -> __rye::Result<(), __rye::RegistryError> {
-            __registry.add_test(
-                __rye::TestDesc {
-                    name: __rye::test_name!(attributes),
-                    location: __rye::location!(),
-                    sections: __rye::sections! {
-                        0u64 => ("with unused variable", {});
-                    },
-                    leaf_sections: &[ 0u64 ],
+    impl __rye::TestCase for attributes {
+        fn desc(&self) -> __rye::TestDesc {
+            __rye::TestDesc {
+                name: __rye::test_name!(attributes),
+                location: __rye::location!(),
+                sections: __rye::sections! {
+                    0u64 => ("with unused variable", {});
                 },
-                __rye::blocking_test_fn!(Self::__body)
-            )?;
-            __rye::Result::Ok(())
+                leaf_sections: &[ 0u64 ],
+            }
+        }
+
+        fn test_fn(&self) -> __rye::TestFn {
+            __rye::blocking_test_fn!(Self::__body)
         }
     }
 };

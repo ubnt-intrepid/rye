@@ -179,7 +179,7 @@ pub mod _internal {
         __test_name as test_name,
         test::{
             imp::{test_name, Location, Section, TestFn},
-            Fallible, Registry, RegistryError, TestDesc, TestSet,
+            Fallible, TestCase, TestDesc,
         },
     };
     pub use futures::task::{FutureObj, LocalFutureObj};
@@ -198,7 +198,7 @@ pub mod _internal {
 
     #[cfg(feature = "harness")]
     #[linkme::distributed_slice]
-    pub static TEST_CASES: [&'static dyn TestSet] = [..];
+    pub static TEST_CASES: [&'static dyn TestCase] = [..];
 
     #[inline]
     pub fn enter_section(id: SectionId) -> EnterSection {
@@ -267,11 +267,11 @@ pub mod _internal {
                     #[$crate::_internal::linkme::distributed_slice($crate::_internal::TEST_CASES)]
                     #[linkme(crate = $crate::_internal::linkme)]
                     #[allow(non_upper_case_globals)]
-                    static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestSet = &$target::__new();
+                    static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestCase = &$target::__new();
                 }
                 $crate::_internal::cfg_frameworks! {
                     #[test_case]
-                    static [< __TEST_CASE_FRAMEWORKS__ $target >]: &dyn $crate::_internal::TestSet = &$target::__new();
+                    static [< __TEST_CASE_FRAMEWORKS__ $target >]: &dyn $crate::_internal::TestCase = &$target::__new();
                 }
             }
         };

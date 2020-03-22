@@ -2,40 +2,24 @@
 
 use self::imp::{Location, Section, SectionId, TestFn};
 use hashbrown::HashMap;
-use std::{borrow::Cow, error, sync::Arc};
+use std::borrow::Cow;
 
-/// Description about a single test case.
-#[derive(Debug)]
-pub struct Test {
-    pub(crate) desc: Arc<TestDesc>,
-    pub(crate) test_fn: TestFn,
-    pub(crate) filtered_out: bool,
+#[allow(missing_docs)]
+pub trait TestCase: Send + Sync {
+    fn desc(&self) -> TestDesc;
+    fn test_fn(&self) -> TestFn;
 }
 
-impl Test {
-    /// Return the reference to the test description.
-    #[inline]
-    pub fn desc(&self) -> &TestDesc {
-        &self.desc
+impl<T: ?Sized> TestCase for &T
+where
+    T: TestCase,
+{
+    fn desc(&self) -> TestDesc {
+        (**self).desc()
     }
 
-    /// Return the test case is asynchronous or not.
-    #[inline]
-    pub fn is_async(&self) -> bool {
-        match self.test_fn {
-            TestFn::Async(..) | TestFn::LocalAsync(..) => true,
-            _ => false,
-        }
-    }
-
-    /// Return whether the future produced by the test case must
-    /// be executed onto the current thread or not.
-    #[inline]
-    pub fn is_local(&self) -> bool {
-        match self.test_fn {
-            TestFn::LocalAsync(..) => true,
-            _ => false,
-        }
+    fn test_fn(&self) -> TestFn {
+        (**self).test_fn()
     }
 }
 
@@ -93,86 +77,6 @@ pub trait Fallible: imp::FallibleImp {}
 impl Fallible for () {}
 
 impl<E> Fallible for Result<(), E> where E: Into<anyhow::Error> {}
-
-/// A collection of one or more test cases.
-pub trait TestSet: Send + Sync {
-    /// Register a collection of test cases in the registry.
-    fn register(&self, registry: &mut dyn Registry) -> Result<(), RegistryError>;
-}
-
-impl<T: ?Sized> TestSet for &T
-where
-    T: TestSet,
-{
-    #[inline]
-    fn register(&self, registry: &mut dyn Registry) -> Result<(), RegistryError> {
-        (**self).register(registry)
-    }
-}
-
-impl<T: ?Sized> TestSet for Box<T>
-where
-    T: TestSet,
-{
-    #[inline]
-    fn register(&self, registry: &mut dyn Registry) -> Result<(), RegistryError> {
-        (**self).register(registry)
-    }
-}
-
-impl<T> TestSet for [T]
-where
-    T: TestSet,
-{
-    #[inline]
-    fn register(&self, registry: &mut dyn Registry) -> Result<(), RegistryError> {
-        for tests in self {
-            tests.register(registry)?;
-        }
-        Ok(())
-    }
-}
-
-/// The registry of test cases.
-pub trait Registry {
-    #[doc(hidden)] // private API.
-    fn add_test(&mut self, desc: TestDesc, test_fn: TestFn) -> Result<(), RegistryError>;
-}
-
-impl<R: ?Sized> Registry for &mut R
-where
-    R: Registry,
-{
-    #[doc(hidden)] // private API.
-    #[inline]
-    fn add_test(&mut self, desc: TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
-        (**self).add_test(desc, test_fn)
-    }
-}
-
-impl<R: ?Sized> Registry for Box<R>
-where
-    R: Registry,
-{
-    #[doc(hidden)] // private API.
-    #[inline]
-    fn add_test(&mut self, desc: TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
-        (**self).add_test(desc, test_fn)
-    }
-}
-
-/// The error value occurred during registration test cases.
-#[derive(Debug, thiserror::Error)]
-#[error("{}", _0)]
-pub struct RegistryError(#[source] Box<dyn error::Error + Send + Sync>);
-
-impl RegistryError {
-    /// Create a new `RegistryError`.
-    #[inline]
-    pub fn new(cause: impl Into<Box<dyn error::Error + Send + Sync>>) -> Self {
-        Self(cause.into())
-    }
-}
 
 #[allow(missing_docs)]
 pub(crate) mod imp {

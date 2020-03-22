@@ -1,7 +1,7 @@
 use crate::{
     args::{Args, ColorConfig},
     reporter::{Outcome, Reporter, Summary, TestCaseSummary},
-    test::{Test, TestDesc},
+    test::{TestCase, TestDesc},
 };
 use std::{
     fmt,
@@ -136,11 +136,9 @@ impl ConsoleReporter {
 }
 
 impl Reporter for ConsoleReporter {
-    fn test_run_starting(&self, tests: &[Test]) {
+    fn test_run_starting(&self, tests: &[&dyn TestCase]) {
         let mut w = self.stream.lock();
-
-        let num_tests = tests.iter().filter(|test| !test.filtered_out).count();
-        let _ = writeln!(w, "running {} tests", num_tests);
+        let _ = writeln!(w, "running {} tests", tests.len());
     }
 
     fn test_run_ended(&self, summary: &Summary) {

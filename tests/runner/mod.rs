@@ -7,12 +7,12 @@ use futures::{
 use rye::{
     executor::{AsyncTest, BlockingTest, LocalAsyncTest, TestExecutor},
     reporter::{ConsoleReporter, TestCaseSummary},
-    test::TestSet,
+    test::TestCase,
     Args, Session,
 };
 use std::{io, sync::Arc, thread};
 
-pub(crate) fn run_tests(tests: &[&dyn TestSet]) {
+pub(crate) fn run_tests(tests: &[&dyn TestCase]) {
     rye::install();
 
     let args = Args::from_env().unwrap_or_else(|st| st.exit());

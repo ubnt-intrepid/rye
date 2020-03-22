@@ -4,7 +4,7 @@ use crate::{
     reporter::{Outcome, Reporter, TestCaseSummary},
     test::{
         imp::{Location, SectionId, TestFn},
-        Fallible, Test, TestDesc,
+        Fallible, TestCase, TestDesc,
     },
 };
 use futures::{
@@ -105,15 +105,15 @@ where
 }
 
 pub(crate) trait TestExecutorExt: TestExecutor {
-    fn spawn_test<R>(&mut self, test: &Test, reporter: R) -> Self::Handle
+    fn spawn_test<R>(&mut self, test: &dyn TestCase, reporter: R) -> Self::Handle
     where
         R: Reporter + Send + 'static,
     {
         let inner = TestInner {
-            desc: test.desc.clone(),
+            desc: Arc::new(test.desc()),
             reporter: Box::new(reporter),
         };
-        match test.test_fn {
+        match test.test_fn() {
             TestFn::Blocking(f) => self.spawn_blocking(BlockingTest {
                 inner,
                 f,
@@ -489,7 +489,7 @@ mod tests {
     use super::*;
     use crate::{
         reporter::Summary,
-        test::{imp::TestFn, Registry, RegistryError, TestDesc, TestSet},
+        test::{imp::TestFn, TestCase, TestDesc},
     };
     use scoped_tls_async::{scoped_thread_local, ScopedKeyExt as _};
     use std::cell::RefCell;
@@ -504,29 +504,18 @@ mod tests {
         HISTORY.with(|history| history.borrow_mut().push((msg, current_section)));
     }
 
-    struct MockRegistry<'a>(&'a mut Option<(TestDesc, TestFn)>);
-    impl Registry for MockRegistry<'_> {
-        fn add_test(&mut self, desc: TestDesc, test_fn: TestFn) -> Result<(), RegistryError> {
-            self.0.replace((desc, test_fn));
-            Ok(())
-        }
-    }
-
     struct NullReporter;
 
     impl Reporter for NullReporter {
-        fn test_run_starting(&self, _: &[Test]) {}
+        fn test_run_starting(&self, _: &[&dyn TestCase]) {}
         fn test_run_ended(&self, _: &Summary) {}
         fn test_case_starting(&self, _: &TestDesc) {}
         fn test_case_ended(&self, _: &TestCaseSummary) {}
     }
 
-    fn run_test(r: &dyn TestSet) -> Vec<HistoryLog> {
-        let (desc, test_fn) = {
-            let mut test = None;
-            r.register(&mut MockRegistry(&mut test)).unwrap();
-            test.take().expect("test is not registered")
-        };
+    fn run_test(t: &dyn TestCase) -> Vec<HistoryLog> {
+        let desc = t.desc();
+        let test_fn = t.test_fn();
 
         let history = RefCell::new(vec![]);
         let mut state = TestInner {
