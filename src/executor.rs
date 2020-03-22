@@ -4,7 +4,7 @@ use crate::{
     reporter::{Outcome, Reporter, TestCaseSummary},
     test::{
         imp::{Location, SectionId, TestFn},
-        Fallible, TestCase, TestDesc,
+        TestCase, TestDesc,
     },
 };
 use futures::{
@@ -138,7 +138,7 @@ impl<E: TestExecutor + ?Sized> TestExecutorExt for E {}
 /// Blocking test function.
 pub struct BlockingTest {
     inner: TestInner,
-    f: fn() -> Box<dyn Fallible>,
+    f: fn() -> anyhow::Result<()>,
     _marker: PhantomData<Cell<()>>,
 }
 
@@ -158,7 +158,7 @@ impl BlockingTest {
 /// Asynchronous test function.
 pub struct AsyncTest {
     inner: TestInner,
-    f: fn() -> FutureObj<'static, Box<dyn Fallible>>,
+    f: fn() -> FutureObj<'static, anyhow::Result<()>>,
     _marker: PhantomData<Cell<()>>,
 }
 
@@ -182,7 +182,7 @@ impl AsyncTest {
 /// on the current thread.
 pub struct LocalAsyncTest {
     inner: TestInner,
-    f: fn() -> LocalFutureObj<'static, Box<dyn Fallible>>,
+    f: fn() -> LocalFutureObj<'static, anyhow::Result<()>>,
     _marker: PhantomData<Rc<Cell<()>>>,
 }
 
@@ -208,13 +208,13 @@ struct TestInner {
 impl TestInner {
     async fn run_async<Fut>(&mut self, f: fn() -> Fut) -> TestCaseSummary
     where
-        Fut: Future<Output = Box<dyn Fallible>>,
+        Fut: Future<Output = anyhow::Result<()>>,
     {
         self.start_test_case();
 
         let mut outcome = Outcome::Passed;
         for section in self.desc.target_sections() {
-            if let Some(o) = {
+            if let Err(o) = {
                 Context::new(
                     &self.desc, //
                     &mut *self.reporter,
@@ -231,12 +231,12 @@ impl TestInner {
         self.end_test_case(outcome)
     }
 
-    fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) -> TestCaseSummary {
+    fn run_blocking(&mut self, f: fn() -> anyhow::Result<()>) -> TestCaseSummary {
         self.start_test_case();
 
         let mut outcome = Outcome::Passed;
         for section in self.desc.target_sections() {
-            if let Some(o) = {
+            if let Err(o) = {
                 Context::new(
                     &self.desc, //
                     &mut *self.reporter,
@@ -408,31 +408,28 @@ impl<'a> Context<'a> {
         self.current_section = enter.last_section;
     }
 
-    async fn run_async<Fut>(&mut self, fut: Fut) -> Option<Outcome>
+    async fn run_async<Fut>(&mut self, fut: Fut) -> Result<(), Outcome>
     where
-        Fut: Future<Output = Box<dyn Fallible>>,
+        Fut: Future<Output = anyhow::Result<()>>,
     {
         let outcome = self.scope_async(AssertUnwindSafe(fut).catch_unwind()).await;
         self.check_outcome(outcome)
     }
 
-    fn run_blocking(&mut self, f: fn() -> Box<dyn Fallible>) -> Option<Outcome> {
+    fn run_blocking(&mut self, f: fn() -> anyhow::Result<()>) -> Result<(), Outcome> {
         let outcome = self.scope(|| std::panic::catch_unwind(f));
         self.check_outcome(outcome)
     }
 
     fn check_outcome(
         &mut self,
-        result: Result<Box<dyn Fallible>, Box<dyn std::any::Any + Send>>,
-    ) -> Option<Outcome> {
+        result: Result<anyhow::Result<()>, Box<dyn std::any::Any + Send>>,
+    ) -> Result<(), Outcome> {
         match result {
-            Ok(fallible) => match fallible.into_result() {
-                Ok(()) => None,
-                Err(err) => Some(Outcome::Errored(err)),
-            },
+            Ok(fallible) => fallible.map_err(Outcome::Errored),
             Err(panic_payload) => match self.termination_reason.take() {
-                Some(TerminationReason::Skipped { reason }) => Some(Outcome::Skipped { reason }),
-                Some(TerminationReason::Panicked { location }) => Some(Outcome::Panicked {
+                Some(TerminationReason::Skipped { reason }) => Err(Outcome::Skipped { reason }),
+                Some(TerminationReason::Panicked { location }) => Err(Outcome::Panicked {
                     payload: panic_payload,
                     location: location.expect("the panic location is not available"),
                 }),

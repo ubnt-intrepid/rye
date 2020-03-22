@@ -142,8 +142,9 @@ mod args;
 mod exit_status;
 mod global;
 mod session;
+mod termination;
 
-pub use crate::{args::Args, exit_status::ExitStatus, session::Session};
+pub use crate::{args::Args, exit_status::ExitStatus, session::Session, termination::Termination};
 
 #[allow(missing_docs)]
 pub fn install() {
@@ -177,15 +178,16 @@ pub mod _internal {
         __register_test_case as register_test_case,
         __sections as sections,
         __test_name as test_name,
+        termination::Termination,
         test::{
             imp::{test_name, Location, Section, TestFn},
-            Fallible, TestCase, TestDesc,
+            TestCase, TestDesc,
         },
     };
     pub use futures::task::{FutureObj, LocalFutureObj};
     pub use hashbrown::{HashMap, HashSet};
     pub use paste;
-    pub use std::{boxed::Box, module_path, result::Result, stringify};
+    pub use std::{module_path, result::Result, stringify};
 
     use crate::{
         executor::{Context, EnterSection},

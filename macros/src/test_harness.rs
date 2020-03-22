@@ -72,9 +72,9 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
     quote! {
         #[cfg(any(test, trybuild))]
         fn #main_id () -> Result<(), impl std::fmt::Debug> {
-            use #crate_path::_internal::Fallible;
-            let fallible: Box<dyn Fallible> = Box::new(#test_runner(&#crate_path::_internal::TEST_CASES[..]));
-            Fallible::into_result(fallible)
+            use #crate_path::_internal::Termination;
+            let t = #test_runner(&#crate_path::_internal::TEST_CASES[..]);
+            Termination::into_result(t)
         }
     }
 }

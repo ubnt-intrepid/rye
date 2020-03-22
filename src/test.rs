@@ -71,47 +71,11 @@ impl TestDesc {
     }
 }
 
-/// The result values returned from test functions.
-pub trait Fallible: imp::FallibleImp {}
-
-impl Fallible for () {}
-
-impl<E> Fallible for Result<(), E> where E: Into<anyhow::Error> {}
-
 #[allow(missing_docs)]
 pub(crate) mod imp {
-    use super::Fallible;
     use futures::task::{FutureObj, LocalFutureObj};
     use hashbrown::HashSet;
     use std::{borrow::Cow, fmt, panic};
-
-    pub trait FallibleImp {
-        fn is_ok(&self) -> bool;
-        fn into_result(self: Box<Self>) -> anyhow::Result<()>;
-    }
-
-    impl FallibleImp for () {
-        fn is_ok(&self) -> bool {
-            true
-        }
-
-        fn into_result(self: Box<Self>) -> anyhow::Result<()> {
-            Ok(())
-        }
-    }
-
-    impl<E> FallibleImp for Result<(), E>
-    where
-        E: Into<anyhow::Error>,
-    {
-        fn is_ok(&self) -> bool {
-            self.is_ok()
-        }
-
-        fn into_result(self: Box<Self>) -> anyhow::Result<()> {
-            (*self).map_err(|e| e.into())
-        }
-    }
 
     pub(crate) type SectionId = u64;
 
@@ -123,9 +87,9 @@ pub(crate) mod imp {
 
     #[derive(Debug)]
     pub enum TestFn {
-        Blocking(fn() -> Box<dyn Fallible>),
-        Async(fn() -> FutureObj<'static, Box<dyn Fallible>>),
-        LocalAsync(fn() -> LocalFutureObj<'static, Box<dyn Fallible>>),
+        Blocking(fn() -> anyhow::Result<()>),
+        Async(fn() -> FutureObj<'static, anyhow::Result<()>>),
+        LocalAsync(fn() -> LocalFutureObj<'static, anyhow::Result<()>>),
     }
 
     #[doc(hidden)] // private API.
@@ -133,12 +97,9 @@ pub(crate) mod imp {
     macro_rules! __async_local_test_fn {
         ($path:path) => {
             $crate::_internal::TestFn::LocalAsync(|| {
-                use $crate::_internal::{Box, Fallible, LocalFutureObj};
+                use $crate::_internal::{LocalFutureObj, Termination};
                 let fut = $path();
-                LocalFutureObj::new(Box::pin(async move {
-                    let fallible = fut.await;
-                    Box::new(fallible) as Box<dyn Fallible>
-                }))
+                LocalFutureObj::new(Box::pin(async move { Termination::into_result(fut.await) }))
             })
         };
     }
@@ -148,12 +109,9 @@ pub(crate) mod imp {
     macro_rules! __async_test_fn {
         ($path:path) => {
             $crate::_internal::TestFn::Async(|| {
-                use $crate::_internal::{Box, Fallible, FutureObj};
+                use $crate::_internal::{FutureObj, Termination};
                 let fut = $path();
-                FutureObj::new(Box::pin(async move {
-                    let fallible = fut.await;
-                    Box::new(fallible) as Box<dyn Fallible>
-                }))
+                FutureObj::new(Box::pin(async move { Termination::into_result(fut.await) }))
             })
         };
     }
@@ -163,9 +121,8 @@ pub(crate) mod imp {
     macro_rules! __blocking_test_fn {
         ($path:path) => {
             $crate::_internal::TestFn::Blocking(|| {
-                use $crate::_internal::{Box, Fallible};
-                let fallible = $path();
-                Box::new(fallible) as Box<dyn Fallible>
+                use $crate::_internal::Termination;
+                Termination::into_result($path())
             })
         };
     }
