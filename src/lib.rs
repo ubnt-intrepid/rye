@@ -134,10 +134,10 @@ teardown
 #![deny(missing_docs)]
 #![forbid(clippy::unimplemented, clippy::todo)]
 
-pub mod executor;
 pub mod reporter;
 
 mod args;
+mod executor;
 mod exit_status;
 mod global;
 mod session;
@@ -146,6 +146,7 @@ mod test;
 
 pub use crate::{
     args::Args,
+    executor::TestExecutor,
     exit_status::ExitStatus,
     session::Session,
     termination::Termination,

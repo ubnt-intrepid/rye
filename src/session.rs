@@ -20,7 +20,7 @@ impl<'sess> Session<'sess> {
     }
 
     #[inline]
-    pub fn run<T: ?Sized, R: ?Sized>(
+    pub async fn run<T: ?Sized, R: ?Sized>(
         &mut self,
         tests: &[&dyn TestCase],
         runner: &mut T,
@@ -83,12 +83,10 @@ impl<'sess> Session<'sess> {
             let reporter = reporter.clone();
             handles.push(runner.spawn_test(test, reporter));
         }
-        runner.run(async {
-            let results = futures::future::join_all(handles).await;
-            for result in results {
-                summary.append(result);
-            }
-        });
+        let results = futures::future::join_all(handles).await;
+        for result in results {
+            summary.append(result);
+        }
 
         reporter.test_run_ended(&summary);
 

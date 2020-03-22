@@ -5,9 +5,8 @@ use futures::{
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
 use rye::{
-    executor::{AsyncTest, BlockingTest, LocalAsyncTest, TestExecutor},
     reporter::{ConsoleReporter, TestCaseSummary},
-    Args, Session, TestCase,
+    Args, Session, TestCase, TestExecutor,
 };
 use std::{io, sync::Arc, thread};
 
@@ -17,26 +16,24 @@ pub(crate) fn run_tests(tests: &[&dyn TestCase]) {
     let args = Args::from_env().unwrap_or_else(|st| st.exit());
     let mut session = Session::new(&args);
 
-    let mut runner = FuturesTestRunner::new().unwrap();
+    let mut local_pool = LocalPool::new();
+    let mut runner = FuturesTestRunner::new(local_pool.spawner()).unwrap();
+
     let reporter = Arc::new(ConsoleReporter::new(&args));
-    let st = session.run(tests, &mut runner, &reporter);
+    let st = local_pool.run_until(session.run(tests, &mut runner, &reporter));
 
     st.exit();
 }
 
 struct FuturesTestRunner {
     thread_pool: ThreadPool,
-    local_pool: LocalPool,
     local_spawner: LocalSpawner,
 }
 
 impl FuturesTestRunner {
-    fn new() -> io::Result<Self> {
-        let local_pool = LocalPool::new();
-        let local_spawner = local_pool.spawner();
+    fn new(local_spawner: LocalSpawner) -> io::Result<Self> {
         Ok(FuturesTestRunner {
             thread_pool: ThreadPool::new()?,
-            local_pool,
             local_spawner,
         })
     }
@@ -45,33 +42,30 @@ impl FuturesTestRunner {
 impl TestExecutor for FuturesTestRunner {
     type Handle = RemoteHandle<TestCaseSummary>;
 
-    fn spawn(&mut self, mut test: AsyncTest) -> Self::Handle {
-        self.thread_pool
-            .spawn_with_handle(async move { test.run().await })
-            .unwrap()
+    fn spawn<Fut>(&mut self, fut: Fut) -> Self::Handle
+    where
+        Fut: Future<Output = TestCaseSummary> + Send + 'static,
+    {
+        self.thread_pool.spawn_with_handle(fut).unwrap()
     }
 
-    fn spawn_local(&mut self, mut test: LocalAsyncTest) -> Self::Handle {
-        self.local_spawner
-            .spawn_local_with_handle(async move { test.run().await })
-            .unwrap()
+    fn spawn_local<Fut>(&mut self, fut: Fut) -> Self::Handle
+    where
+        Fut: Future<Output = TestCaseSummary> + 'static,
+    {
+        self.local_spawner.spawn_local_with_handle(fut).unwrap()
     }
 
-    fn spawn_blocking(&mut self, mut test: BlockingTest) -> Self::Handle {
+    fn spawn_blocking<F>(&mut self, f: F) -> Self::Handle
+    where
+        F: FnOnce() -> TestCaseSummary + Send + 'static,
+    {
         let (tx, rx) = oneshot::channel();
         let (remote, handle) = rx.map(|res| res.unwrap()).remote_handle();
         self.local_spawner.spawn(remote).unwrap();
         thread::spawn(move || {
-            let is_success = test.run();
-            let _ = tx.send(is_success);
+            let _ = tx.send(f());
         });
         handle
-    }
-
-    fn run<Fut>(&mut self, fut: Fut)
-    where
-        Fut: Future<Output = ()>,
-    {
-        self.local_pool.run_until(fut)
     }
 }

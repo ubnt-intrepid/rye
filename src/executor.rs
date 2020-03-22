@@ -5,7 +5,7 @@ use crate::{
     test::{Location, SectionId, TestCase, TestDesc, TestFn},
 };
 use futures::{
-    future::{BoxFuture, Future, FutureExt as _, LocalBoxFuture},
+    future::{Future, FutureExt as _},
     task::{self, Poll},
 };
 use pin_project::pin_project;
@@ -17,7 +17,6 @@ use std::{
     panic::{AssertUnwindSafe, PanicInfo},
     pin::Pin,
     ptr::NonNull,
-    rc::Rc,
     sync::Arc,
 };
 
@@ -26,19 +25,20 @@ pub trait TestExecutor {
     /// Future for awaiting a result of test execution.
     type Handle: Future<Output = TestCaseSummary>;
 
-    /// Spawn a task to execute the specified test function.
-    fn spawn(&mut self, test: AsyncTest) -> Self::Handle;
-
-    /// Spawn a task to execute the specified test function onto the current thread.
-    fn spawn_local(&mut self, test: LocalAsyncTest) -> Self::Handle;
-
-    /// Spawn a taek to execute the specified test function that may block the running thread.
-    fn spawn_blocking(&mut self, test: BlockingTest) -> Self::Handle;
-
-    /// Run all test cases and collect their results.
-    fn run<Fut>(&mut self, fut: Fut)
+    /// Spawn a task to execute the specified test future.
+    fn spawn<Fut>(&mut self, fut: Fut) -> Self::Handle
     where
-        Fut: Future<Output = ()>;
+        Fut: Future<Output = TestCaseSummary> + Send + 'static;
+
+    /// Spawn a task to execute the specified test future onto the current thread.
+    fn spawn_local<Fut>(&mut self, fut: Fut) -> Self::Handle
+    where
+        Fut: Future<Output = TestCaseSummary> + 'static;
+
+    /// Spawn a task to execute the specified test function that may block the running thread.
+    fn spawn_blocking<F>(&mut self, f: F) -> Self::Handle
+    where
+        F: FnOnce() -> TestCaseSummary + Send + 'static;
 }
 
 impl<T: ?Sized> TestExecutor for &mut T
@@ -48,26 +48,27 @@ where
     type Handle = T::Handle;
 
     #[inline]
-    fn spawn(&mut self, test: AsyncTest) -> Self::Handle {
-        (**self).spawn(test)
-    }
-
-    #[inline]
-    fn spawn_local(&mut self, test: LocalAsyncTest) -> Self::Handle {
-        (**self).spawn_local(test)
-    }
-
-    #[inline]
-    fn spawn_blocking(&mut self, test: BlockingTest) -> Self::Handle {
-        (**self).spawn_blocking(test)
-    }
-
-    #[inline]
-    fn run<Fut>(&mut self, fut: Fut)
+    fn spawn<Fut>(&mut self, fut: Fut) -> Self::Handle
     where
-        Fut: Future<Output = ()>,
+        Fut: Future<Output = TestCaseSummary> + Send + 'static,
     {
-        (**self).run(fut)
+        (**self).spawn(fut)
+    }
+
+    #[inline]
+    fn spawn_local<Fut>(&mut self, fut: Fut) -> Self::Handle
+    where
+        Fut: Future<Output = TestCaseSummary> + 'static,
+    {
+        (**self).spawn_local(fut)
+    }
+
+    #[inline]
+    fn spawn_blocking<F>(&mut self, f: F) -> Self::Handle
+    where
+        F: FnOnce() -> TestCaseSummary + Send + 'static,
+    {
+        (**self).spawn_blocking(f)
     }
 }
 
@@ -78,26 +79,27 @@ where
     type Handle = T::Handle;
 
     #[inline]
-    fn spawn(&mut self, test: AsyncTest) -> Self::Handle {
-        (**self).spawn(test)
-    }
-
-    #[inline]
-    fn spawn_local(&mut self, test: LocalAsyncTest) -> Self::Handle {
-        (**self).spawn_local(test)
-    }
-
-    #[inline]
-    fn spawn_blocking(&mut self, test: BlockingTest) -> Self::Handle {
-        (**self).spawn_blocking(test)
-    }
-
-    #[inline]
-    fn run<Fut>(&mut self, fut: Fut)
+    fn spawn<Fut>(&mut self, fut: Fut) -> Self::Handle
     where
-        Fut: Future<Output = ()>,
+        Fut: Future<Output = TestCaseSummary> + Send + 'static,
     {
-        (**self).run(fut)
+        (**self).spawn(fut)
+    }
+
+    #[inline]
+    fn spawn_local<Fut>(&mut self, fut: Fut) -> Self::Handle
+    where
+        Fut: Future<Output = TestCaseSummary> + 'static,
+    {
+        (**self).spawn_local(fut)
+    }
+
+    #[inline]
+    fn spawn_blocking<F>(&mut self, f: F) -> Self::Handle
+    where
+        F: FnOnce() -> TestCaseSummary + Send + 'static,
+    {
+        (**self).spawn_blocking(f)
     }
 }
 
@@ -106,96 +108,19 @@ pub(crate) trait TestExecutorExt: TestExecutor {
     where
         R: Reporter + Send + 'static,
     {
-        let inner = TestInner {
+        let mut inner = TestInner {
             desc: Arc::new(test.desc()),
             reporter: Box::new(reporter),
         };
         match test.test_fn() {
-            TestFn::Blocking(f) => self.spawn_blocking(BlockingTest {
-                inner,
-                f,
-                _marker: PhantomData,
-            }),
-            TestFn::LocalAsync(f) => self.spawn_local(LocalAsyncTest {
-                inner,
-                f,
-                _marker: PhantomData,
-            }),
-            TestFn::Async(f) => self.spawn(AsyncTest {
-                inner,
-                f,
-                _marker: PhantomData,
-            }),
+            TestFn::Blocking(f) => self.spawn_blocking(move || inner.run_blocking(f)),
+            TestFn::LocalAsync(f) => self.spawn_local(async move { inner.run_async(f).await }),
+            TestFn::Async(f) => self.spawn(async move { inner.run_async(f).await }),
         }
     }
 }
 
 impl<E: TestExecutor + ?Sized> TestExecutorExt for E {}
-
-/// Blocking test function.
-pub struct BlockingTest {
-    inner: TestInner,
-    f: fn() -> anyhow::Result<()>,
-    _marker: PhantomData<Cell<()>>,
-}
-
-impl BlockingTest {
-    #[allow(missing_docs)]
-    #[inline]
-    pub fn desc(&self) -> &TestDesc {
-        &self.inner.desc
-    }
-
-    /// Run the test function until all sections are completed.
-    pub fn run(&mut self) -> TestCaseSummary {
-        self.inner.run_blocking(self.f)
-    }
-}
-
-/// Asynchronous test function.
-pub struct AsyncTest {
-    inner: TestInner,
-    f: fn() -> BoxFuture<'static, anyhow::Result<()>>,
-    _marker: PhantomData<Cell<()>>,
-}
-
-impl AsyncTest {
-    #[allow(missing_docs)]
-    #[inline]
-    pub fn desc(&self) -> &TestDesc {
-        &self.inner.desc
-    }
-
-    /// Run the test function until all sections are completed.
-    #[inline]
-    pub async fn run(&mut self) -> TestCaseSummary {
-        self.inner.run_async(self.f).await
-    }
-}
-
-/// Asynchronous test function.
-///
-/// Unlike `AsyncTest`, this function must be executed
-/// on the current thread.
-pub struct LocalAsyncTest {
-    inner: TestInner,
-    f: fn() -> LocalBoxFuture<'static, anyhow::Result<()>>,
-    _marker: PhantomData<Rc<Cell<()>>>,
-}
-
-impl LocalAsyncTest {
-    #[allow(missing_docs)]
-    #[inline]
-    pub fn desc(&self) -> &TestDesc {
-        &self.inner.desc
-    }
-
-    /// Run the test function until all sections are completed.
-    #[inline]
-    pub async fn run(&mut self) -> TestCaseSummary {
-        self.inner.run_async(self.f).await
-    }
-}
 
 struct TestInner {
     desc: Arc<TestDesc>,
@@ -377,12 +302,6 @@ impl<'a> Context<'a> {
         F: FnOnce(&mut Context<'_>) -> R,
     {
         Self::try_with(f).expect("cannot acquire the test context")
-    }
-
-    /// Return the name of section currently executing.
-    #[inline]
-    pub fn section_name(&self) -> Option<&str> {
-        self.current_section.map(|id| self.desc.sections[&id].name)
     }
 
     pub(crate) fn enter_section(&mut self, id: SectionId) -> EnterSection {
