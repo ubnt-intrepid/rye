@@ -1,45 +1,8 @@
 //! Registration of test cases.
 
-use self::imp::{Section, SectionId, TestFn};
+use self::imp::{Location, Section, SectionId, TestFn};
 use hashbrown::HashMap;
-use std::{borrow::Cow, error, fmt, panic, sync::Arc};
-
-#[doc(hidden)] // private API.
-#[derive(Debug)]
-pub struct Location {
-    pub file: Cow<'static, str>,
-    pub line: u32,
-    pub column: u32,
-}
-
-impl Location {
-    #[inline]
-    pub(crate) fn from_std(loc: &panic::Location<'_>) -> Self {
-        Self {
-            file: loc.file().to_string().into(),
-            line: loc.line(),
-            column: loc.column(),
-        }
-    }
-}
-
-impl fmt::Display for Location {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}:{}", self.file, self.line, self.column)
-    }
-}
-
-#[doc(hidden)] // private API.
-#[macro_export]
-macro_rules! __location {
-    () => {
-        $crate::test::Location {
-            file: file!().into(),
-            line: line!(),
-            column: column!(),
-        }
-    };
-}
+use std::{borrow::Cow, error, sync::Arc};
 
 /// Description about a single test case.
 #[derive(Debug)]
@@ -60,7 +23,7 @@ impl Test {
     #[inline]
     pub fn is_async(&self) -> bool {
         match self.test_fn {
-            TestFn::Async { .. } => true,
+            TestFn::Async(..) | TestFn::LocalAsync(..) => true,
             _ => false,
         }
     }
@@ -70,8 +33,8 @@ impl Test {
     #[inline]
     pub fn is_local(&self) -> bool {
         match self.test_fn {
-            TestFn::Async { local, .. } => local,
-            TestFn::Blocking { .. } => false,
+            TestFn::LocalAsync(..) => true,
+            _ => false,
         }
     }
 }
@@ -214,13 +177,9 @@ impl RegistryError {
 #[allow(missing_docs)]
 pub(crate) mod imp {
     use super::Fallible;
-    use futures::{
-        future::{Future, LocalFutureObj},
-        task::{self, FutureObj, Poll},
-    };
+    use futures::task::{FutureObj, LocalFutureObj};
     use hashbrown::HashSet;
-    use pin_project::pin_project;
-    use std::pin::Pin;
+    use std::{borrow::Cow, fmt, panic};
 
     pub trait FallibleImp {
         fn is_ok(&self) -> bool;
@@ -260,63 +219,105 @@ pub(crate) mod imp {
 
     #[derive(Debug)]
     pub enum TestFn {
-        Blocking { f: fn() -> Box<dyn Fallible> },
-        Async { f: fn() -> TestFuture, local: bool },
+        Blocking(fn() -> Box<dyn Fallible>),
+        Async(fn() -> FutureObj<'static, Box<dyn Fallible>>),
+        LocalAsync(fn() -> LocalFutureObj<'static, Box<dyn Fallible>>),
     }
 
-    #[pin_project]
-    pub struct TestFuture {
-        #[pin]
-        inner: LocalFutureObj<'static, Box<dyn Fallible>>,
-        local: bool,
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __async_local_test_fn {
+        ($path:path) => {
+            $crate::_internal::TestFn::LocalAsync(|| {
+                use $crate::_internal::{Box, Fallible, LocalFutureObj};
+                let fut = $path();
+                LocalFutureObj::new(Box::pin(async move {
+                    let fallible = fut.await;
+                    Box::new(fallible) as Box<dyn Fallible>
+                }))
+            })
+        };
     }
 
-    impl TestFuture {
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __async_test_fn {
+        ($path:path) => {
+            $crate::_internal::TestFn::Async(|| {
+                use $crate::_internal::{Box, Fallible, FutureObj};
+                let fut = $path();
+                FutureObj::new(Box::pin(async move {
+                    let fallible = fut.await;
+                    Box::new(fallible) as Box<dyn Fallible>
+                }))
+            })
+        };
+    }
+
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __blocking_test_fn {
+        ($path:path) => {
+            $crate::_internal::TestFn::Blocking(|| {
+                use $crate::_internal::{Box, Fallible};
+                let fallible = $path();
+                Box::new(fallible) as Box<dyn Fallible>
+            })
+        };
+    }
+
+    #[derive(Debug)]
+    pub struct Location {
+        pub file: Cow<'static, str>,
+        pub line: u32,
+        pub column: u32,
+    }
+
+    impl Location {
         #[inline]
-        pub fn new<Fut>(fut: Fut) -> Self
-        where
-            Fut: Future + Send + 'static,
-            Fut::Output: Fallible,
-        {
+        pub(crate) fn from_std(loc: &panic::Location<'_>) -> Self {
             Self {
-                inner: LocalFutureObj::new(Box::pin(async move {
-                    Box::new(fut.await) as Box<dyn Fallible>
-                })),
-                local: false,
+                file: loc.file().to_string().into(),
+                line: loc.line(),
+                column: loc.column(),
             }
         }
+    }
 
-        #[inline]
-        pub fn new_local<Fut>(fut: Fut) -> Self
-        where
-            Fut: Future + 'static,
-            Fut::Output: Fallible,
-        {
-            Self {
-                inner: LocalFutureObj::new(Box::pin(async move {
-                    Box::new(fut.await) as Box<dyn Fallible>
-                })),
-                local: true,
-            }
-        }
-
-        #[inline]
-        pub(crate) fn into_future_obj(self) -> FutureObj<'static, Box<dyn Fallible>> {
-            assert!(
-                !self.local,
-                "the test future cannot be converted into FutureObj when it is not Send"
-            );
-            unsafe { self.inner.into_future_obj() }
+    impl fmt::Display for Location {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}:{}:{}", self.file, self.line, self.column)
         }
     }
 
-    impl Future for TestFuture {
-        type Output = Box<dyn Fallible>;
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __location {
+        () => {
+            $crate::_internal::Location {
+                file: file!().into(),
+                line: line!(),
+                column: column!(),
+            }
+        };
+    }
 
-        #[inline]
-        fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-            let me = self.project();
-            me.inner.poll(cx)
-        }
+    #[doc(hidden)] // private API.
+    #[macro_export]
+    macro_rules! __test_name {
+        ($name:ident) => {
+            $crate::_internal::test_name(
+                $crate::_internal::module_path!(),
+                $crate::_internal::stringify!($name),
+            )
+        };
+    }
+
+    #[inline]
+    pub fn test_name(module_path: &'static str, name: &'static str) -> Cow<'static, str> {
+        module_path
+            .splitn(2, "::")
+            .nth(1)
+            .map_or(name.into(), |m| format!("{}::{}", m, name).into())
     }
 }

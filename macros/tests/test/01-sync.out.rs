@@ -32,7 +32,7 @@ const __SCOPE_FOR__case_sync: () = {
                 __rye::TestDesc {
                     name: __rye::test_name!(case_sync),
                     location: __rye::location!(),
-                    sections: __rye::declare_section! {
+                    sections: __rye::sections! {
                         0u64 => ("resizing bigger changes size and capacity", {});
                     },
                     leaf_sections: &[ 0u64 ],

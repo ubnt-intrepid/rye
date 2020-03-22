@@ -26,7 +26,7 @@ const __SCOPE_FOR__no_sections: () = {
                 __rye::TestDesc {
                     name: __rye::test_name!(no_sections),
                     location: __rye::location!(),
-                    sections: __rye::declare_section! {},
+                    sections: __rye::sections! {},
                     leaf_sections: &[],
                 },
                 __rye::blocking_test_fn!(Self::__body)

@@ -3,13 +3,13 @@
 use crate::{
     reporter::{Outcome, Reporter, TestCaseSummary},
     test::{
-        imp::{SectionId, TestFn, TestFuture},
-        Fallible, Location, Test, TestDesc,
+        imp::{Location, SectionId, TestFn},
+        Fallible, Test, TestDesc,
     },
 };
 use futures::{
-    future::{Future, FutureExt as _},
-    task::{self, Poll},
+    future::{Future, FutureExt as _, LocalFutureObj},
+    task::{self, FutureObj, Poll},
 };
 use pin_project::pin_project;
 use std::{
@@ -114,26 +114,21 @@ pub(crate) trait TestExecutorExt: TestExecutor {
             reporter: Box::new(reporter),
         };
         match test.test_fn {
-            TestFn::Blocking { f } => self.spawn_blocking(BlockingTest {
+            TestFn::Blocking(f) => self.spawn_blocking(BlockingTest {
                 inner,
                 f,
                 _marker: PhantomData,
             }),
-            TestFn::Async { f, local } => {
-                if local {
-                    self.spawn_local(LocalAsyncTest {
-                        inner,
-                        f,
-                        _marker: PhantomData,
-                    })
-                } else {
-                    self.spawn(AsyncTest {
-                        inner,
-                        f,
-                        _marker: PhantomData,
-                    })
-                }
-            }
+            TestFn::LocalAsync(f) => self.spawn_local(LocalAsyncTest {
+                inner,
+                f,
+                _marker: PhantomData,
+            }),
+            TestFn::Async(f) => self.spawn(AsyncTest {
+                inner,
+                f,
+                _marker: PhantomData,
+            }),
         }
     }
 }
@@ -163,7 +158,7 @@ impl BlockingTest {
 /// Asynchronous test function.
 pub struct AsyncTest {
     inner: TestInner,
-    f: fn() -> TestFuture,
+    f: fn() -> FutureObj<'static, Box<dyn Fallible>>,
     _marker: PhantomData<Cell<()>>,
 }
 
@@ -177,9 +172,7 @@ impl AsyncTest {
     /// Run the test function until all sections are completed.
     #[inline]
     pub async fn run(&mut self) -> TestCaseSummary {
-        self.inner
-            .run_async(self.f, TestFuture::into_future_obj)
-            .await
+        self.inner.run_async(self.f).await
     }
 }
 
@@ -189,7 +182,7 @@ impl AsyncTest {
 /// on the current thread.
 pub struct LocalAsyncTest {
     inner: TestInner,
-    f: fn() -> TestFuture,
+    f: fn() -> LocalFutureObj<'static, Box<dyn Fallible>>,
     _marker: PhantomData<Rc<Cell<()>>>,
 }
 
@@ -203,7 +196,7 @@ impl LocalAsyncTest {
     /// Run the test function until all sections are completed.
     #[inline]
     pub async fn run(&mut self) -> TestCaseSummary {
-        self.inner.run_async(self.f, std::convert::identity).await
+        self.inner.run_async(self.f).await
     }
 }
 
@@ -213,9 +206,8 @@ struct TestInner {
 }
 
 impl TestInner {
-    async fn run_async<F, Fut>(&mut self, f: fn() -> TestFuture, conv: F) -> TestCaseSummary
+    async fn run_async<Fut>(&mut self, f: fn() -> Fut) -> TestCaseSummary
     where
-        F: Fn(TestFuture) -> Fut,
         Fut: Future<Output = Box<dyn Fallible>>,
     {
         self.start_test_case();
@@ -228,7 +220,7 @@ impl TestInner {
                     &mut *self.reporter,
                     section,
                 )
-                .run_async(f, &conv)
+                .run_async(f())
                 .await
             } {
                 outcome = o;
@@ -416,12 +408,10 @@ impl<'a> Context<'a> {
         self.current_section = enter.last_section;
     }
 
-    async fn run_async<F, Fut>(&mut self, f: fn() -> TestFuture, conv: F) -> Option<Outcome>
+    async fn run_async<Fut>(&mut self, fut: Fut) -> Option<Outcome>
     where
-        F: FnOnce(TestFuture) -> Fut,
         Fut: Future<Output = Box<dyn Fallible>>,
     {
-        let fut = conv(f());
         let outcome = self.scope_async(AssertUnwindSafe(fut).catch_unwind()).await;
         self.check_outcome(outcome)
     }
@@ -545,10 +535,13 @@ mod tests {
         };
 
         let _ = match test_fn {
-            TestFn::Blocking { f } => HISTORY.set(&history, || state.run_blocking(f)),
-            TestFn::Async { f, .. } => futures::executor::block_on(
-                HISTORY.set_async(&history, state.run_async(f, std::convert::identity)),
-            ),
+            TestFn::Blocking(f) => HISTORY.set(&history, || state.run_blocking(f)),
+            TestFn::Async(f) => {
+                futures::executor::block_on(HISTORY.set_async(&history, state.run_async(f)))
+            }
+            TestFn::LocalAsync(f) => {
+                futures::executor::block_on(HISTORY.set_async(&history, state.run_async(f)))
+            }
         };
 
         history.into_inner()

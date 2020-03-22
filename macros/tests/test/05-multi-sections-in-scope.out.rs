@@ -48,7 +48,7 @@ const __SCOPE_FOR__multi_section_in_scope: () = {
                 __rye::TestDesc {
                     name: __rye::test_name!(multi_section_in_scope),
                     location: __rye::location!(),
-                    sections: __rye::declare_section! {
+                    sections: __rye::sections! {
                         0u64 => ("section1"     , {});
                         1u64 => ("section2"     , {});
                         2u64 => ("section2-1"   , { 1u64 });

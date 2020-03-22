@@ -391,7 +391,7 @@ impl ToTokens for Generated<'_> {
                             __rye::TestDesc {
                                 name: __rye::test_name!(#ident),
                                 location: #location,
-                                sections: __rye::declare_section! { #( #section_map_entries )* },
+                                sections: __rye::sections! { #( #section_map_entries )* },
                                 leaf_sections: &[ #( #leaf_section_ids ),* ],
                             },
                             __rye::#test_fn_id!(Self::__body)

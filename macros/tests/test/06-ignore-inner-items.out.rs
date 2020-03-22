@@ -28,7 +28,7 @@ const __SCOPE_FOR__ignore_inner_items: () = {
                 __rye::TestDesc {
                     name: __rye::test_name!(ignore_inner_items),
                     location: __rye::location!(),
-                    sections: __rye::declare_section! {},
+                    sections: __rye::sections! {},
                     leaf_sections: &[],
                 },
                 __rye::blocking_test_fn!(Self::__body)

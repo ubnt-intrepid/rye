@@ -5,7 +5,7 @@ mod log;
 
 pub use self::{console::ConsoleReporter, log::LogReporter};
 
-use crate::test::{Location, Test, TestDesc};
+use crate::test::{imp::Location, Test, TestDesc};
 use std::{any::Any, sync::Arc};
 
 #[derive(Debug)]

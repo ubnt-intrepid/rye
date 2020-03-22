@@ -35,7 +35,7 @@ const __SCOPE_FOR__attributes: () = {
                 __rye::TestDesc {
                     name: __rye::test_name!(attributes),
                     location: __rye::location!(),
-                    sections: __rye::declare_section! {
+                    sections: __rye::sections! {
                         0u64 => ("with unused variable", {});
                     },
                     leaf_sections: &[ 0u64 ],

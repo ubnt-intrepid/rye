@@ -172,33 +172,33 @@ pub mod _internal {
         __blocking_test_fn as blocking_test_fn,
         __cfg_frameworks as cfg_frameworks,
         __cfg_harness as cfg_harness,
-        __declare_section as declare_section,
         __enter_section as enter_section,
         __location as location,
         __register_test_case as register_test_case,
+        __sections as sections,
         __test_name as test_name,
         test::{
-            imp::{Section, TestFn, TestFuture},
-            Registry, RegistryError, TestDesc, TestSet,
+            imp::{test_name, Location, Section, TestFn},
+            Fallible, Registry, RegistryError, TestDesc, TestSet,
         },
     };
+    pub use futures::task::{FutureObj, LocalFutureObj};
     pub use hashbrown::{HashMap, HashSet};
     pub use paste;
-    pub use std::{module_path, result::Result, stringify};
+    pub use std::{boxed::Box, module_path, result::Result, stringify};
+
+    use crate::{
+        executor::{Context, EnterSection},
+        test::imp::SectionId,
+    };
+    use std::fmt;
 
     #[cfg(feature = "harness")]
     pub use linkme;
 
-    use crate::{
-        executor::{Context, EnterSection},
-        test::{imp::SectionId, Fallible},
-    };
-    use std::{borrow::Cow, fmt};
-
-    #[inline]
-    pub fn test_result<T: Fallible + 'static>(res: T) -> Box<dyn Fallible + 'static> {
-        Box::new(res)
-    }
+    #[cfg(feature = "harness")]
+    #[linkme::distributed_slice]
+    pub static TEST_CASES: [&'static dyn TestSet] = [..];
 
     #[inline]
     pub fn enter_section(id: SectionId) -> EnterSection {
@@ -209,29 +209,6 @@ pub mod _internal {
     pub fn skip(reason: fmt::Arguments<'_>) -> ! {
         Context::with(|ctx| ctx.mark_skipped(reason));
         panic!("skipped")
-    }
-
-    #[inline]
-    pub fn test_name(module_path: &'static str, name: &'static str) -> Cow<'static, str> {
-        module_path
-            .splitn(2, "::")
-            .nth(1)
-            .map_or(name.into(), |m| format!("{}::{}", m, name).into())
-    }
-
-    #[cfg(feature = "harness")]
-    #[linkme::distributed_slice]
-    pub static TEST_CASES: [&'static dyn TestSet] = [..];
-
-    #[doc(hidden)] // private API.
-    #[macro_export]
-    macro_rules! __test_name {
-        ($name:ident) => {
-            $crate::_internal::test_name(
-                $crate::_internal::module_path!(),
-                $crate::_internal::stringify!($name),
-            )
-        };
     }
 
     #[doc(hidden)] // private API.
@@ -251,22 +228,22 @@ pub mod _internal {
 
     #[doc(hidden)] // private API.
     #[macro_export]
-    macro_rules! __declare_section {
+    macro_rules! __sections {
         (@single $($x:tt)*) => (());
         (@count $($rest:expr),*) => {
-            <[()]>::len(&[$($crate::__declare_section!(@single $rest)),*])
+            <[()]>::len(&[$($crate::__sections!(@single $rest)),*])
         };
 
         ($( $key:expr => ($name:expr, { $($ancestors:tt)* }); )*) => {
             {
-                let _cap = $crate::__declare_section!(@count $($key),*);
+                let _cap = $crate::__sections!(@count $($key),*);
                 #[allow(clippy::let_and_return)]
                 let mut _map = $crate::_internal::HashMap::with_capacity(_cap);
                 $(
                     let _ = _map.insert($key, $crate::_internal::Section {
                         name: $name,
                         ancestors: {
-                            let _cap = $crate::__declare_section!(@count $($ancestors),*);
+                            let _cap = $crate::__sections!(@count $($ancestors),*);
                             #[allow(clippy::let_and_return)]
                             let mut _set = $crate::_internal::HashSet::with_capacity(_cap);
                             $(
@@ -277,38 +254,6 @@ pub mod _internal {
                     });
                 )*
                 _map
-            }
-        };
-    }
-
-    #[doc(hidden)] // private API.
-    #[macro_export]
-    macro_rules! __async_local_test_fn {
-        ($path:path) => {
-            $crate::_internal::TestFn::Async {
-                f: || $crate::_internal::TestFuture::new_local($path()),
-                local: true,
-            }
-        };
-    }
-
-    #[doc(hidden)] // private API.
-    #[macro_export]
-    macro_rules! __async_test_fn {
-        ($path:path) => {
-            $crate::_internal::TestFn::Async {
-                f: || $crate::_internal::TestFuture::new($path()),
-                local: false,
-            }
-        };
-    }
-
-    #[doc(hidden)] // private API.
-    #[macro_export]
-    macro_rules! __blocking_test_fn {
-        ($path:path) => {
-            $crate::_internal::TestFn::Blocking {
-                f: || $crate::_internal::test_result($path()),
             }
         };
     }

@@ -38,7 +38,7 @@ const __SCOPE_FOR__case_sync_nested: () = {
                 __rye::TestDesc {
                     name: __rye::test_name!(case_sync_nested),
                     location: __rye::location!(),
-                    sections: __rye::declare_section! {
+                    sections: __rye::sections! {
                         0u64 => ("resizing bigger changes size and capacity", {});
                         1u64 => ("shrinking smaller does not changes capacity", { 0u64 });
                     },
