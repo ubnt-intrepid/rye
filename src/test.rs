@@ -1,4 +1,4 @@
-use futures::task::{FutureObj, LocalFutureObj};
+use futures::future::{BoxFuture, LocalBoxFuture};
 use hashbrown::{HashMap, HashSet};
 use std::{borrow::Cow, fmt, panic};
 
@@ -83,8 +83,8 @@ pub struct Section {
 #[derive(Debug)]
 pub enum TestFn {
     Blocking(fn() -> anyhow::Result<()>),
-    Async(fn() -> FutureObj<'static, anyhow::Result<()>>),
-    LocalAsync(fn() -> LocalFutureObj<'static, anyhow::Result<()>>),
+    Async(fn() -> BoxFuture<'static, anyhow::Result<()>>),
+    LocalAsync(fn() -> LocalBoxFuture<'static, anyhow::Result<()>>),
 }
 
 #[doc(hidden)] // private API.
@@ -92,9 +92,9 @@ pub enum TestFn {
 macro_rules! __async_local_test_fn {
     ($path:path) => {
         $crate::_internal::TestFn::LocalAsync(|| {
-            use $crate::_internal::{LocalFutureObj, Termination};
+            use $crate::_internal::{Box, Termination};
             let fut = $path();
-            LocalFutureObj::new(Box::pin(async move { Termination::into_result(fut.await) }))
+            Box::pin(async move { Termination::into_result(fut.await) })
         })
     };
 }
@@ -104,9 +104,9 @@ macro_rules! __async_local_test_fn {
 macro_rules! __async_test_fn {
     ($path:path) => {
         $crate::_internal::TestFn::Async(|| {
-            use $crate::_internal::{FutureObj, Termination};
+            use $crate::_internal::{Box, Termination};
             let fut = $path();
-            FutureObj::new(Box::pin(async move { Termination::into_result(fut.await) }))
+            Box::pin(async move { Termination::into_result(fut.await) })
         })
     };
 }

@@ -5,8 +5,8 @@ use crate::{
     test::{Location, SectionId, TestCase, TestDesc, TestFn},
 };
 use futures::{
-    future::{Future, FutureExt as _, LocalFutureObj},
-    task::{self, FutureObj, Poll},
+    future::{BoxFuture, Future, FutureExt as _, LocalBoxFuture},
+    task::{self, Poll},
 };
 use pin_project::pin_project;
 use std::{
@@ -155,7 +155,7 @@ impl BlockingTest {
 /// Asynchronous test function.
 pub struct AsyncTest {
     inner: TestInner,
-    f: fn() -> FutureObj<'static, anyhow::Result<()>>,
+    f: fn() -> BoxFuture<'static, anyhow::Result<()>>,
     _marker: PhantomData<Cell<()>>,
 }
 
@@ -179,7 +179,7 @@ impl AsyncTest {
 /// on the current thread.
 pub struct LocalAsyncTest {
     inner: TestInner,
-    f: fn() -> LocalFutureObj<'static, anyhow::Result<()>>,
+    f: fn() -> LocalBoxFuture<'static, anyhow::Result<()>>,
     _marker: PhantomData<Rc<Cell<()>>>,
 }
 

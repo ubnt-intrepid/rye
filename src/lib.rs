@@ -187,10 +187,9 @@ pub mod _internal {
         termination::Termination,
         test::{test_name, Location, Section, TestCase, TestDesc, TestFn},
     };
-    pub use futures::task::{FutureObj, LocalFutureObj};
     pub use hashbrown::{HashMap, HashSet};
     pub use paste;
-    pub use std::{module_path, result::Result, stringify};
+    pub use std::{boxed::Box, module_path, result::Result, stringify};
 
     use crate::{
         executor::{Context, EnterSection},
