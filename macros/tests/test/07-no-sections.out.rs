@@ -5,6 +5,9 @@ const no_sections: &dyn ::rye::_internal::TestCase = {
     use ::rye::_internal as __rye;
 
     fn no_sections() {
+        #[allow(unused_imports)]
+        use __rye::prelude::*;
+
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
         assert!(vec.capacity() >= 5);

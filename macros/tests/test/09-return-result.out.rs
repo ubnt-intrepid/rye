@@ -8,6 +8,9 @@ const return_result: &dyn ::rye::_internal::TestCase = {
     where
         std::io::Result<()>: __rye::Termination
     {
+        #[allow(unused_imports)]
+        use __rye::prelude::*;
+
         Ok(())
     }
 

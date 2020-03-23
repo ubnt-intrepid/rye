@@ -5,6 +5,9 @@ const multi_section_in_scope: &dyn ::rye::_internal::TestCase = {
     use ::rye::_internal as __rye;
 
     fn multi_section_in_scope() {
+        #[allow(unused_imports)]
+        use __rye::prelude::*;
+
         __rye::enter_section!(0u64, {
             assert!(1 + 1 == 2);
         });

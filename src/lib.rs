@@ -154,10 +154,10 @@ pub use rye_macros::test;
 #[cfg(feature = "harness")]
 pub use rye_macros::test_harness;
 
-/// Mark the current test case as having been skipped and terminate its execution.
+#[doc(hidden)] // private API.
 #[macro_export]
-macro_rules! skip {
-    () => ( $crate::skip!("explicitly skipped") );
+macro_rules! __skip {
+    () => ( $crate::__skip!("explicitly skipped") );
     ($($arg:tt)+) => {
         const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
         return $crate::_internal::skip(
@@ -167,10 +167,10 @@ macro_rules! skip {
     };
 }
 
-/// Mark the current test case as having been skipped and terminate its execution.
+#[doc(hidden)] // private API.
 #[macro_export]
-macro_rules! fail {
-    () => ( $crate::fail!("explicitly failed") );
+macro_rules! __fail {
+    () => ( $crate::__fail!("explicitly failed") );
     ($($arg:tt)+) => {{
         const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
         return $crate::_internal::fail(
@@ -180,9 +180,9 @@ macro_rules! fail {
     }};
 }
 
-/// Assert that the specified boolean expression is `true`.
+#[doc(hidden)] // private API.
 #[macro_export]
-macro_rules! require {
+macro_rules! __require {
     ($e:expr) => {
         if !($e) {
             const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
@@ -212,6 +212,14 @@ pub mod _internal {
     pub use hashbrown::{HashMap, HashSet};
     pub use paste;
     pub use std::{boxed::Box, module_path, result::Result, stringify};
+
+    pub mod prelude {
+        pub use crate::{
+            __fail as fail, //
+            __require as require,
+            __skip as skip,
+        };
+    }
 
     use crate::{
         executor::{Context, EnterSection},

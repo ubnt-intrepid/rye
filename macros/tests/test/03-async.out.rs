@@ -5,6 +5,9 @@ const case_async: &dyn ::rye::_internal::TestCase = {
     use ::rye::_internal as __rye;
 
     async fn case_async() {
+        #[allow(unused_imports)]
+        use __rye::prelude::*;
+
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
         assert!(vec.capacity() >= 5);

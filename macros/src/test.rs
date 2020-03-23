@@ -57,6 +57,15 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
             .push(syn::parse_quote!(#ty: __rye::Termination));
     }
 
+    // inject prelude import
+    item.block.stmts.insert(
+        0,
+        syn::parse_quote! {
+            #[allow(unused_imports)]
+            use __rye::prelude::*;
+        },
+    );
+
     Generated {
         item: &item,
         params: &params,

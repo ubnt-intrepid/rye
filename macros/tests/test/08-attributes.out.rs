@@ -6,6 +6,9 @@ const attributes: &dyn path::to::rye::_internal::TestCase = {
 
     #[allow(missing_docs)]
     fn attributes() {
+        #[allow(unused_imports)]
+        use __rye::prelude::*;
+
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
         assert!(vec.capacity() >= 5);
