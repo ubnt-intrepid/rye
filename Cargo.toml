@@ -34,7 +34,10 @@ pin-project = "0.4"
 termcolor = "1"
 
 [dev-dependencies]
-futures = { version = "0.3", features = [ "thread-pool" ] }
+rye-runner-futures = { path = "runners/futures" }
+rye-runner-tokio = { path = "runners/tokio" }
+rye-runner-async-std = { path = "runners/async-std" }
+futures-executor = "0.3"
 futures-test = "0.3"
 scoped-tls-async = { git = "https://github.com/ubnt-intrepid/scoped-tls-async.git" }
 trybuild = "1"
@@ -59,4 +62,6 @@ required-features = [ "frameworks" ]
 members = [
   ".",
   "macros",
+  "runners/futures",
+  "runners/tokio",
 ]

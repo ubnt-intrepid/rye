@@ -1,8 +1,6 @@
 rye::test_harness! {
-    #![test_runner(crate::runner::runner)]
+    #![test_runner(rye_runner_futures::runner)]
 }
-
-mod runner;
 
 #[rye::test]
 fn case_sync() {

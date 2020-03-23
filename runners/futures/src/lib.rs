@@ -7,7 +7,7 @@ use futures::{
 use rye::{reporter::TestCaseSummary, TestCase, TestExecutor, TestRunner};
 use std::{io, thread};
 
-pub(crate) fn runner(tests: &[&dyn TestCase]) {
+pub fn runner(tests: &[&dyn TestCase]) {
     let mut runner = TestRunner::new();
     runner.install_hook();
 

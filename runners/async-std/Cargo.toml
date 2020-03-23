@@ -1,0 +1,12 @@
+[package]
+name = "rye-runner-async-std"
+version = "0.1.0-dev"
+publish = false
+authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+rye = { version = "0.1.0-dev", path = "../..", default-features = false }
+async-std = { version = "1", features = [ "unstable" ] }
+futures = "0.3"
+pin-project-lite = "0.1"
