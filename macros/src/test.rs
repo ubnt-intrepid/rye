@@ -49,6 +49,14 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     // expand section!()
     let sections = expand_sections(&mut item);
 
+    // append bounds to where clause.
+    if let syn::ReturnType::Type(_, ref ty) = item.sig.output {
+        let where_clause = item.sig.generics.make_where_clause();
+        where_clause
+            .predicates
+            .push(syn::parse_quote!(#ty: __rye::Termination));
+    }
+
     Generated {
         item: &item,
         params: &params,
@@ -461,5 +469,10 @@ mod tests {
     #[test]
     fn attributes() {
         test_expanded("08-attributes");
+    }
+
+    #[test]
+    fn return_result() {
+        test_expanded("09-return-result");
     }
 }
