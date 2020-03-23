@@ -136,6 +136,7 @@ teardown
 
 pub mod reporter;
 
+mod context;
 mod executor;
 mod location;
 mod runner;
@@ -155,46 +156,6 @@ pub use rye_macros::test;
 pub use rye_macros::test_harness;
 
 #[doc(hidden)] // private API.
-#[macro_export]
-macro_rules! __skip {
-    () => ( $crate::__skip!("explicitly skipped") );
-    ($($arg:tt)+) => {
-        const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
-        return $crate::_internal::skip(
-            &LOCATION,
-            format_args!($($arg)+),
-        );
-    };
-}
-
-#[doc(hidden)] // private API.
-#[macro_export]
-macro_rules! __fail {
-    () => ( $crate::__fail!("explicitly failed") );
-    ($($arg:tt)+) => {{
-        const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
-        return $crate::_internal::fail(
-            &LOCATION,
-            format_args!($($arg)+),
-        );
-    }};
-}
-
-#[doc(hidden)] // private API.
-#[macro_export]
-macro_rules! __require {
-    ($e:expr) => {
-        if !($e) {
-            const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
-            return $crate::_internal::assertion_failed(
-                &LOCATION,
-                format_args!(concat!("assertion failed: ", stringify!($e))),
-            );
-        }
-    };
-}
-
-#[doc(hidden)] // private API.
 pub mod _internal {
     pub use crate::{
         __cfg_frameworks as cfg_frameworks, //
@@ -205,6 +166,7 @@ pub mod _internal {
         __sections as sections,
         __test_fn as test_fn,
         __test_name as test_name,
+        context::with_tls_context,
         location::Location,
         termination::Termination,
         test::{test_name, Section, TestCase, TestDesc, TestFn},
@@ -221,136 +183,10 @@ pub mod _internal {
         };
     }
 
-    use crate::{
-        executor::{Context, EnterSection},
-        test::SectionId,
-    };
-    use std::fmt;
-
     #[cfg(feature = "harness")]
     pub use linkme;
 
     #[cfg(feature = "harness")]
     #[linkme::distributed_slice]
     pub static TEST_CASES: [&'static dyn TestCase] = [..];
-
-    #[inline]
-    pub fn enter_section(id: SectionId) -> EnterSection {
-        Context::with(|ctx| ctx.enter_section(id))
-    }
-
-    #[inline]
-    pub fn skip<T: Termination>(location: &'static Location, reason: fmt::Arguments<'_>) -> T {
-        Context::with(|ctx| ctx.mark_skipped(location, reason));
-        T::exit()
-    }
-
-    #[inline]
-    pub fn fail<T: Termination>(location: &'static Location, reason: fmt::Arguments<'_>) -> T {
-        Context::with(|ctx| ctx.mark_failed(location, reason));
-        T::exit()
-    }
-
-    #[inline]
-    pub fn assertion_failed<T: Termination>(
-        location: &'static Location,
-        message: fmt::Arguments<'_>,
-    ) -> T {
-        Context::with(|ctx| ctx.mark_assertion_failed(location, message));
-        T::exit()
-    }
-
-    #[doc(hidden)] // private API.
-    #[macro_export]
-    macro_rules! __enter_section {
-        ( $id:expr, $(#[$attr:meta])* $block:block ) => {
-            $(#[$attr])*
-            {
-                let section = $crate::_internal::enter_section($id);
-                if section.enabled() {
-                    $block
-                }
-                section.leave();
-            }
-        };
-    }
-
-    #[doc(hidden)] // private API.
-    #[macro_export]
-    macro_rules! __sections {
-        (@single $($x:tt)*) => (());
-        (@count $($rest:expr),*) => {
-            <[()]>::len(&[$($crate::__sections!(@single $rest)),*])
-        };
-
-        ($( $key:expr => ($name:expr, { $($ancestors:tt)* }); )*) => {
-            {
-                let _cap = $crate::__sections!(@count $($key),*);
-                #[allow(clippy::let_and_return)]
-                let mut _map = $crate::_internal::HashMap::with_capacity(_cap);
-                $(
-                    let _ = _map.insert($key, $crate::_internal::Section {
-                        name: $name,
-                        ancestors: {
-                            let _cap = $crate::__sections!(@count $($ancestors),*);
-                            #[allow(clippy::let_and_return)]
-                            let mut _set = $crate::_internal::HashSet::with_capacity(_cap);
-                            $(
-                                _set.insert($ancestors);
-                            )*
-                            _set
-                        },
-                    });
-                )*
-                _map
-            }
-        };
-    }
-
-    #[doc(hidden)] // private API.
-    #[macro_export]
-    macro_rules! __register_test_case {
-        ($target:ident) => {
-            $crate::_internal::paste::item! {
-                $crate::_internal::cfg_harness! {
-                    #[$crate::_internal::linkme::distributed_slice($crate::_internal::TEST_CASES)]
-                    #[linkme(crate = $crate::_internal::linkme)]
-                    #[allow(non_upper_case_globals)]
-                    static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestCase = $target;
-                }
-                $crate::_internal::cfg_frameworks! {
-                    #[test_case]
-                    const [< __TEST_CASE_FRAMEWORKS__ $target >]: &dyn $crate::_internal::TestCase = $target;
-                }
-            }
-        };
-    }
-
-    #[doc(hidden)] // private API.
-    #[cfg(not(feature = "harness"))]
-    #[macro_export]
-    macro_rules! __cfg_harness {
-        ($($item:item)*) => {};
-    }
-
-    #[doc(hidden)] // private API.
-    #[cfg(feature = "harness")]
-    #[macro_export]
-    macro_rules! __cfg_harness {
-        ($($item:item)*) => ( $($item)* );
-    }
-
-    #[doc(hidden)] // private API.
-    #[cfg(not(feature = "frameworks"))]
-    #[macro_export]
-    macro_rules! __cfg_frameworks {
-        ($($item:item)*) => {};
-    }
-
-    #[doc(hidden)] // private API.
-    #[cfg(feature = "frameworks")]
-    #[macro_export]
-    macro_rules! __cfg_frameworks {
-        ($($item:item)*) => ( $($item)* );
-    }
 }

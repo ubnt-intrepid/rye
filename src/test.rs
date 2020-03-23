@@ -134,3 +134,82 @@ pub fn test_name(module_path: &'static str, name: &'static str) -> Cow<'static, 
         .nth(1)
         .map_or(name.into(), |m| format!("{}::{}", m, name).into())
 }
+
+#[doc(hidden)] // private API.
+#[macro_export]
+macro_rules! __sections {
+    (@single $($x:tt)*) => (());
+    (@count $($rest:expr),*) => {
+        <[()]>::len(&[$($crate::__sections!(@single $rest)),*])
+    };
+
+    ($( $key:expr => ($name:expr, { $($ancestors:tt)* }); )*) => {
+        {
+            let _cap = $crate::__sections!(@count $($key),*);
+            #[allow(clippy::let_and_return)]
+            let mut _map = $crate::_internal::HashMap::with_capacity(_cap);
+            $(
+                let _ = _map.insert($key, $crate::_internal::Section {
+                    name: $name,
+                    ancestors: {
+                        let _cap = $crate::__sections!(@count $($ancestors),*);
+                        #[allow(clippy::let_and_return)]
+                        let mut _set = $crate::_internal::HashSet::with_capacity(_cap);
+                        $(
+                            _set.insert($ancestors);
+                        )*
+                        _set
+                    },
+                });
+            )*
+            _map
+        }
+    };
+}
+
+#[doc(hidden)] // private API.
+#[macro_export]
+macro_rules! __register_test_case {
+    ($target:ident) => {
+        $crate::_internal::paste::item! {
+            $crate::_internal::cfg_harness! {
+                #[$crate::_internal::linkme::distributed_slice($crate::_internal::TEST_CASES)]
+                #[linkme(crate = $crate::_internal::linkme)]
+                #[allow(non_upper_case_globals)]
+                static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestCase = $target;
+            }
+            $crate::_internal::cfg_frameworks! {
+                #[test_case]
+                const [< __TEST_CASE_FRAMEWORKS__ $target >]: &dyn $crate::_internal::TestCase = $target;
+            }
+        }
+    };
+}
+
+#[doc(hidden)] // private API.
+#[cfg(not(feature = "harness"))]
+#[macro_export]
+macro_rules! __cfg_harness {
+    ($($item:item)*) => {};
+}
+
+#[doc(hidden)] // private API.
+#[cfg(feature = "harness")]
+#[macro_export]
+macro_rules! __cfg_harness {
+    ($($item:item)*) => ( $($item)* );
+}
+
+#[doc(hidden)] // private API.
+#[cfg(not(feature = "frameworks"))]
+#[macro_export]
+macro_rules! __cfg_frameworks {
+    ($($item:item)*) => {};
+}
+
+#[doc(hidden)] // private API.
+#[cfg(feature = "frameworks")]
+#[macro_export]
+macro_rules! __cfg_frameworks {
+    ($($item:item)*) => ( $($item)* );
+}

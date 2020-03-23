@@ -1,16 +1,12 @@
 //! Abstraction of test execution in the rye.
 
 use crate::{
-    location::Location,
+    context::Context,
     reporter::{Outcome, Reporter, TestCaseSummary},
-    test::{SectionId, TestCase, TestDesc, TestFn},
+    test::{TestCase, TestDesc, TestFn},
 };
-use futures_core::{
-    future::Future,
-    task::{self, Poll},
-};
-use pin_project::pin_project;
-use std::{cell::Cell, fmt, marker::PhantomData, mem, pin::Pin, ptr::NonNull, sync::Arc};
+use futures_core::future::Future;
+use std::sync::Arc;
 
 /// The executor of test cases.
 pub trait TestExecutor {
@@ -180,239 +176,11 @@ impl TestInner {
     }
 }
 
-#[derive(Debug)]
-enum ExitReason {
-    Skipped {
-        location: &'static Location,
-        reason: String,
-    },
-    Failed {
-        location: &'static Location,
-        reason: String,
-    },
-    AssertionFailed {
-        location: &'static Location,
-        message: String,
-    },
-}
-
-/// Context values while running the test case.
-pub struct Context<'a> {
-    desc: &'a TestDesc,
-    exit_reason: Option<ExitReason>,
-    target_section: Option<SectionId>,
-    current_section: Option<SectionId>,
-    #[allow(dead_code)]
-    reporter: &'a mut (dyn Reporter + Send),
-    _marker: PhantomData<fn(&'a ()) -> &'a ()>,
-}
-
-thread_local! {
-    static TLS_CTX: Cell<Option<NonNull<Context<'static>>>> = Cell::new(None);
-}
-
-struct Guard(Option<NonNull<Context<'static>>>);
-
-impl Drop for Guard {
-    fn drop(&mut self) {
-        TLS_CTX.with(|tls| tls.set(self.0.take()));
-    }
-}
-
-impl<'a> Context<'a> {
-    fn new(
-        desc: &'a TestDesc,
-        reporter: &'a mut (dyn Reporter + Send),
-        target_section: Option<SectionId>,
-    ) -> Self {
-        Self {
-            desc,
-            exit_reason: None,
-            target_section,
-            current_section: None,
-            reporter,
-            _marker: PhantomData,
-        }
-    }
-
-    pub(crate) fn scope<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        let prev = TLS_CTX.with(|tls| unsafe {
-            let ctx_ptr = mem::transmute::<&mut Self, &mut Context<'static>>(self);
-            tls.replace(Some(NonNull::from(ctx_ptr)))
-        });
-        let _guard = Guard(prev);
-        f()
-    }
-
-    #[inline]
-    pub(crate) async fn scope_async<Fut>(&mut self, fut: Fut) -> Fut::Output
-    where
-        Fut: Future,
-    {
-        #[pin_project]
-        struct ScopeAsync<'a, 'ctx, Fut> {
-            #[pin]
-            fut: Fut,
-            ctx: &'a mut Context<'ctx>,
-        }
-
-        impl<Fut> Future for ScopeAsync<'_, '_, Fut>
-        where
-            Fut: Future,
-        {
-            type Output = Fut::Output;
-
-            fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-                let me = self.project();
-                let fut = me.fut;
-                me.ctx.scope(|| fut.poll(cx))
-            }
-        }
-
-        ScopeAsync { fut, ctx: self }.await
-    }
-
-    /// Attempt to get a reference to the test context and invoke the provided closure.
-    ///
-    /// This function returns an `AccessError` if the test context is not available.
-    pub fn try_with<F, R>(f: F) -> Result<R, AccessError>
-    where
-        F: FnOnce(&mut Context<'_>) -> R,
-    {
-        let ctx_ptr = TLS_CTX.with(|tls| tls.take());
-        let _guard = Guard(ctx_ptr);
-        let mut ctx_ptr = ctx_ptr.ok_or_else(|| AccessError { _p: () })?;
-        Ok(unsafe { f(ctx_ptr.as_mut()) })
-    }
-
-    /// Get a reference to the test context and invoke the provided closure.
-    ///
-    /// # Panics
-    /// This function causes a panic if the test context is not available.
-    #[inline]
-    pub fn with<F, R>(f: F) -> R
-    where
-        F: FnOnce(&mut Context<'_>) -> R,
-    {
-        Self::try_with(f).expect("cannot acquire the test context")
-    }
-
-    pub(crate) fn enter_section(&mut self, id: SectionId) -> EnterSection {
-        let enabled = self.target_section.map_or(false, |section_id| {
-            let section = self
-                .desc
-                .sections
-                .get(&section_id)
-                .expect("invalid section id is set");
-            section_id == id || section.ancestors.contains(&id)
-        });
-        let last_section = self.current_section.replace(id);
-        EnterSection {
-            enabled,
-            last_section,
-        }
-    }
-
-    fn leave_section(&mut self, enter: EnterSection) {
-        self.current_section = enter.last_section;
-    }
-
-    async fn run_async<Fut>(&mut self, fut: Fut) -> Result<(), Outcome>
-    where
-        Fut: Future<Output = anyhow::Result<()>>,
-    {
-        let outcome = self.scope_async(fut).await;
-        self.check_outcome(outcome)
-    }
-
-    fn run_blocking(&mut self, f: fn() -> anyhow::Result<()>) -> Result<(), Outcome> {
-        let outcome = self.scope(f);
-        self.check_outcome(outcome)
-    }
-
-    fn check_outcome(&mut self, result: anyhow::Result<()>) -> Result<(), Outcome> {
-        match result {
-            Ok(()) => match self.exit_reason.take() {
-                Some(ExitReason::Skipped { location, reason }) => {
-                    Err(Outcome::Skipped { location, reason })
-                }
-                Some(ExitReason::Failed { location, reason }) => {
-                    Err(Outcome::Failed { location, reason })
-                }
-                Some(ExitReason::AssertionFailed { location, message }) => {
-                    Err(Outcome::AssertionFailed { location, message })
-                }
-                None => Ok(()),
-            },
-            Err(err) => Err(Outcome::Errored(err)),
-        }
-    }
-
-    #[inline]
-    pub(crate) fn mark_skipped(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) {
-        debug_assert!(self.exit_reason.is_none());
-        self.exit_reason.replace(ExitReason::Skipped {
-            location,
-            reason: reason.to_string(),
-        });
-    }
-
-    #[inline]
-    pub(crate) fn mark_failed(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) {
-        debug_assert!(self.exit_reason.is_none());
-        self.exit_reason.replace(ExitReason::Failed {
-            location,
-            reason: reason.to_string(),
-        });
-    }
-
-    #[inline]
-    pub(crate) fn mark_assertion_failed(
-        &mut self,
-        location: &'static Location,
-        message: fmt::Arguments<'_>,
-    ) {
-        debug_assert!(self.exit_reason.is_none());
-        self.exit_reason.replace(ExitReason::AssertionFailed {
-            location,
-            message: message.to_string(),
-        });
-    }
-}
-
-#[doc(hidden)]
-pub struct EnterSection {
-    enabled: bool,
-    last_section: Option<SectionId>,
-}
-
-impl EnterSection {
-    #[doc(hidden)]
-    #[inline]
-    pub fn enabled(&self) -> bool {
-        self.enabled
-    }
-
-    #[doc(hidden)]
-    #[inline]
-    pub fn leave(self) {
-        Context::with(|ctx| ctx.leave_section(self))
-    }
-}
-
-/// The error value returned from `Context::try_with`.
-#[derive(Debug)]
-pub struct AccessError {
-    _p: (),
-}
-
 #[cfg(all(test, not(feature = "frameworks")))]
 mod tests {
     use super::*;
     use crate::{
+        context::with_tls_context,
         reporter::Summary,
         test::{TestCase, TestDesc, TestFn},
     };
@@ -425,8 +193,7 @@ mod tests {
     scoped_thread_local!(static HISTORY: RefCell<Vec<HistoryLog>>);
 
     fn append_history(msg: &'static str) {
-        let current_section =
-            Context::with(|ctx| ctx.current_section.map(|id| ctx.desc.sections[&id].name));
+        let current_section = with_tls_context(|ctx| ctx.current_section_name());
         HISTORY.with(|history| history.borrow_mut().push((msg, current_section)));
     }
 
