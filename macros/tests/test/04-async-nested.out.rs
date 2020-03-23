@@ -1,38 +1,30 @@
 #[cfg(any(test, trybuild))]
-#[allow(non_camel_case_types)]
-struct case_async_nested(());
-
-#[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const __SCOPE_FOR__case_async_nested: () = {
+const case_async_nested: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    impl case_async_nested {
-        const fn __new() -> Self {
-            Self(())
-        }
+    async fn case_async_nested() {
+        let mut vec = vec![0usize; 5];
+        assert_eq!(vec.len(), 5);
+        assert!(vec.capacity() >= 5);
 
-        async fn __body() {
-            let mut vec = vec![0usize; 5];
-            assert_eq!(vec.len(), 5);
-            assert!(vec.capacity() >= 5);
+        __rye::enter_section!(0u64, {
+            vec.resize(10, 0);
+            assert_eq!(vec.len(), 10);
+            assert!(vec.capacity() >= 10);
 
-            __rye::enter_section!(0u64, {
-                vec.resize(10, 0);
-                assert_eq!(vec.len(), 10);
+            __rye::enter_section!(1u64, {
+                vec.resize(0, 0);
+                assert_eq!(vec.len(), 0);
                 assert!(vec.capacity() >= 10);
-
-                __rye::enter_section!(1u64, {
-                    vec.resize(0, 0);
-                    assert_eq!(vec.len(), 0);
-                    assert!(vec.capacity() >= 10);
-                });
             });
-        }
+        });
     }
 
-    impl __rye::TestCase for case_async_nested {
+    struct __TestCase;
+
+    impl __rye::TestCase for __TestCase {
         fn desc(&self) -> __rye::TestDesc {
             __rye::TestDesc {
                 name: __rye::test_name!(case_async_nested),
@@ -46,9 +38,11 @@ const __SCOPE_FOR__case_async_nested: () = {
         }
 
         fn test_fn(&self) -> __rye::TestFn {
-            __rye::async_test_fn!(Self::__body)
+            __rye::test_fn!(@async case_async_nested)
         }
     }
+
+    &__TestCase
 };
 
 #[cfg(any(test, trybuild))]

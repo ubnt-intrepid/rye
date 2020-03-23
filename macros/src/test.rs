@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote, quote_spanned, ToTokens, TokenStreamExt as _};
+use quote::{quote, quote_spanned, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
     ext::IdentExt as _,
@@ -49,20 +49,23 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     // expand section!()
     let sections = expand_sections(&mut item);
 
-    let ident = mem::replace(&mut item.sig.ident, Ident::new("__body", Span::call_site()));
-
     Generated {
         item: &item,
         params: &params,
         args: &args,
-        ident: &ident,
         sections: &sections,
     }
     .to_token_stream()
 }
 
+#[derive(Copy, Clone)]
+enum Sendness {
+    Send,
+    NoSend,
+}
+
 struct Args {
-    local: bool,
+    sendness: Sendness,
 }
 
 mod kw {
@@ -72,7 +75,9 @@ mod kw {
 impl Parse for Args {
     fn parse(input: ParseStream) -> Result<Self> {
         if input.is_empty() {
-            return Ok(Self { local: false });
+            return Ok(Self {
+                sendness: Sendness::Send,
+            });
         }
 
         let span = input.span();
@@ -87,7 +92,9 @@ impl Parse for Args {
         }
         input.parse::<kw::Send>().map_err(|_| error())?;
 
-        Ok(Args { local: true })
+        Ok(Args {
+            sendness: Sendness::NoSend,
+        })
     }
 }
 
@@ -316,7 +323,6 @@ struct Generated<'a> {
     params: &'a Params,
     args: &'a Args,
     item: &'a ItemFn,
-    ident: &'a Ident,
     sections: &'a [Section],
 }
 
@@ -349,38 +355,26 @@ impl ToTokens for Generated<'_> {
             }
         });
 
+        let crate_path = &self.params.crate_path;
         let item = &*self.item;
-        let vis = &self.item.vis;
-        let ident = &*self.ident;
+        let ident = &self.item.sig.ident;
         let rye_reexport = &self.params.reexport_internal_module();
         let location = quote_spanned!(self.item.sig.span() => __rye::location!());
 
-        let scope_for_id = format_ident!("__SCOPE_FOR__{}", ident);
-        let test_fn_id = {
-            let prefix = match (self.item.sig.asyncness.is_some(), self.args.local) {
-                (true, true) => "async_local",
-                (true, false) => "async",
-                (false, _) => "blocking",
-            };
-            format_ident!("{}_test_fn", prefix)
+        let test_fn_id = match (self.item.sig.asyncness, self.args.sendness) {
+            (Some(..), Sendness::Send) => Ident::new("async", Span::call_site()),
+            (Some(..), Sendness::NoSend) => Ident::new("async_local", Span::call_site()),
+            (None, ..) => Ident::new("blocking", Span::call_site()),
         };
 
         tokens.append_all(vec![quote! {
             #[cfg(any(test, trybuild))]
-            #[allow(non_camel_case_types)]
-            #vis struct #ident(());
-
-            #[cfg(any(test, trybuild))]
             #[allow(non_upper_case_globals)]
-            const #scope_for_id: () = {
+            const #ident: &dyn #crate_path::_internal::TestCase = {
                 #rye_reexport
-                impl #ident {
-                    #vis const fn __new() -> Self {
-                        Self(())
-                    }
-                    #item
-                }
-                impl __rye::TestCase for #ident {
+                #item
+                struct __TestCase;
+                impl __rye::TestCase for __TestCase {
                     fn desc(&self) -> __rye::TestDesc {
                         __rye::TestDesc {
                             name: __rye::test_name!(#ident),
@@ -390,17 +384,15 @@ impl ToTokens for Generated<'_> {
                         }
                     }
                     fn test_fn(&self) -> __rye::TestFn {
-                        __rye::#test_fn_id!(Self::__body)
+                        __rye::test_fn!(@#test_fn_id #ident)
                     }
                 }
+                &__TestCase
             };
-        }]);
 
-        let crate_path = &self.params.crate_path;
-        tokens.append_all(Some(quote! {
             #[cfg(any(test, trybuild))]
             #crate_path::_internal::register_test_case!(#ident);
-        }));
+        }]);
     }
 }
 

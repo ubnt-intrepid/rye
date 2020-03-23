@@ -1,26 +1,18 @@
 #[cfg(any(test, trybuild))]
-#[allow(non_camel_case_types)]
-struct no_sections(());
-
-#[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const __SCOPE_FOR__no_sections: () = {
+const no_sections: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    impl no_sections {
-        const fn __new() -> Self {
-            Self(())
-        }
-
-        fn __body() {
-            let mut vec = vec![0usize; 5];
-            assert_eq!(vec.len(), 5);
-            assert!(vec.capacity() >= 5);
-        }
+    fn no_sections() {
+        let mut vec = vec![0usize; 5];
+        assert_eq!(vec.len(), 5);
+        assert!(vec.capacity() >= 5);
     }
 
-    impl __rye::TestCase for no_sections {
+    struct __TestCase;
+
+    impl __rye::TestCase for __TestCase {
         fn desc(&self) -> __rye::TestDesc {
             __rye::TestDesc {
                 name: __rye::test_name!(no_sections),
@@ -31,9 +23,11 @@ const __SCOPE_FOR__no_sections: () = {
         }
 
         fn test_fn(&self) -> __rye::TestFn {
-            __rye::blocking_test_fn!(Self::__body)
+            __rye::test_fn!(@blocking no_sections)
         }
     }
+
+    &__TestCase
 };
 
 #[cfg(any(test, trybuild))]

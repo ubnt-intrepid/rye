@@ -113,9 +113,9 @@ pub(crate) trait TestExecutorExt: TestExecutor {
             reporter: Box::new(reporter),
         };
         match test.test_fn() {
-            TestFn::Blocking(f) => self.spawn_blocking(move || inner.run_blocking(f)),
-            TestFn::LocalAsync(f) => self.spawn_local(async move { inner.run_async(f).await }),
             TestFn::Async(f) => self.spawn(async move { inner.run_async(f).await }),
+            TestFn::AsyncLocal(f) => self.spawn_local(async move { inner.run_async(f).await }),
+            TestFn::Blocking(f) => self.spawn_blocking(move || inner.run_blocking(f)),
         }
     }
 }
@@ -404,6 +404,7 @@ mod tests {
         reporter::Summary,
         test::{TestCase, TestDesc, TestFn},
     };
+    use futures::executor::block_on;
     use scoped_tls_async::{scoped_thread_local, ScopedKeyExt as _};
     use std::cell::RefCell;
 
@@ -437,13 +438,9 @@ mod tests {
         };
 
         let _ = match test_fn {
+            TestFn::Async(f) => block_on(HISTORY.set_async(&history, state.run_async(f))),
+            TestFn::AsyncLocal(f) => block_on(HISTORY.set_async(&history, state.run_async(f))),
             TestFn::Blocking(f) => HISTORY.set(&history, || state.run_blocking(f)),
-            TestFn::Async(f) => {
-                futures::executor::block_on(HISTORY.set_async(&history, state.run_async(f)))
-            }
-            TestFn::LocalAsync(f) => {
-                futures::executor::block_on(HISTORY.set_async(&history, state.run_async(f)))
-            }
         };
 
         history.into_inner()
@@ -457,7 +454,7 @@ mod tests {
             append_history("test");
         }
 
-        let history = run_test(&test_case::__new());
+        let history = run_test(test_case);
         assert_eq!(history, vec![("test", None)]);
     }
 
@@ -475,7 +472,7 @@ mod tests {
             append_history("teardown");
         }
 
-        let history = run_test(&test_case::__new());
+        let history = run_test(test_case);
         assert_eq!(
             history,
             vec![
@@ -504,7 +501,7 @@ mod tests {
             append_history("teardown");
         }
 
-        let history = run_test(&test_case::__new());
+        let history = run_test(test_case);
         assert_eq!(
             history,
             vec![
@@ -548,7 +545,7 @@ mod tests {
             append_history("teardown");
         }
 
-        let history = run_test(&test_case::__new());
+        let history = run_test(test_case);
         assert_eq!(
             history,
             vec![
@@ -609,7 +606,7 @@ mod tests {
             append_history("teardown");
         }
 
-        let history = run_test(&test_case::__new());
+        let history = run_test(test_case);
         assert_eq!(
             history,
             vec![

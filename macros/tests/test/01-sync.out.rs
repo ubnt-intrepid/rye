@@ -1,32 +1,24 @@
 #[cfg(any(test, trybuild))]
-#[allow(non_camel_case_types)]
-struct case_sync(());
-
-#[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const __SCOPE_FOR__case_sync: () = {
+const case_sync: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    impl case_sync {
-        const fn __new() -> Self {
-            Self(())
-        }
+    fn case_sync() {
+        let mut vec = vec![0usize; 5];
+        assert_eq!(vec.len(), 5);
+        assert!(vec.capacity() >= 5);
 
-        fn __body() {
-            let mut vec = vec![0usize; 5];
-            assert_eq!(vec.len(), 5);
+        __rye::enter_section!(0u64, {
+            vec.resize(10, 0);
+            assert_eq!(vec.len(), 10);
             assert!(vec.capacity() >= 5);
-
-            __rye::enter_section!(0u64, {
-                vec.resize(10, 0);
-                assert_eq!(vec.len(), 10);
-                assert!(vec.capacity() >= 5);
-            });
-        }
+        });
     }
 
-    impl __rye::TestCase for case_sync {
+    struct __TestCase;
+
+    impl __rye::TestCase for __TestCase {
         fn desc(&self) -> __rye::TestDesc {
             __rye::TestDesc {
                 name: __rye::test_name!(case_sync),
@@ -39,9 +31,11 @@ const __SCOPE_FOR__case_sync: () = {
         }
 
         fn test_fn(&self) -> __rye::TestFn {
-            __rye::blocking_test_fn!(Self::__body)
+            __rye::test_fn!(@blocking case_sync)
         }
     }
+
+    &__TestCase
 };
 
 #[cfg(any(test, trybuild))]

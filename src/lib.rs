@@ -165,15 +165,13 @@ macro_rules! skip {
 #[doc(hidden)] // private API.
 pub mod _internal {
     pub use crate::{
-        __async_local_test_fn as async_local_test_fn, //
-        __async_test_fn as async_test_fn,
-        __blocking_test_fn as blocking_test_fn,
-        __cfg_frameworks as cfg_frameworks,
+        __cfg_frameworks as cfg_frameworks, //
         __cfg_harness as cfg_harness,
         __enter_section as enter_section,
         __location as location,
         __register_test_case as register_test_case,
         __sections as sections,
+        __test_fn as test_fn,
         __test_name as test_name,
         termination::Termination,
         test::{test_name, Location, Section, TestCase, TestDesc, TestFn},
@@ -262,11 +260,11 @@ pub mod _internal {
                     #[$crate::_internal::linkme::distributed_slice($crate::_internal::TEST_CASES)]
                     #[linkme(crate = $crate::_internal::linkme)]
                     #[allow(non_upper_case_globals)]
-                    static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestCase = &$target::__new();
+                    static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestCase = $target;
                 }
                 $crate::_internal::cfg_frameworks! {
                     #[test_case]
-                    static [< __TEST_CASE_FRAMEWORKS__ $target >]: &dyn $crate::_internal::TestCase = &$target::__new();
+                    const [< __TEST_CASE_FRAMEWORKS__ $target >]: &dyn $crate::_internal::TestCase = $target;
                 }
             }
         };

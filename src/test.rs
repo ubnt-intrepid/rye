@@ -82,39 +82,31 @@ pub struct Section {
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub enum TestFn {
-    Blocking(fn() -> anyhow::Result<()>),
     Async(fn() -> BoxFuture<'static, anyhow::Result<()>>),
-    LocalAsync(fn() -> LocalBoxFuture<'static, anyhow::Result<()>>),
+    AsyncLocal(fn() -> LocalBoxFuture<'static, anyhow::Result<()>>),
+    Blocking(fn() -> anyhow::Result<()>),
 }
 
 #[doc(hidden)] // private API.
 #[macro_export]
-macro_rules! __async_local_test_fn {
-    ($path:path) => {
-        $crate::_internal::TestFn::LocalAsync(|| {
-            use $crate::_internal::{Box, Termination};
-            let fut = $path();
-            Box::pin(async move { Termination::into_result(fut.await) })
-        })
-    };
-}
-
-#[doc(hidden)] // private API.
-#[macro_export]
-macro_rules! __async_test_fn {
-    ($path:path) => {
+macro_rules! __test_fn {
+    (@async $path:path) => {
         $crate::_internal::TestFn::Async(|| {
             use $crate::_internal::{Box, Termination};
             let fut = $path();
             Box::pin(async move { Termination::into_result(fut.await) })
         })
     };
-}
 
-#[doc(hidden)] // private API.
-#[macro_export]
-macro_rules! __blocking_test_fn {
-    ($path:path) => {
+    (@async_local $path:path) => {
+        $crate::_internal::TestFn::AsyncLocal(|| {
+            use $crate::_internal::{Box, Termination};
+            let fut = $path();
+            Box::pin(async move { Termination::into_result(fut.await) })
+        })
+    };
+
+    (@blocking $path:path) => {
         $crate::_internal::TestFn::Blocking(|| {
             use $crate::_internal::Termination;
             Termination::into_result($path())
