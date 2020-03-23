@@ -158,7 +158,8 @@ pub use rye_macros::test_harness;
 macro_rules! skip {
     () => ( $crate::skip!("explicitly skipped") );
     ($($arg:tt)+) => {
-        $crate::_internal::skip(format_args!($($arg)+))
+        $crate::_internal::mark_skipped(format_args!($($arg)+));
+        return $crate::_internal::Termination::ok();
     };
 }
 
@@ -199,9 +200,8 @@ pub mod _internal {
     }
 
     #[inline]
-    pub fn skip(reason: fmt::Arguments<'_>) -> ! {
+    pub fn mark_skipped(reason: fmt::Arguments<'_>) {
         Context::with(|ctx| ctx.mark_skipped(reason));
-        panic!("skipped")
     }
 
     #[doc(hidden)] // private API.

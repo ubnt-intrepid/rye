@@ -343,7 +343,12 @@ impl<'a> Context<'a> {
         result: Result<anyhow::Result<()>, Box<dyn std::any::Any + Send>>,
     ) -> Result<(), Outcome> {
         match result {
-            Ok(fallible) => fallible.map_err(Outcome::Errored),
+            Ok(Ok(())) => match self.termination_reason.take() {
+                Some(TerminationReason::Skipped { reason }) => Err(Outcome::Skipped { reason }),
+                Some(TerminationReason::Panicked { .. }) => unreachable!(),
+                None => Ok(()),
+            },
+            Ok(Err(err)) => Err(Outcome::Errored(err)),
             Err(panic_payload) => match self.termination_reason.take() {
                 Some(TerminationReason::Skipped { reason }) => Err(Outcome::Skipped { reason }),
                 Some(TerminationReason::Panicked { location }) => Err(Outcome::Panicked {

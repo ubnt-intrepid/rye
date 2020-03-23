@@ -151,3 +151,14 @@ fn expensive_test() {
 
     // do expensive tests ...
 }
+
+#[rye::test]
+fn expensive_test_fallible() -> anyhow::Result<()> {
+    if std::env::var("RUN_EXPENSIVE_TESTS").is_err() {
+        rye::skip!("set RUN_EXPENSIVE_TESTS=true to be enabled");
+    }
+
+    // do expensive tests ...
+
+    Ok(())
+}
