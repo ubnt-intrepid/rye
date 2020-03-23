@@ -1,6 +1,6 @@
 use futures_core::future::{BoxFuture, LocalBoxFuture};
 use hashbrown::{HashMap, HashSet};
-use std::{borrow::Cow, fmt, panic};
+use std::{borrow::Cow, fmt};
 
 #[allow(missing_docs)]
 pub trait TestCase: Send + Sync {
@@ -117,20 +117,9 @@ macro_rules! __test_fn {
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub struct Location {
-    pub file: Cow<'static, str>,
+    pub file: &'static str,
     pub line: u32,
     pub column: u32,
-}
-
-impl Location {
-    #[inline]
-    pub(crate) fn from_std(loc: &panic::Location<'_>) -> Self {
-        Self {
-            file: loc.file().to_string().into(),
-            line: loc.line(),
-            column: loc.column(),
-        }
-    }
 }
 
 impl fmt::Display for Location {
@@ -144,7 +133,7 @@ impl fmt::Display for Location {
 macro_rules! __location {
     () => {
         $crate::_internal::Location {
-            file: file!().into(),
+            file: file!(),
             line: line!(),
             column: column!(),
         }

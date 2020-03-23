@@ -4,7 +4,6 @@ use rye::{reporter::TestCaseSummary, TestCase, TestExecutor, TestRunner};
 
 pub fn runner(tests: &[&dyn TestCase]) {
     let mut runner = TestRunner::new();
-    runner.install_hook();
 
     task::block_on(async {
         let mut executor = AsyncStdTestRunner { _p: () };

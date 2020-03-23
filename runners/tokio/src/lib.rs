@@ -12,7 +12,6 @@ use tokio::{
 
 pub fn runner(tests: &[&dyn TestCase]) {
     let mut runner = TestRunner::new();
-    runner.install_hook();
 
     let mut rt = runtime::Builder::new()
         .threaded_scheduler()

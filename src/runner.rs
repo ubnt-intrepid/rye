@@ -1,18 +1,13 @@
 #![allow(missing_docs)]
 
 use crate::{
-    executor::{Context, TestExecutor, TestExecutorExt as _},
+    executor::{TestExecutor, TestExecutorExt as _},
     reporter::{console::ConsoleReporter, Reporter, Summary},
     test::TestCase,
 };
 use getopts::Options;
 use hashbrown::HashSet;
-use std::{
-    panic,
-    path::Path,
-    str::FromStr,
-    sync::{Arc, Once},
-};
+use std::{path::Path, str::FromStr, sync::Arc};
 use termcolor::ColorChoice;
 
 /// Command line arguments.
@@ -176,21 +171,6 @@ impl TestRunner {
         Self {
             parser: Parser::new(std::env::args()),
         }
-    }
-
-    #[inline]
-    pub fn install_hook(&self) {
-        static INSTALL: Once = Once::new();
-        INSTALL.call_once(|| {
-            let prev_hook = panic::take_hook();
-            panic::set_hook(Box::new(move |info| {
-                if Context::is_set() {
-                    let _ = Context::try_with(|ctx| ctx.capture_panic_info(info));
-                    return;
-                }
-                prev_hook(info);
-            }));
-        });
     }
 
     #[inline]

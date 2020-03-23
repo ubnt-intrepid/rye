@@ -162,6 +162,18 @@ macro_rules! skip {
     };
 }
 
+/// Mark the current test case as having been skipped and terminate its execution.
+#[macro_export]
+macro_rules! fail {
+    () => ( $crate::fail!("explicitly failed") );
+    ($($arg:tt)+) => {
+        return $crate::_internal::fail(
+            $crate::_internal::location!(),
+            format_args!($($arg)+),
+        );
+    };
+}
+
 /// Assert that the specified boolean expression is `true`.
 #[macro_export]
 macro_rules! require {
@@ -214,6 +226,12 @@ pub mod _internal {
     #[inline]
     pub fn skip<T: Termination>(reason: fmt::Arguments<'_>) -> T {
         Context::with(|ctx| ctx.mark_skipped(reason));
+        T::exit()
+    }
+
+    #[inline]
+    pub fn fail<T: Termination>(location: Location, reason: fmt::Arguments<'_>) -> T {
+        Context::with(|ctx| ctx.mark_failed(location, reason));
         T::exit()
     }
 

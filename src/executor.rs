@@ -8,18 +8,8 @@ use futures_core::{
     future::Future,
     task::{self, Poll},
 };
-use futures_util::future::FutureExt as _;
 use pin_project::pin_project;
-use std::{
-    cell::Cell,
-    fmt,
-    marker::PhantomData,
-    mem,
-    panic::{AssertUnwindSafe, PanicInfo},
-    pin::Pin,
-    ptr::NonNull,
-    sync::Arc,
-};
+use std::{cell::Cell, fmt, marker::PhantomData, mem, pin::Pin, ptr::NonNull, sync::Arc};
 
 /// The executor of test cases.
 pub trait TestExecutor {
@@ -192,8 +182,8 @@ impl TestInner {
 #[derive(Debug)]
 enum TerminationReason {
     Skipped { reason: String },
+    Failed { location: Location, reason: String },
     AssertionFailed { location: Location, message: String },
-    Panicked { location: Option<Location> },
 }
 
 /// Context values while running the test case.
@@ -275,12 +265,6 @@ impl<'a> Context<'a> {
         ScopeAsync { fut, ctx: self }.await
     }
 
-    /// Return whether the test context is available or not.
-    #[inline]
-    pub fn is_set() -> bool {
-        TLS_CTX.with(|tls| tls.get().is_some())
-    }
-
     /// Attempt to get a reference to the test context and invoke the provided closure.
     ///
     /// This function returns an `AccessError` if the test context is not available.
@@ -330,50 +314,44 @@ impl<'a> Context<'a> {
     where
         Fut: Future<Output = anyhow::Result<()>>,
     {
-        let outcome = self.scope_async(AssertUnwindSafe(fut).catch_unwind()).await;
+        let outcome = self.scope_async(fut).await;
         self.check_outcome(outcome)
     }
 
     fn run_blocking(&mut self, f: fn() -> anyhow::Result<()>) -> Result<(), Outcome> {
-        let outcome = self.scope(|| std::panic::catch_unwind(f));
+        let outcome = self.scope(f);
         self.check_outcome(outcome)
     }
 
-    fn check_outcome(
-        &mut self,
-        result: Result<anyhow::Result<()>, Box<dyn std::any::Any + Send>>,
-    ) -> Result<(), Outcome> {
+    fn check_outcome(&mut self, result: anyhow::Result<()>) -> Result<(), Outcome> {
         match result {
-            Ok(Ok(())) => match self.termination_reason.take() {
+            Ok(()) => match self.termination_reason.take() {
                 Some(TerminationReason::Skipped { reason }) => Err(Outcome::Skipped { reason }),
+                Some(TerminationReason::Failed { location, reason }) => {
+                    Err(Outcome::Failed { location, reason })
+                }
                 Some(TerminationReason::AssertionFailed { location, message }) => {
                     Err(Outcome::AssertionFailed { location, message })
                 }
-                Some(TerminationReason::Panicked { .. }) => unreachable!(),
                 None => Ok(()),
             },
-            Ok(Err(err)) => Err(Outcome::Errored(err)),
-            Err(panic_payload) => match self.termination_reason.take() {
-                Some(TerminationReason::Panicked { location }) => Err(Outcome::Panicked {
-                    payload: panic_payload,
-                    location: location.expect("the panic location is not available"),
-                }),
-                _ => unreachable!("unexpected termination reason"),
-            },
+            Err(err) => Err(Outcome::Errored(err)),
         }
-    }
-
-    pub(crate) fn capture_panic_info(&mut self, info: &PanicInfo) {
-        self.termination_reason
-            .get_or_insert(TerminationReason::Panicked {
-                location: info.location().map(|loc| Location::from_std(loc)),
-            });
     }
 
     #[inline]
     pub(crate) fn mark_skipped(&mut self, reason: fmt::Arguments<'_>) {
         debug_assert!(self.termination_reason.is_none());
         self.termination_reason.replace(TerminationReason::Skipped {
+            reason: reason.to_string(),
+        });
+    }
+
+    #[inline]
+    pub(crate) fn mark_failed(&mut self, location: Location, reason: fmt::Arguments<'_>) {
+        debug_assert!(self.termination_reason.is_none());
+        self.termination_reason.replace(TerminationReason::Failed {
+            location,
             reason: reason.to_string(),
         });
     }

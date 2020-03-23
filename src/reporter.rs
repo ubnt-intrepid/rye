@@ -3,23 +3,19 @@
 pub(crate) mod console;
 
 use crate::test::{Location, TestCase, TestDesc};
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub(crate) enum Outcome {
     Passed,
     Errored(anyhow::Error),
-    Panicked {
-        payload: Box<dyn Any + Send + 'static>,
-        location: Location,
-    },
-    Skipped {
-        reason: String,
-    },
-    AssertionFailed {
-        location: Location,
-        message: String,
-    },
+    // Panicked {
+    //     payload: Box<dyn Any + Send + 'static>,
+    //     location: Location,
+    // },
+    Skipped { reason: String },
+    Failed { location: Location, reason: String },
+    AssertionFailed { location: Location, message: String },
 }
 
 #[allow(missing_docs)]
@@ -56,7 +52,7 @@ impl Summary {
     pub(crate) fn append(&mut self, result: TestCaseSummary) {
         match result.outcome {
             Outcome::Passed => self.passed.push(result),
-            Outcome::Errored(..) | Outcome::Panicked { .. } | Outcome::AssertionFailed { .. } => {
+            Outcome::Errored(..) | Outcome::AssertionFailed { .. } | Outcome::Failed { .. } => {
                 self.failed.push(result)
             }
             Outcome::Skipped { .. } => self.skipped.push(result),

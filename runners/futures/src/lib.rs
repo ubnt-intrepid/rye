@@ -9,7 +9,6 @@ use std::{io, thread};
 
 pub fn runner(tests: &[&dyn TestCase]) {
     let mut runner = TestRunner::new();
-    runner.install_hook();
 
     let mut local_pool = LocalPool::new();
     let mut executor = FuturesTestRunner::new(local_pool.spawner()).unwrap();

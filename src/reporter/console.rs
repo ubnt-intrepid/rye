@@ -59,7 +59,7 @@ impl ConsoleReporter {
     ) -> io::Result<()> {
         let status = match summary.outcome {
             Outcome::Passed => colored("ok").fg(Color::Green),
-            Outcome::Errored(..) | Outcome::Panicked { .. } | Outcome::AssertionFailed { .. } => {
+            Outcome::Errored(..) | Outcome::AssertionFailed { .. } | Outcome::Failed { .. } => {
                 colored("FAILED").fg(Color::Red)
             }
             Outcome::Skipped { .. } => colored("skipped").fg(Color::Yellow),
@@ -83,18 +83,6 @@ impl ConsoleReporter {
                 )?;
 
                 match result.outcome {
-                    Outcome::Panicked {
-                        ref payload,
-                        ref location,
-                    } => {
-                        let payload = &**payload;
-                        let payload_str = payload
-                            .downcast_ref::<&str>()
-                            .copied()
-                            .or_else(|| payload.downcast_ref::<String>().map(|s| s.as_str()))
-                            .unwrap_or("Box<dyn Any>");
-                        writeln!(w, "{} {}", location, payload_str)?;
-                    }
                     Outcome::Errored(ref err) => {
                         writeln!(w, "{:?}", err)?;
                     }
@@ -103,6 +91,12 @@ impl ConsoleReporter {
                         ref message,
                     } => {
                         writeln!(w, "{} {}", location, message)?;
+                    }
+                    Outcome::Failed {
+                        ref location,
+                        ref reason,
+                    } => {
+                        writeln!(w, "{} {}", location, reason)?;
                     }
                     _ => unreachable!(),
                 }
