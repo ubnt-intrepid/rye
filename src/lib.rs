@@ -137,6 +137,7 @@ teardown
 pub mod reporter;
 
 mod executor;
+mod location;
 mod runner;
 mod termination;
 mod test;
@@ -158,7 +159,11 @@ pub use rye_macros::test_harness;
 macro_rules! skip {
     () => ( $crate::skip!("explicitly skipped") );
     ($($arg:tt)+) => {
-        return $crate::_internal::skip(format_args!($($arg)+));
+        const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
+        return $crate::_internal::skip(
+            &LOCATION,
+            format_args!($($arg)+),
+        );
     };
 }
 
@@ -166,12 +171,13 @@ macro_rules! skip {
 #[macro_export]
 macro_rules! fail {
     () => ( $crate::fail!("explicitly failed") );
-    ($($arg:tt)+) => {
+    ($($arg:tt)+) => {{
+        const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
         return $crate::_internal::fail(
-            $crate::_internal::location!(),
+            &LOCATION,
             format_args!($($arg)+),
         );
-    };
+    }};
 }
 
 /// Assert that the specified boolean expression is `true`.
@@ -179,8 +185,9 @@ macro_rules! fail {
 macro_rules! require {
     ($e:expr) => {
         if !($e) {
+            const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
             return $crate::_internal::assertion_failed(
-                $crate::_internal::location!(),
+                &LOCATION,
                 format_args!(concat!("assertion failed: ", stringify!($e))),
             );
         }
@@ -198,8 +205,9 @@ pub mod _internal {
         __sections as sections,
         __test_fn as test_fn,
         __test_name as test_name,
+        location::Location,
         termination::Termination,
-        test::{test_name, Location, Section, TestCase, TestDesc, TestFn},
+        test::{test_name, Section, TestCase, TestDesc, TestFn},
     };
     pub use hashbrown::{HashMap, HashSet};
     pub use paste;
@@ -224,19 +232,22 @@ pub mod _internal {
     }
 
     #[inline]
-    pub fn skip<T: Termination>(reason: fmt::Arguments<'_>) -> T {
-        Context::with(|ctx| ctx.mark_skipped(reason));
+    pub fn skip<T: Termination>(location: &'static Location, reason: fmt::Arguments<'_>) -> T {
+        Context::with(|ctx| ctx.mark_skipped(location, reason));
         T::exit()
     }
 
     #[inline]
-    pub fn fail<T: Termination>(location: Location, reason: fmt::Arguments<'_>) -> T {
+    pub fn fail<T: Termination>(location: &'static Location, reason: fmt::Arguments<'_>) -> T {
         Context::with(|ctx| ctx.mark_failed(location, reason));
         T::exit()
     }
 
     #[inline]
-    pub fn assertion_failed<T: Termination>(location: Location, message: fmt::Arguments<'_>) -> T {
+    pub fn assertion_failed<T: Termination>(
+        location: &'static Location,
+        message: fmt::Arguments<'_>,
+    ) -> T {
         Context::with(|ctx| ctx.mark_assertion_failed(location, message));
         T::exit()
     }

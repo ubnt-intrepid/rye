@@ -1,8 +1,9 @@
 //! Abstraction of test execution in the rye.
 
 use crate::{
+    location::Location,
     reporter::{Outcome, Reporter, TestCaseSummary},
-    test::{Location, SectionId, TestCase, TestDesc, TestFn},
+    test::{SectionId, TestCase, TestDesc, TestFn},
 };
 use futures_core::{
     future::Future,
@@ -180,16 +181,25 @@ impl TestInner {
 }
 
 #[derive(Debug)]
-enum TerminationReason {
-    Skipped { reason: String },
-    Failed { location: Location, reason: String },
-    AssertionFailed { location: Location, message: String },
+enum ExitReason {
+    Skipped {
+        location: &'static Location,
+        reason: String,
+    },
+    Failed {
+        location: &'static Location,
+        reason: String,
+    },
+    AssertionFailed {
+        location: &'static Location,
+        message: String,
+    },
 }
 
 /// Context values while running the test case.
 pub struct Context<'a> {
     desc: &'a TestDesc,
-    termination_reason: Option<TerminationReason>,
+    exit_reason: Option<ExitReason>,
     target_section: Option<SectionId>,
     current_section: Option<SectionId>,
     #[allow(dead_code)]
@@ -217,7 +227,7 @@ impl<'a> Context<'a> {
     ) -> Self {
         Self {
             desc,
-            termination_reason: None,
+            exit_reason: None,
             target_section,
             current_section: None,
             reporter,
@@ -325,12 +335,14 @@ impl<'a> Context<'a> {
 
     fn check_outcome(&mut self, result: anyhow::Result<()>) -> Result<(), Outcome> {
         match result {
-            Ok(()) => match self.termination_reason.take() {
-                Some(TerminationReason::Skipped { reason }) => Err(Outcome::Skipped { reason }),
-                Some(TerminationReason::Failed { location, reason }) => {
+            Ok(()) => match self.exit_reason.take() {
+                Some(ExitReason::Skipped { location, reason }) => {
+                    Err(Outcome::Skipped { location, reason })
+                }
+                Some(ExitReason::Failed { location, reason }) => {
                     Err(Outcome::Failed { location, reason })
                 }
-                Some(TerminationReason::AssertionFailed { location, message }) => {
+                Some(ExitReason::AssertionFailed { location, message }) => {
                     Err(Outcome::AssertionFailed { location, message })
                 }
                 None => Ok(()),
@@ -340,17 +352,18 @@ impl<'a> Context<'a> {
     }
 
     #[inline]
-    pub(crate) fn mark_skipped(&mut self, reason: fmt::Arguments<'_>) {
-        debug_assert!(self.termination_reason.is_none());
-        self.termination_reason.replace(TerminationReason::Skipped {
+    pub(crate) fn mark_skipped(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) {
+        debug_assert!(self.exit_reason.is_none());
+        self.exit_reason.replace(ExitReason::Skipped {
+            location,
             reason: reason.to_string(),
         });
     }
 
     #[inline]
-    pub(crate) fn mark_failed(&mut self, location: Location, reason: fmt::Arguments<'_>) {
-        debug_assert!(self.termination_reason.is_none());
-        self.termination_reason.replace(TerminationReason::Failed {
+    pub(crate) fn mark_failed(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) {
+        debug_assert!(self.exit_reason.is_none());
+        self.exit_reason.replace(ExitReason::Failed {
             location,
             reason: reason.to_string(),
         });
@@ -359,15 +372,14 @@ impl<'a> Context<'a> {
     #[inline]
     pub(crate) fn mark_assertion_failed(
         &mut self,
-        location: Location,
+        location: &'static Location,
         message: fmt::Arguments<'_>,
     ) {
-        debug_assert!(self.termination_reason.is_none());
-        self.termination_reason
-            .replace(TerminationReason::AssertionFailed {
-                location,
-                message: message.to_string(),
-            });
+        debug_assert!(self.exit_reason.is_none());
+        self.exit_reason.replace(ExitReason::AssertionFailed {
+            location,
+            message: message.to_string(),
+        });
     }
 }
 

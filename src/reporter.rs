@@ -2,20 +2,28 @@
 
 pub(crate) mod console;
 
-use crate::test::{Location, TestCase, TestDesc};
+use crate::{
+    location::Location,
+    test::{TestCase, TestDesc},
+};
 use std::sync::Arc;
 
 #[derive(Debug)]
 pub(crate) enum Outcome {
     Passed,
     Errored(anyhow::Error),
-    // Panicked {
-    //     payload: Box<dyn Any + Send + 'static>,
-    //     location: Location,
-    // },
-    Skipped { reason: String },
-    Failed { location: Location, reason: String },
-    AssertionFailed { location: Location, message: String },
+    Skipped {
+        location: &'static Location,
+        reason: String,
+    },
+    Failed {
+        location: &'static Location,
+        reason: String,
+    },
+    AssertionFailed {
+        location: &'static Location,
+        message: String,
+    },
 }
 
 #[allow(missing_docs)]
