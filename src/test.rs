@@ -1,4 +1,4 @@
-use futures::future::{BoxFuture, LocalBoxFuture};
+use futures_core::future::{BoxFuture, LocalBoxFuture};
 use hashbrown::{HashMap, HashSet};
 use std::{borrow::Cow, fmt, panic};
 

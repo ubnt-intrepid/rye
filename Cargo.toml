@@ -23,7 +23,8 @@ frameworks = []
 [dependencies]
 rye-macros = { version = "=0.1.0-dev", path = "./macros" }
 anyhow = "1"
-futures = "0.3"
+futures-core = "0.3"
+futures-util = { version = "0.3", default-features = false, features = [ "std" ] }
 getopts = "0.2"
 hashbrown = "0.7"
 linkme = { version = "0.2", optional = true }
@@ -31,7 +32,6 @@ log = "0.4"
 paste = "0.1"
 pin-project = "0.4"
 termcolor = "1"
-thiserror = "1"
 
 [dev-dependencies]
 futures = { version = "0.3", features = [ "thread-pool" ] }

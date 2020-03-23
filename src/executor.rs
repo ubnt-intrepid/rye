@@ -4,10 +4,11 @@ use crate::{
     reporter::{Outcome, Reporter, TestCaseSummary},
     test::{Location, SectionId, TestCase, TestDesc, TestFn},
 };
-use futures::{
-    future::{Future, FutureExt as _},
+use futures_core::{
+    future::Future,
     task::{self, Poll},
 };
+use futures_util::future::FutureExt as _;
 use pin_project::pin_project;
 use std::{
     cell::Cell,
@@ -391,8 +392,7 @@ impl EnterSection {
 }
 
 /// The error value returned from `Context::try_with`.
-#[derive(Debug, thiserror::Error)]
-#[error("cannot access the test context outside of the test body")]
+#[derive(Debug)]
 pub struct AccessError {
     _p: (),
 }

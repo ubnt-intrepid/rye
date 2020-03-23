@@ -268,7 +268,7 @@ impl TestRunner {
             let reporter = reporter.clone();
             handles.push(runner.spawn_test(test, reporter));
         }
-        let results = futures::future::join_all(handles).await;
+        let results = futures_util::future::join_all(handles).await;
         for result in results {
             summary.append(result);
         }
