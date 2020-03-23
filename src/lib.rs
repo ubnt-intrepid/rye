@@ -158,8 +158,20 @@ pub use rye_macros::test_harness;
 macro_rules! skip {
     () => ( $crate::skip!("explicitly skipped") );
     ($($arg:tt)+) => {
-        $crate::_internal::mark_skipped(format_args!($($arg)+));
-        return $crate::_internal::Termination::ok();
+        return $crate::_internal::skip(format_args!($($arg)+));
+    };
+}
+
+/// Assert that the specified boolean expression is `true`.
+#[macro_export]
+macro_rules! require {
+    ($e:expr) => {
+        if !($e) {
+            return $crate::_internal::assertion_failed(
+                $crate::_internal::location!(),
+                format_args!(concat!("assertion failed: ", stringify!($e))),
+            );
+        }
     };
 }
 
@@ -200,8 +212,15 @@ pub mod _internal {
     }
 
     #[inline]
-    pub fn mark_skipped(reason: fmt::Arguments<'_>) {
+    pub fn skip<T: Termination>(reason: fmt::Arguments<'_>) -> T {
         Context::with(|ctx| ctx.mark_skipped(reason));
+        T::exit()
+    }
+
+    #[inline]
+    pub fn assertion_failed<T: Termination>(location: Location, message: fmt::Arguments<'_>) -> T {
+        Context::with(|ctx| ctx.mark_assertion_failed(location, message));
+        T::exit()
     }
 
     #[doc(hidden)] // private API.

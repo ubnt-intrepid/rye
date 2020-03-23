@@ -1,3 +1,5 @@
+#![allow(clippy::len_zero)]
+
 rye::test_harness! {
     #![test_runner(rye_runner_futures::runner)]
 }
@@ -6,14 +8,14 @@ rye::test_harness! {
 fn case_sync() {
     let mut vec = vec![0usize; 5];
 
-    assert_eq!(vec.len(), 5);
-    assert!(vec.capacity() >= 5);
+    rye::require!(vec.len() == 5);
+    rye::require!(vec.capacity() >= 5);
 
     section!("resizing bigger changes size and capacity", {
         vec.resize(10, 0);
 
-        assert_eq!(vec.len(), 10);
-        assert!(vec.capacity() >= 5);
+        rye::require!(vec.len() == 10);
+        rye::require!(vec.capacity() >= 10);
     });
 }
 
@@ -21,20 +23,20 @@ fn case_sync() {
 fn nested() {
     let mut vec = vec![0usize; 5];
 
-    assert_eq!(vec.len(), 5);
-    assert!(vec.capacity() >= 5);
+    rye::require!(vec.len() == 5);
+    rye::require!(vec.capacity() >= 5);
 
     section!("resizing bigger changes size and capacity", {
         vec.resize(10, 0);
 
-        assert_eq!(vec.len(), 10);
-        assert!(vec.capacity() >= 10);
+        rye::require!(vec.len() == 10);
+        rye::require!(vec.capacity() >= 10);
 
         section!("shrinking smaller does not changes capacity", {
             vec.resize(0, 0);
 
-            assert_eq!(vec.len(), 0);
-            assert!(vec.capacity() >= 10);
+            rye::require!(vec.len() == 0);
+            rye::require!(vec.capacity() >= 10);
         });
     });
 }
@@ -43,14 +45,14 @@ fn nested() {
 async fn case_async() {
     let mut vec = vec![0usize; 5];
 
-    assert_eq!(vec.len(), 5);
-    assert!(vec.capacity() >= 5);
+    rye::require!(vec.len() == 5);
+    rye::require!(vec.capacity() >= 5);
 
     section!("resizing bigger changes size and capacity", {
         vec.resize(10, 0);
 
-        assert_eq!(vec.len(), 10);
-        assert!(vec.capacity() >= 5);
+        rye::require!(vec.len() == 10);
+        rye::require!(vec.capacity() >= 10);
     });
 }
 
@@ -60,16 +62,16 @@ async fn case_async_nosend() {
     let _rc = std::rc::Rc::new(());
 
     (async {
-        assert_eq!(vec.len(), 5);
-        assert!(vec.capacity() >= 5);
+        rye::require!(vec.len() == 5);
+        rye::require!(vec.capacity() >= 5);
     })
     .await;
 
     section!("resizing bigger changes size and capacity", {
         vec.resize(10, 0);
 
-        assert_eq!(vec.len(), 10);
-        assert!(vec.capacity() >= 5);
+        rye::require!(vec.len() == 10);
+        rye::require!(vec.capacity() >= 5);
     });
 }
 
@@ -78,14 +80,14 @@ mod sub {
     fn sub_test() {
         let mut vec = vec![0usize; 5];
 
-        assert_eq!(vec.len(), 5);
-        assert!(vec.capacity() >= 5);
+        rye::require!(vec.len() == 5);
+        rye::require!(vec.capacity() >= 5);
 
         section!("resizing bigger changes size and capacity", {
             vec.resize(10, 0);
 
-            assert_eq!(vec.len(), 10);
-            assert!(vec.capacity() >= 5);
+            rye::require!(vec.len() == 10);
+            rye::require!(vec.capacity() >= 5);
         });
     }
 
@@ -96,43 +98,32 @@ mod sub {
     fn modified_rye_path() {
         let mut vec = vec![0usize; 5];
 
-        assert_eq!(vec.len(), 5);
-        assert!(vec.capacity() >= 5);
+        rye::require!(vec.len() == 5);
+        rye::require!(vec.capacity() >= 5);
 
         section!("resizing bigger changes size and capacity", {
             vec.resize(10, 0);
 
-            assert_eq!(vec.len(), 10);
-            assert!(vec.capacity() >= 5);
+            rye::require!(vec.len() == 10);
+            rye::require!(vec.capacity() >= 10);
         });
     }
 }
 
 #[rye::test]
 fn return_result() -> anyhow::Result<()> {
-    macro_rules! require {
-        ($e:expr) => {
-            anyhow::ensure!(
-                $e,
-                "assertion failed at {}:{}:{}: {}",
-                file!(),
-                line!(),
-                column!(),
-                stringify!($e)
-            )
-        };
-    }
-
     let mut vec = vec![0usize; 5];
 
-    require!(vec.len() == 5);
-    require!(vec.capacity() >= 5);
+    rye::require!(vec.len() == 5);
+    rye::require!(vec.capacity() >= 5);
+
+    anyhow::ensure!(!vec.is_empty(), "vec is empty");
 
     section!("resizing bigger changes size and capacity", {
         vec.resize(10, 0);
 
-        require!(vec.len() == 10);
-        require!(vec.capacity() >= 10);
+        rye::require!(vec.len() == 10);
+        rye::require!(vec.capacity() >= 10);
     });
 
     #[cfg(FALSE)]

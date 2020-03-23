@@ -1,7 +1,7 @@
 /// Arbitrary return values in test cases.
 pub trait Termination: sealed::Sealed {
     #[doc(hidden)] // TODO: dox
-    fn ok() -> Self;
+    fn exit() -> Self;
 
     #[doc(hidden)] // TODO: dox
     fn into_result(self) -> anyhow::Result<()>;
@@ -9,7 +9,7 @@ pub trait Termination: sealed::Sealed {
 
 impl Termination for () {
     #[doc(hidden)] // TODO: dox
-    fn ok() -> Self {}
+    fn exit() -> Self {}
 
     #[doc(hidden)] // TODO: dox
     #[inline]
@@ -23,7 +23,7 @@ where
     E: Into<anyhow::Error>,
 {
     #[doc(hidden)] // TODO: dox
-    fn ok() -> Self {
+    fn exit() -> Self {
         Ok(())
     }
 

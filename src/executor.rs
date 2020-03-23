@@ -192,6 +192,7 @@ impl TestInner {
 #[derive(Debug)]
 enum TerminationReason {
     Skipped { reason: String },
+    AssertionFailed { location: Location, message: String },
     Panicked { location: Option<Location> },
 }
 
@@ -345,17 +346,19 @@ impl<'a> Context<'a> {
         match result {
             Ok(Ok(())) => match self.termination_reason.take() {
                 Some(TerminationReason::Skipped { reason }) => Err(Outcome::Skipped { reason }),
+                Some(TerminationReason::AssertionFailed { location, message }) => {
+                    Err(Outcome::AssertionFailed { location, message })
+                }
                 Some(TerminationReason::Panicked { .. }) => unreachable!(),
                 None => Ok(()),
             },
             Ok(Err(err)) => Err(Outcome::Errored(err)),
             Err(panic_payload) => match self.termination_reason.take() {
-                Some(TerminationReason::Skipped { reason }) => Err(Outcome::Skipped { reason }),
                 Some(TerminationReason::Panicked { location }) => Err(Outcome::Panicked {
                     payload: panic_payload,
                     location: location.expect("the panic location is not available"),
                 }),
-                None => unreachable!("unexpected termination reason"),
+                _ => unreachable!("unexpected termination reason"),
             },
         }
     }
@@ -373,6 +376,20 @@ impl<'a> Context<'a> {
         self.termination_reason.replace(TerminationReason::Skipped {
             reason: reason.to_string(),
         });
+    }
+
+    #[inline]
+    pub(crate) fn mark_assertion_failed(
+        &mut self,
+        location: Location,
+        message: fmt::Arguments<'_>,
+    ) {
+        debug_assert!(self.termination_reason.is_none());
+        self.termination_reason
+            .replace(TerminationReason::AssertionFailed {
+                location,
+                message: message.to_string(),
+            });
     }
 }
 
