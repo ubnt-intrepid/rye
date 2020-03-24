@@ -4,7 +4,7 @@ const no_sections: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    fn no_sections() {
+    fn no_sections(__ctx: &mut __rye::Context<'_>) {
         #[allow(unused_imports)]
         use __rye::prelude::*;
 

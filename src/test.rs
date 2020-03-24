@@ -1,4 +1,4 @@
-use crate::location::Location;
+use crate::{context::ContextPtr, location::Location};
 use futures_core::future::{BoxFuture, LocalBoxFuture};
 
 #[allow(missing_docs)]
@@ -69,34 +69,32 @@ pub(crate) type SectionId = u64;
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub enum TestFn {
-    Async(fn() -> BoxFuture<'static, anyhow::Result<()>>),
-    AsyncLocal(fn() -> LocalBoxFuture<'static, anyhow::Result<()>>),
-    Blocking(fn() -> anyhow::Result<()>),
+    Async(fn(ContextPtr) -> BoxFuture<'static, anyhow::Result<()>>),
+    AsyncLocal(fn(ContextPtr) -> LocalBoxFuture<'static, anyhow::Result<()>>),
+    Blocking(fn(ContextPtr) -> anyhow::Result<()>),
 }
 
 #[doc(hidden)] // private API.
 #[macro_export]
 macro_rules! __test_fn {
     (@async $path:path) => {
-        $crate::_internal::TestFn::Async(|| {
+        $crate::_internal::TestFn::Async(|mut ctx_ptr| {
             use $crate::_internal::{Box, Termination};
-            let fut = $path();
-            Box::pin(async move { Termination::into_result(fut.await) })
+            Box::pin(async move { Termination::into_result($path(ctx_ptr.as_mut()).await) })
         })
     };
 
     (@async_local $path:path) => {
-        $crate::_internal::TestFn::AsyncLocal(|| {
+        $crate::_internal::TestFn::AsyncLocal(|mut ctx_ptr| {
             use $crate::_internal::{Box, Termination};
-            let fut = $path();
-            Box::pin(async move { Termination::into_result(fut.await) })
+            Box::pin(async move { Termination::into_result($path(ctx_ptr.as_mut()).await) })
         })
     };
 
     (@blocking $path:path) => {
-        $crate::_internal::TestFn::Blocking(|| {
+        $crate::_internal::TestFn::Blocking(|mut ctx_ptr| {
             use $crate::_internal::Termination;
-            Termination::into_result($path())
+            Termination::into_result($path(ctx_ptr.as_mut()))
         })
     };
 }

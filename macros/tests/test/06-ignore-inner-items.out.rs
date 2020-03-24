@@ -4,7 +4,7 @@ const ignore_inner_items: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    fn ignore_inner_items() {
+    fn ignore_inner_items(__ctx: &mut __rye::Context<'_>) {
         #[allow(unused_imports)]
         use __rye::prelude::*;
 

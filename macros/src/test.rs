@@ -46,8 +46,14 @@ pub(crate) fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     // extract rye-specific attributes.
     let params = try_quote!(Params::from_attrs(&mut item.attrs));
 
+    // inject an argument to pass the test context.
+    let test_context_id = Ident::new("__ctx", Span::call_site());
+    item.sig.inputs.push(syn::parse_quote! {
+        #test_context_id: &mut __rye::Context<'_>
+    });
+
     // expand section!()
-    let sections = expand_sections(&mut item);
+    let sections = expand_sections(&mut item, &test_context_id);
 
     // append bounds to where clause.
     if let syn::ReturnType::Type(_, ref ty) = item.sig.output {
@@ -189,25 +195,27 @@ struct Section {
     children: Vec<SectionId>,
 }
 
-fn expand_sections(item: &mut ItemFn) -> Vec<Section> {
+fn expand_sections(item: &mut ItemFn, test_context_id: &Ident) -> Vec<Section> {
     let mut expand = ExpandSections {
         sections: IndexMap::new(),
         next_section_id: 0,
         parent: None,
         forbidden_sections: false,
+        test_context_id,
     };
     expand.visit_block_mut(&mut *item.block);
     expand.sections.into_iter().map(|(_k, v)| v).collect()
 }
 
-struct ExpandSections {
+struct ExpandSections<'a> {
     sections: IndexMap<SectionId, Section>,
     next_section_id: SectionId,
     parent: Option<SectionId>,
     forbidden_sections: bool,
+    test_context_id: &'a Ident,
 }
 
-impl ExpandSections {
+impl ExpandSections<'_> {
     fn try_expand_section(&mut self, attrs: &[Attribute], mac: &Macro) -> Result<Stmt> {
         if self.forbidden_sections {
             return Err(Error::new_spanned(
@@ -247,8 +255,9 @@ impl ExpandSections {
             me.visit_block_mut(&mut *block);
         });
 
+        let test_context_id = self.test_context_id;
         Stmt::parse.parse2(quote_spanned! { mac.span() =>
-            __rye::enter_section!(#section_id, #name, #(#attrs)* #block);
+            __rye::enter_section!(#test_context_id, #section_id, #name, #(#attrs)* #block);
         })
     }
 
@@ -280,7 +289,14 @@ impl ExpandSections {
     }
 }
 
-impl VisitMut for ExpandSections {
+fn is_builtin_macro(path: &Path) -> bool {
+    match path.get_ident() {
+        Some(id) if id == "require" || id == "skip" || id == "fail" => true,
+        _ => false,
+    }
+}
+
+impl VisitMut for ExpandSections<'_> {
     fn visit_block_mut(&mut self, block: &mut Block) {
         enum State {
             Setup,
@@ -315,6 +331,15 @@ impl VisitMut for ExpandSections {
                             self.expand_section(&item.attrs[..], &item.mac)
                         }
                         State::Teardown => err_section_after_teardown(&stmt),
+                    };
+                }
+                Stmt::Expr(Expr::Macro(expr)) | Stmt::Semi(Expr::Macro(expr), _)
+                    if is_builtin_macro(&expr.mac.path) =>
+                {
+                    expr.mac.tokens = {
+                        let test_context_id = self.test_context_id;
+                        let tokens = &expr.mac.tokens;
+                        quote!(#test_context_id, #tokens)
                     };
                 }
                 Stmt::Item(..) => {

@@ -165,7 +165,7 @@ pub mod _internal {
         __register_test_case as register_test_case,
         __test_fn as test_fn,
         __test_name as test_name,
-        context::{with_tls_context, Section},
+        context::{Context, Section},
         location::Location,
         termination::Termination,
         test::{TestCase, TestDesc, TestFn, TestName, TestPlan},

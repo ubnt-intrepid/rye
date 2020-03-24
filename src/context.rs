@@ -4,12 +4,8 @@ use crate::{
     termination::Termination,
     test::{SectionId, TestPlan},
 };
-use futures_core::{
-    future::Future,
-    task::{self, Poll},
-};
-use pin_project::pin_project;
-use std::{cell::Cell, fmt, marker::PhantomData, mem, pin::Pin, ptr::NonNull};
+use futures_core::future::Future;
+use std::{fmt, marker::PhantomData, ptr::NonNull};
 
 #[derive(Debug)]
 enum ExitReason {
@@ -25,6 +21,21 @@ enum ExitReason {
         location: &'static Location,
         message: String,
     },
+}
+
+#[doc(hidden)] // private API.
+#[repr(transparent)]
+pub struct ContextPtr(NonNull<Context<'static>>);
+
+unsafe impl Send for ContextPtr {}
+
+impl ContextPtr {
+    #[doc(hidden)] // private API.
+    #[allow(clippy::should_implement_trait)]
+    #[inline]
+    pub fn as_mut(&mut self) -> &mut Context<'static> {
+        unsafe { self.0.as_mut() }
+    }
 }
 
 /// Context values while running the test case.
@@ -48,19 +59,9 @@ impl<'a> Context<'a> {
         }
     }
 
-    #[doc(hidden)] // private API
-    pub fn enter_section(&mut self, section: &'static Section) -> EnterSection {
-        let enabled = self.plan.is_enabled(section.id);
-        let last_section = self.current_section.replace(section);
-        EnterSection {
-            enabled,
-            last_section,
-        }
-    }
-
-    #[doc(hidden)] // private API
-    pub fn leave_section(&mut self, enter: EnterSection) {
-        self.current_section = enter.last_section;
+    #[inline]
+    unsafe fn transmute(&mut self) -> ContextPtr {
+        ContextPtr(NonNull::from(&mut *self).cast::<Context<'static>>())
     }
 
     #[cfg(test)]
@@ -68,16 +69,19 @@ impl<'a> Context<'a> {
         self.current_section.map(|section| section.name)
     }
 
-    pub(crate) async fn run_async<Fut>(&mut self, fut: Fut) -> Result<(), Outcome>
+    pub(crate) async fn run_async<Fut>(&mut self, f: fn(ContextPtr) -> Fut) -> Result<(), Outcome>
     where
         Fut: Future<Output = anyhow::Result<()>>,
     {
-        let outcome = self.scope_async(fut).await;
+        let outcome = f(unsafe { self.transmute() }).await;
         self.check_outcome(outcome)
     }
 
-    pub(crate) fn run_blocking(&mut self, f: fn() -> anyhow::Result<()>) -> Result<(), Outcome> {
-        let outcome = self.scope(f);
+    pub(crate) fn run_blocking(
+        &mut self,
+        f: fn(ContextPtr) -> anyhow::Result<()>,
+    ) -> Result<(), Outcome> {
+        let outcome = f(unsafe { self.transmute() });
         self.check_outcome(outcome)
     }
 
@@ -97,6 +101,21 @@ impl<'a> Context<'a> {
             },
             Err(err) => Err(Outcome::Errored(err)),
         }
+    }
+
+    #[doc(hidden)] // private API
+    pub fn enter_section(&mut self, section: &'static Section) -> EnterSection {
+        let enabled = self.plan.is_enabled(section.id);
+        let last_section = self.current_section.replace(section);
+        EnterSection {
+            enabled,
+            last_section,
+        }
+    }
+
+    #[doc(hidden)] // private API
+    pub fn leave_section(&mut self, enter: EnterSection) {
+        self.current_section = enter.last_section;
     }
 
     #[doc(hidden)] // private API.
@@ -167,80 +186,12 @@ pub struct Section {
     pub location: Location,
 }
 
-// ==== TLS ====
-
-thread_local! {
-    static TLS_CTX: Cell<Option<NonNull<Context<'static>>>> = Cell::new(None);
-}
-
-struct Guard(Option<NonNull<Context<'static>>>);
-
-impl Drop for Guard {
-    fn drop(&mut self) {
-        TLS_CTX.with(|tls| tls.set(self.0.take()));
-    }
-}
-
-#[doc(hidden)] // private API
-#[inline]
-pub fn with_tls_context<F, R>(f: F) -> R
-where
-    F: FnOnce(&mut Context<'_>) -> R,
-{
-    let ctx_ptr = TLS_CTX.with(|tls| tls.take());
-    let _guard = Guard(ctx_ptr);
-    let mut ctx_ptr = ctx_ptr.expect("cannot acquire the test context");
-    unsafe { f(ctx_ptr.as_mut()) }
-}
-
-impl Context<'_> {
-    fn scope<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        let prev = TLS_CTX.with(|tls| unsafe {
-            let ctx_ptr = mem::transmute::<&mut Self, &mut Context<'static>>(self);
-            tls.replace(Some(NonNull::from(ctx_ptr)))
-        });
-        let _guard = Guard(prev);
-        f()
-    }
-
-    #[inline]
-    async fn scope_async<Fut>(&mut self, fut: Fut) -> Fut::Output
-    where
-        Fut: Future,
-    {
-        #[pin_project]
-        struct ScopeAsync<'a, 'ctx, Fut> {
-            #[pin]
-            fut: Fut,
-            ctx: &'a mut Context<'ctx>,
-        }
-
-        impl<Fut> Future for ScopeAsync<'_, '_, Fut>
-        where
-            Fut: Future,
-        {
-            type Output = Fut::Output;
-
-            fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-                let me = self.project();
-                let fut = me.fut;
-                me.ctx.scope(|| fut.poll(cx))
-            }
-        }
-
-        ScopeAsync { fut, ctx: self }.await
-    }
-}
-
 // ==== private macros ====
 
 #[doc(hidden)] // private API.
 #[macro_export]
 macro_rules! __enter_section {
-    ( $id:expr, $name:expr, $(#[$attr:meta])* $block:block ) => {
+    ( $ctx:ident, $id:expr, $name:expr, $(#[$attr:meta])* $block:block ) => {
         $(#[$attr])*
         {
             const SECTION: $crate::_internal::Section = $crate::_internal::Section {
@@ -248,11 +199,11 @@ macro_rules! __enter_section {
                 name: $name,
                 location: $crate::_internal::location!(),
             };
-            let section = $crate::_internal::with_tls_context(|ctx| ctx.enter_section(&SECTION));
+            let section = $ctx.enter_section(&SECTION);
             if section.enabled() {
                 $block
             }
-            $crate::_internal::with_tls_context(|ctx| ctx.leave_section(section));
+            $ctx.leave_section(section);
         }
     };
 }
@@ -260,39 +211,37 @@ macro_rules! __enter_section {
 #[doc(hidden)] // private API.
 #[macro_export]
 macro_rules! __skip {
-    () => ( $crate::__skip!("explicitly skipped") );
-    ($($arg:tt)+) => {
+    ($ctx:ident) => {
+        $crate::__skip!($ctx, "explicitly skipped");
+    };
+    ($ctx:ident, $($arg:tt)+) => {
         const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
-        return $crate::_internal::with_tls_context(|ctx| {
-            ctx.skip(&LOCATION, format_args!($($arg)+))
-        });
+        return $ctx.skip(&LOCATION, format_args!($($arg)+));
     };
 }
 
 #[doc(hidden)] // private API.
 #[macro_export]
 macro_rules! __fail {
-    () => ( $crate::__fail!("explicitly failed") );
-    ($($arg:tt)+) => {{
+    ($ctx:ident) => {
+        $crate::__fail!($ctx:ident, "explicitly failed");
+    };
+    ($ctx:ident, $($arg:tt)+) => {{
         const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
-        return $crate::_internal::with_tls_context(|ctx| {
-            ctx.fail(&LOCATION, format_args!($($arg)+))
-        });
+        return $ctx.fail(&LOCATION, format_args!($($arg)+));
     }};
 }
 
 #[doc(hidden)] // private API.
 #[macro_export]
 macro_rules! __require {
-    ($e:expr) => {
+    ($ctx:ident, $e:expr) => {
         if !($e) {
             const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
-            return $crate::_internal::with_tls_context(|ctx| {
-                ctx.assertion_failed(
-                    &LOCATION,
-                    format_args!(concat!("assertion failed: ", stringify!($e))),
-                )
-            });
+            return $ctx.assertion_failed(
+                &LOCATION,
+                format_args!(concat!("assertion failed: ", stringify!($e))),
+            );
         }
     };
 }

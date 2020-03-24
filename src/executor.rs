@@ -1,7 +1,7 @@
 //! Abstraction of test execution in the rye.
 
 use crate::{
-    context::Context,
+    context::{Context, ContextPtr},
     reporter::{Outcome, Reporter, TestCaseSummary},
     test::{TestCase, TestDesc, TestFn, TestPlan},
 };
@@ -117,7 +117,7 @@ struct TestInner {
 }
 
 impl TestInner {
-    async fn run_async<Fut>(&mut self, f: fn() -> Fut) -> TestCaseSummary
+    async fn run_async<Fut>(&mut self, f: fn(ContextPtr) -> Fut) -> TestCaseSummary
     where
         Fut: Future<Output = anyhow::Result<()>>,
     {
@@ -125,7 +125,7 @@ impl TestInner {
 
         let mut outcome = Outcome::Passed;
         for plan in self.plans {
-            if let Err(o) = { Context::new(&mut *self.reporter, plan).run_async(f()).await } {
+            if let Err(o) = { Context::new(&mut *self.reporter, plan).run_async(f).await } {
                 outcome = o;
                 break;
             }
@@ -134,7 +134,7 @@ impl TestInner {
         self.end_test_case(outcome)
     }
 
-    fn run_blocking(&mut self, f: fn() -> anyhow::Result<()>) -> TestCaseSummary {
+    fn run_blocking(&mut self, f: fn(ContextPtr) -> anyhow::Result<()>) -> TestCaseSummary {
         self.start_test_case();
 
         let mut outcome = Outcome::Passed;
@@ -166,7 +166,6 @@ impl TestInner {
 mod tests {
     use super::*;
     use crate::{
-        context::with_tls_context,
         reporter::Summary,
         test::{TestCase, TestDesc, TestFn},
     };
@@ -178,8 +177,8 @@ mod tests {
 
     scoped_thread_local!(static HISTORY: RefCell<Vec<HistoryLog>>);
 
-    fn append_history(msg: &'static str) {
-        let current_section = with_tls_context(|ctx| ctx.current_section_name());
+    fn append_history(ctx: &mut Context<'_>, msg: &'static str) {
+        let current_section = ctx.current_section_name();
         HISTORY.with(|history| history.borrow_mut().push((msg, current_section)));
     }
 
@@ -218,7 +217,7 @@ mod tests {
         #[crate::test]
         #[rye(crate = crate)]
         fn test_case() {
-            append_history("test");
+            append_history(__ctx, "test");
         }
 
         let history = run_test(test_case);
@@ -230,13 +229,13 @@ mod tests {
         #[crate::test]
         #[rye(crate = crate)]
         fn test_case() {
-            append_history("setup");
+            append_history(__ctx, "setup");
 
             section!("section1", {
-                append_history("section1");
+                append_history(__ctx, "section1");
             });
 
-            append_history("teardown");
+            append_history(__ctx, "teardown");
         }
 
         let history = run_test(test_case);
@@ -255,17 +254,17 @@ mod tests {
         #[crate::test]
         #[rye(crate = crate)]
         fn test_case() {
-            append_history("setup");
+            append_history(__ctx, "setup");
 
             section!("section1", {
-                append_history("section1");
+                append_history(__ctx, "section1");
             });
 
             section!("section2", {
-                append_history("section2");
+                append_history(__ctx, "section2");
             });
 
-            append_history("teardown");
+            append_history(__ctx, "teardown");
         }
 
         let history = run_test(test_case);
@@ -289,27 +288,27 @@ mod tests {
         #[crate::test]
         #[rye(crate = crate)]
         fn test_case() {
-            append_history("setup");
+            append_history(__ctx, "setup");
 
             section!("section1", {
-                append_history("section1:setup");
+                append_history(__ctx, "section1:setup");
 
                 section!("section2", {
-                    append_history("section2");
+                    append_history(__ctx, "section2");
                 });
 
                 section!("section3", {
-                    append_history("section3");
+                    append_history(__ctx, "section3");
                 });
 
-                append_history("section1:teardown");
+                append_history(__ctx, "section1:teardown");
             });
 
             section!("section4", {
-                append_history("section4");
+                append_history(__ctx, "section4");
             });
 
-            append_history("teardown");
+            append_history(__ctx, "teardown");
         }
 
         let history = run_test(test_case);
@@ -343,34 +342,34 @@ mod tests {
         async fn test_case() {
             use futures_test::future::FutureTestExt as _;
 
-            append_history("setup");
+            append_history(__ctx, "setup");
             async {}.pending_once().await;
 
             section!("section1", {
-                append_history("section1:setup");
+                append_history(__ctx, "section1:setup");
                 async {}.pending_once().await;
 
                 section!("section2", {
                     async {}.pending_once().await;
-                    append_history("section2");
+                    append_history(__ctx, "section2");
                 });
 
                 section!("section3", {
                     async {}.pending_once().await;
-                    append_history("section3");
+                    append_history(__ctx, "section3");
                 });
 
                 async {}.pending_once().await;
-                append_history("section1:teardown");
+                append_history(__ctx, "section1:teardown");
             });
 
             section!("section4", {
                 async {}.pending_once().await;
-                append_history("section4");
+                append_history(__ctx, "section4");
             });
 
             async {}.pending_once().await;
-            append_history("teardown");
+            append_history(__ctx, "teardown");
         }
 
         let history = run_test(test_case);

@@ -4,33 +4,33 @@ const multi_section_in_scope: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    fn multi_section_in_scope() {
+    fn multi_section_in_scope(__ctx: &mut __rye::Context<'_>) {
         #[allow(unused_imports)]
         use __rye::prelude::*;
 
-        __rye::enter_section!(0u64, "section1", {
+        __rye::enter_section!(__ctx, 0u64, "section1", {
             assert!(1 + 1 == 2);
         });
 
-        __rye::enter_section!(1u64, "section2", {
+        __rye::enter_section!(__ctx, 1u64, "section2", {
             assert!(1 + 1 == 2);
 
-            __rye::enter_section!(2u64, "section2-1", {
+            __rye::enter_section!(__ctx, 2u64, "section2-1", {
                 assert!(true);
 
-                __rye::enter_section!(3u64, "section2-1-2", {
+                __rye::enter_section!(__ctx, 3u64, "section2-1-2", {
                     assert!(true);
                 });
             });
 
-            __rye::enter_section!(4u64, "section2-2", {
+            __rye::enter_section!(__ctx, 4u64, "section2-2", {
                 assert!(true);
             });
 
             assert!(1 + 2 == 3);
         });
 
-        __rye::enter_section!(5u64, "section3", {
+        __rye::enter_section!(__ctx, 5u64, "section3", {
             assert!(false);
         });
     }
