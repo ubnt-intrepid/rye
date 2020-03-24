@@ -20,9 +20,8 @@ fn case1() {
 # }
 ```
 
-The type that implements `TestResult` can be specified as the output type of the
-test function. Currently, the implementors of this trait are only `()` and
-`Result<(), E: Debug>`.
+The type that implements `Termination` can be specified as the output type of the
+test function.
 
 ```
 #[rye::test]
@@ -133,19 +132,19 @@ teardown
 #![doc(html_root_url = "https://docs.rs/rye/0.1.0-dev")]
 #![deny(missing_docs)]
 #![forbid(clippy::unimplemented, clippy::todo)]
+#![cfg_attr(docs, feature(doc_cfg))]
 
-pub mod reporter;
+pub mod report;
+pub mod runner;
 
 mod context;
 mod executor;
 mod location;
-mod runner;
 mod termination;
 mod test;
 
 pub use crate::{
     executor::TestExecutor,
-    runner::TestRunner,
     termination::Termination,
     test::{TestCase, TestDesc},
 };

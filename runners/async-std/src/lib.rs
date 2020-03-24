@@ -1,6 +1,6 @@
 use async_std::task;
 use futures::future::{Future, FutureExt as _, LocalBoxFuture};
-use rye::{reporter::TestCaseSummary, TestCase, TestExecutor, TestRunner};
+use rye::{report::TestCaseSummary, runner::TestRunner, TestCase, TestExecutor};
 
 pub fn runner(tests: &[&dyn TestCase]) {
     let mut runner = TestRunner::new();

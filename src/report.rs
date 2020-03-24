@@ -1,7 +1,5 @@
 #![allow(missing_docs)]
 
-pub(crate) mod console;
-
 use crate::{
     location::Location,
     test::{TestCase, TestDesc},

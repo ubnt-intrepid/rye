@@ -2,7 +2,7 @@
 
 use crate::{
     context::{Context, ContextPtr},
-    reporter::{Outcome, Reporter, TestCaseSummary},
+    report::{Outcome, Reporter, TestCaseSummary},
     test::{TestCase, TestDesc, TestFn, TestPlan},
 };
 use futures_core::future::Future;
@@ -170,7 +170,7 @@ impl TestInner {
 mod tests {
     use super::*;
     use crate::{
-        reporter::Summary,
+        report::Summary,
         test::{TestCase, TestDesc, TestFn},
     };
     use futures_executor::block_on;

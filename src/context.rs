@@ -1,6 +1,6 @@
 use crate::{
     location::Location,
-    reporter::{Outcome, Reporter},
+    report::{Outcome, Reporter},
     termination::Termination,
     test::{SectionId, TestPlan},
 };

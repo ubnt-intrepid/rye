@@ -4,7 +4,7 @@ use futures::{
     future::{Future, FutureExt as _, RemoteHandle},
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
-use rye::{reporter::TestCaseSummary, TestCase, TestExecutor, TestRunner};
+use rye::{report::TestCaseSummary, runner::TestRunner, TestCase, TestExecutor};
 use std::{io, thread};
 
 pub fn runner(tests: &[&dyn TestCase]) {

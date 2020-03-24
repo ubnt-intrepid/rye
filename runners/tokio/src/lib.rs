@@ -3,7 +3,7 @@ use futures::{
     task::{self, Poll},
 };
 use pin_project_lite::pin_project;
-use rye::{reporter::TestCaseSummary, TestCase, TestExecutor, TestRunner};
+use rye::{report::TestCaseSummary, runner::TestRunner, TestCase, TestExecutor};
 use std::pin::Pin;
 use tokio::{
     runtime::{self, Handle},
