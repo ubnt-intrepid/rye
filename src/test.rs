@@ -1,7 +1,6 @@
 use crate::location::Location;
 use futures_core::future::{BoxFuture, LocalBoxFuture};
 use hashbrown::{HashMap, HashSet};
-use std::borrow::Cow;
 
 #[allow(missing_docs)]
 pub trait TestCase: Send + Sync {
@@ -27,7 +26,7 @@ where
 #[derive(Debug)]
 pub struct TestDesc {
     #[doc(hidden)]
-    pub name: Cow<'static, str>,
+    pub name: TestName,
     #[doc(hidden)]
     pub location: Location,
     #[doc(hidden)]
@@ -43,7 +42,7 @@ impl TestDesc {
     /// the root module.
     #[inline]
     pub fn name(&self) -> &str {
-        &*self.name
+        self.name.as_ref()
     }
 
     /// Return the iterator over the section ids to be enabled.
@@ -115,24 +114,30 @@ macro_rules! __test_fn {
     };
 }
 
+#[doc(hidden)] // private API
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct TestName {
+    pub raw: &'static str,
+}
+
+impl AsRef<str> for TestName {
+    fn as_ref(&self) -> &str {
+        self.raw.splitn(2, "::").nth(1).unwrap()
+    }
+}
+
 #[doc(hidden)] // private API.
 #[macro_export]
 macro_rules! __test_name {
     ($name:ident) => {
-        $crate::_internal::test_name(
-            $crate::_internal::module_path!(),
-            $crate::_internal::stringify!($name),
-        )
+        $crate::_internal::TestName {
+            raw: $crate::_internal::concat!(
+                $crate::_internal::module_path!(),
+                "::",
+                $crate::_internal::stringify!($name),
+            ),
+        }
     };
-}
-
-#[allow(missing_docs)]
-#[inline(never)]
-pub fn test_name(module_path: &'static str, name: &'static str) -> Cow<'static, str> {
-    module_path
-        .splitn(2, "::")
-        .nth(1)
-        .map_or(name.into(), |m| format!("{}::{}", m, name).into())
 }
 
 #[doc(hidden)] // private API.

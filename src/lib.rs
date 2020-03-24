@@ -169,11 +169,11 @@ pub mod _internal {
         context::with_tls_context,
         location::Location,
         termination::Termination,
-        test::{test_name, Section, TestCase, TestDesc, TestFn},
+        test::{Section, TestCase, TestDesc, TestFn, TestName},
     };
     pub use hashbrown::{HashMap, HashSet};
     pub use paste;
-    pub use std::{boxed::Box, module_path, result::Result, stringify};
+    pub use std::{boxed::Box, concat, module_path, result::Result, stringify};
 
     pub mod prelude {
         pub use crate::{
