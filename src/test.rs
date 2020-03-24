@@ -1,24 +1,33 @@
 use crate::location::Location;
 use futures_core::future::{BoxFuture, LocalBoxFuture};
-use hashbrown::{HashMap, HashSet};
 
 #[allow(missing_docs)]
 pub trait TestCase: Send + Sync {
-    fn desc(&self) -> TestDesc;
+    fn desc(&self) -> &'static TestDesc;
+
     #[doc(hidden)] // private API.
     fn test_fn(&self) -> TestFn;
+
+    #[doc(hidden)] // private API.
+    fn test_plans(&self) -> &'static [TestPlan];
 }
 
 impl<T: ?Sized> TestCase for &T
 where
     T: TestCase,
 {
-    fn desc(&self) -> TestDesc {
+    fn desc(&self) -> &'static TestDesc {
         (**self).desc()
     }
 
+    #[doc(hidden)] // private API.
     fn test_fn(&self) -> TestFn {
         (**self).test_fn()
+    }
+
+    #[doc(hidden)] // private API.
+    fn test_plans(&self) -> &'static [TestPlan] {
+        (**self).test_plans()
     }
 }
 
@@ -29,10 +38,6 @@ pub struct TestDesc {
     pub name: TestName,
     #[doc(hidden)]
     pub location: Location,
-    #[doc(hidden)]
-    pub sections: HashMap<SectionId, Section>,
-    #[doc(hidden)]
-    pub leaf_sections: &'static [SectionId],
 }
 
 impl TestDesc {
@@ -44,40 +49,22 @@ impl TestDesc {
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
+}
 
-    /// Return the iterator over the section ids to be enabled.
-    pub(crate) fn target_sections(&self) -> impl Iterator<Item = Option<SectionId>> + '_ {
-        enum TargetSections<'a> {
-            Root { terminated: bool },
-            Leaves(std::slice::Iter<'a, SectionId>),
-        }
-        let mut target_sections = if self.leaf_sections.is_empty() {
-            TargetSections::Root { terminated: false }
-        } else {
-            TargetSections::Leaves(self.leaf_sections.iter())
-        };
-        std::iter::from_fn(move || match target_sections {
-            TargetSections::Root { ref mut terminated } => {
-                if !*terminated {
-                    *terminated = true;
-                    Some(None)
-                } else {
-                    None
-                }
-            }
-            TargetSections::Leaves(ref mut iter) => iter.next().map(|&section| Some(section)),
-        })
+#[doc(hidden)] // private API.
+#[derive(Debug)]
+pub struct TestPlan {
+    pub target: Option<SectionId>,
+    pub ancestors: &'static [SectionId],
+}
+
+impl TestPlan {
+    pub(crate) fn is_enabled(&self, id: SectionId) -> bool {
+        self.target.map_or(false, |target| target == id) || self.ancestors.contains(&id)
     }
 }
 
 pub(crate) type SectionId = u64;
-
-#[allow(missing_docs)]
-#[derive(Debug)]
-pub struct Section {
-    pub name: &'static str,
-    pub ancestors: HashSet<SectionId>,
-}
 
 #[allow(missing_docs)]
 #[derive(Debug)]
@@ -136,38 +123,6 @@ macro_rules! __test_name {
                 "::",
                 $crate::_internal::stringify!($name),
             ),
-        }
-    };
-}
-
-#[doc(hidden)] // private API.
-#[macro_export]
-macro_rules! __sections {
-    (@single $($x:tt)*) => (());
-    (@count $($rest:expr),*) => {
-        <[()]>::len(&[$($crate::__sections!(@single $rest)),*])
-    };
-
-    ($( $key:expr => ($name:expr, { $($ancestors:tt)* }); )*) => {
-        {
-            let _cap = $crate::__sections!(@count $($key),*);
-            #[allow(clippy::let_and_return)]
-            let mut _map = $crate::_internal::HashMap::with_capacity(_cap);
-            $(
-                let _ = _map.insert($key, $crate::_internal::Section {
-                    name: $name,
-                    ancestors: {
-                        let _cap = $crate::__sections!(@count $($ancestors),*);
-                        #[allow(clippy::let_and_return)]
-                        let mut _set = $crate::_internal::HashSet::with_capacity(_cap);
-                        $(
-                            _set.insert($ancestors);
-                        )*
-                        _set
-                    },
-                });
-            )*
-            _map
         }
     };
 }

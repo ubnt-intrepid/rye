@@ -163,15 +163,13 @@ pub mod _internal {
         __enter_section as enter_section,
         __location as location,
         __register_test_case as register_test_case,
-        __sections as sections,
         __test_fn as test_fn,
         __test_name as test_name,
-        context::with_tls_context,
+        context::{with_tls_context, Section},
         location::Location,
         termination::Termination,
-        test::{Section, TestCase, TestDesc, TestFn, TestName},
+        test::{TestCase, TestDesc, TestFn, TestName, TestPlan},
     };
-    pub use hashbrown::{HashMap, HashSet};
     pub use paste;
     pub use std::{boxed::Box, concat, module_path, result::Result, stringify};
 

@@ -6,7 +6,6 @@ use crate::{
     location::Location,
     test::{TestCase, TestDesc},
 };
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub(crate) enum Outcome {
@@ -29,7 +28,7 @@ pub(crate) enum Outcome {
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub struct TestCaseSummary {
-    pub(crate) desc: Arc<TestDesc>,
+    pub(crate) desc: &'static TestDesc,
     pub(crate) outcome: Outcome,
 }
 
@@ -39,7 +38,7 @@ pub struct Summary {
     pub(crate) passed: Vec<TestCaseSummary>,
     pub(crate) failed: Vec<TestCaseSummary>,
     pub(crate) skipped: Vec<TestCaseSummary>,
-    pub(crate) filtered_out: Vec<TestDesc>,
+    pub(crate) filtered_out: Vec<&'static TestDesc>,
 }
 
 impl Summary {

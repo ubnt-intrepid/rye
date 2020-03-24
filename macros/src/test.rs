@@ -185,7 +185,6 @@ type SectionId = u64;
 
 struct Section {
     id: SectionId,
-    name: syn::Expr,
     ancestors: Vec<SectionId>,
     children: Vec<SectionId>,
 }
@@ -238,7 +237,6 @@ impl ExpandSections {
             section_id,
             Section {
                 id: section_id,
-                name,
                 ancestors,
                 children: vec![],
             },
@@ -250,7 +248,7 @@ impl ExpandSections {
         });
 
         Stmt::parse.parse2(quote_spanned! { mac.span() =>
-            __rye::enter_section!(#section_id, #(#attrs)* #block);
+            __rye::enter_section!(#section_id, #name, #(#attrs)* #block);
         })
     }
 
@@ -345,32 +343,32 @@ struct Generated<'a> {
 
 impl ToTokens for Generated<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        struct SectionMapEntry<'a> {
-            section: &'a Section,
-        }
-
-        impl ToTokens for SectionMapEntry<'_> {
-            fn to_tokens(&self, tokens: &mut TokenStream) {
-                let id = &self.section.id;
-                let name = &self.section.name;
-                let ancestors = &self.section.ancestors;
-                tokens.append_all(&[quote! {
-                    #id => (#name, { #( #ancestors ),* });
-                }]);
-            }
-        }
-
-        let section_map_entries = self
+        let mut plans: Vec<_> = self
             .sections
             .iter()
-            .map(|section| SectionMapEntry { section });
-        let leaf_section_ids = self.sections.iter().filter_map(|section| {
-            if section.children.is_empty() {
-                Some(section.id)
-            } else {
-                None
-            }
-        });
+            .filter_map(|section| {
+                if section.children.is_empty() {
+                    let target = section.id;
+                    let ancestors = &section.ancestors;
+                    Some(quote! {
+                        __rye::TestPlan {
+                            target: Some(#target),
+                            ancestors: &[ #(#ancestors),* ],
+                        }
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if plans.is_empty() {
+            plans.push(quote! {
+                __rye::TestPlan {
+                    target: None,
+                    ancestors: &[],
+                }
+            });
+        }
 
         let crate_path = &self.params.crate_path;
         let item = &*self.item;
@@ -392,16 +390,17 @@ impl ToTokens for Generated<'_> {
                 #item
                 struct __TestCase;
                 impl __rye::TestCase for __TestCase {
-                    fn desc(&self) -> __rye::TestDesc {
-                        __rye::TestDesc {
+                    fn desc(&self) -> &'static __rye::TestDesc {
+                        &__rye::TestDesc {
                             name: __rye::test_name!(#ident),
                             location: #location,
-                            sections: __rye::sections! { #( #section_map_entries )* },
-                            leaf_sections: &[ #( #leaf_section_ids ),* ],
                         }
                     }
                     fn test_fn(&self) -> __rye::TestFn {
                         __rye::test_fn!(@#test_fn_id #ident)
+                    }
+                    fn test_plans(&self) -> &'static [__rye::TestPlan] {
+                        &[ #(#plans,)* ]
                     }
                 }
                 &__TestCase

@@ -18,17 +18,21 @@ const ignore_inner_items: &dyn ::rye::_internal::TestCase = {
     struct __TestCase;
 
     impl __rye::TestCase for __TestCase {
-        fn desc(&self) -> __rye::TestDesc {
-            __rye::TestDesc {
+        fn desc(&self) -> &'static __rye::TestDesc {
+            &__rye::TestDesc {
                 name: __rye::test_name!(ignore_inner_items),
                 location: __rye::location!(),
-                sections: __rye::sections! {},
-                leaf_sections: &[],
             }
         }
 
         fn test_fn(&self) -> __rye::TestFn {
             __rye::test_fn!(@blocking ignore_inner_items)
+        }
+
+        fn test_plans(&self) -> &'static [__rye::TestPlan] {
+            &[
+                __rye::TestPlan { target: None, ancestors: &[], },
+            ]
         }
     }
 

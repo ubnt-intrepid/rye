@@ -2,7 +2,7 @@ use crate::{
     location::Location,
     reporter::{Outcome, Reporter},
     termination::Termination,
-    test::{SectionId, TestDesc},
+    test::{SectionId, TestPlan},
 };
 use futures_core::{
     future::Future,
@@ -29,42 +29,29 @@ enum ExitReason {
 
 /// Context values while running the test case.
 pub struct Context<'a> {
-    desc: &'a TestDesc,
-    exit_reason: Option<ExitReason>,
-    target_section: Option<SectionId>,
-    current_section: Option<SectionId>,
+    plan: &'a TestPlan,
     #[allow(dead_code)]
     reporter: &'a mut (dyn Reporter + Send),
+    current_section: Option<&'static Section>,
+    exit_reason: Option<ExitReason>,
     _marker: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
 impl<'a> Context<'a> {
-    pub(crate) fn new(
-        desc: &'a TestDesc,
-        reporter: &'a mut (dyn Reporter + Send),
-        target_section: Option<SectionId>,
-    ) -> Self {
+    pub(crate) fn new(reporter: &'a mut (dyn Reporter + Send), plan: &'a TestPlan) -> Self {
         Self {
-            desc,
-            exit_reason: None,
-            target_section,
-            current_section: None,
+            plan,
             reporter,
+            current_section: None,
+            exit_reason: None,
             _marker: PhantomData,
         }
     }
 
     #[doc(hidden)] // private API
-    pub fn enter_section(&mut self, id: SectionId) -> EnterSection {
-        let enabled = self.target_section.map_or(false, |section_id| {
-            let section = self
-                .desc
-                .sections
-                .get(&section_id)
-                .expect("invalid section id is set");
-            section_id == id || section.ancestors.contains(&id)
-        });
-        let last_section = self.current_section.replace(id);
+    pub fn enter_section(&mut self, section: &'static Section) -> EnterSection {
+        let enabled = self.plan.is_enabled(section.id);
+        let last_section = self.current_section.replace(section);
         EnterSection {
             enabled,
             last_section,
@@ -78,7 +65,7 @@ impl<'a> Context<'a> {
 
     #[cfg(test)]
     pub(crate) fn current_section_name(&self) -> Option<&'static str> {
-        self.current_section.map(|id| self.desc.sections[&id].name)
+        self.current_section.map(|section| section.name)
     }
 
     pub(crate) async fn run_async<Fut>(&mut self, fut: Fut) -> Result<(), Outcome>
@@ -162,7 +149,7 @@ impl<'a> Context<'a> {
 #[doc(hidden)]
 pub struct EnterSection {
     enabled: bool,
-    last_section: Option<SectionId>,
+    last_section: Option<&'static Section>,
 }
 
 impl EnterSection {
@@ -171,6 +158,13 @@ impl EnterSection {
     pub fn enabled(&self) -> bool {
         self.enabled
     }
+}
+
+#[doc(hidden)] // private API
+pub struct Section {
+    pub id: SectionId,
+    pub name: &'static str,
+    pub location: Location,
 }
 
 // ==== TLS ====
@@ -246,10 +240,15 @@ impl Context<'_> {
 #[doc(hidden)] // private API.
 #[macro_export]
 macro_rules! __enter_section {
-    ( $id:expr, $(#[$attr:meta])* $block:block ) => {
+    ( $id:expr, $name:expr, $(#[$attr:meta])* $block:block ) => {
         $(#[$attr])*
         {
-            let section = $crate::_internal::with_tls_context(|ctx| ctx.enter_section($id));
+            const SECTION: $crate::_internal::Section = $crate::_internal::Section {
+                id: $id,
+                name: $name,
+                location: $crate::_internal::location!(),
+            };
+            let section = $crate::_internal::with_tls_context(|ctx| ctx.enter_section(&SECTION));
             if section.enabled() {
                 $block
             }

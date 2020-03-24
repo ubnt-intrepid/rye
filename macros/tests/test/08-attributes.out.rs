@@ -15,6 +15,7 @@ const attributes: &dyn path::to::rye::_internal::TestCase = {
 
         __rye::enter_section!(
             0u64,
+            "with unused variable",
             #[allow(unused_variables)]
             {
                 let foo = 10;
@@ -25,19 +26,21 @@ const attributes: &dyn path::to::rye::_internal::TestCase = {
     struct __TestCase;
 
     impl __rye::TestCase for __TestCase {
-        fn desc(&self) -> __rye::TestDesc {
-            __rye::TestDesc {
+        fn desc(&self) -> &'static __rye::TestDesc {
+            &__rye::TestDesc {
                 name: __rye::test_name!(attributes),
                 location: __rye::location!(),
-                sections: __rye::sections! {
-                    0u64 => ("with unused variable", {});
-                },
-                leaf_sections: &[ 0u64 ],
             }
         }
 
         fn test_fn(&self) -> __rye::TestFn {
             __rye::test_fn!(@blocking attributes)
+        }
+
+        fn test_plans(&self) -> &'static [__rye::TestPlan] {
+            &[
+                __rye::TestPlan { target: Some(0u64), ancestors: &[], },
+            ]
         }
     }
 

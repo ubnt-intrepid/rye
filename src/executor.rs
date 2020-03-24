@@ -3,10 +3,9 @@
 use crate::{
     context::Context,
     reporter::{Outcome, Reporter, TestCaseSummary},
-    test::{TestCase, TestDesc, TestFn},
+    test::{TestCase, TestDesc, TestFn, TestPlan},
 };
 use futures_core::future::Future;
-use std::sync::Arc;
 
 /// The executor of test cases.
 pub trait TestExecutor {
@@ -97,7 +96,8 @@ pub(crate) trait TestExecutorExt: TestExecutor {
         R: Reporter + Send + 'static,
     {
         let mut inner = TestInner {
-            desc: Arc::new(test.desc()),
+            desc: test.desc(),
+            plans: test.test_plans(),
             reporter: Box::new(reporter),
         };
         match test.test_fn() {
@@ -111,7 +111,8 @@ pub(crate) trait TestExecutorExt: TestExecutor {
 impl<E: TestExecutor + ?Sized> TestExecutorExt for E {}
 
 struct TestInner {
-    desc: Arc<TestDesc>,
+    desc: &'static TestDesc,
+    plans: &'static [TestPlan],
     reporter: Box<dyn Reporter + Send + 'static>,
 }
 
@@ -123,16 +124,8 @@ impl TestInner {
         self.start_test_case();
 
         let mut outcome = Outcome::Passed;
-        for section in self.desc.target_sections() {
-            if let Err(o) = {
-                Context::new(
-                    &self.desc, //
-                    &mut *self.reporter,
-                    section,
-                )
-                .run_async(f())
-                .await
-            } {
+        for plan in self.plans {
+            if let Err(o) = { Context::new(&mut *self.reporter, plan).run_async(f()).await } {
                 outcome = o;
                 break;
             }
@@ -145,15 +138,8 @@ impl TestInner {
         self.start_test_case();
 
         let mut outcome = Outcome::Passed;
-        for section in self.desc.target_sections() {
-            if let Err(o) = {
-                Context::new(
-                    &self.desc, //
-                    &mut *self.reporter,
-                    section,
-                )
-                .run_blocking(f)
-            } {
+        for plan in self.plans {
+            if let Err(o) = { Context::new(&mut *self.reporter, plan).run_blocking(f) } {
                 outcome = o;
                 break;
             }
@@ -168,7 +154,7 @@ impl TestInner {
 
     fn end_test_case(&mut self, outcome: Outcome) -> TestCaseSummary {
         let summary = TestCaseSummary {
-            desc: self.desc.clone(),
+            desc: self.desc,
             outcome,
         };
         self.reporter.test_case_ended(&summary);
@@ -208,11 +194,13 @@ mod tests {
 
     fn run_test(t: &dyn TestCase) -> Vec<HistoryLog> {
         let desc = t.desc();
+        let plans = t.test_plans();
         let test_fn = t.test_fn();
 
         let history = RefCell::new(vec![]);
         let mut state = TestInner {
-            desc: Arc::new(desc),
+            desc,
+            plans,
             reporter: Box::new(NullReporter),
         };
 
