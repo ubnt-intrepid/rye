@@ -125,7 +125,9 @@ impl TestInner {
 
         let mut outcome = Outcome::Passed;
         for plan in self.plans {
-            if let Err(o) = { Context::new(&mut *self.reporter, plan).run_async(f).await } {
+            let mut ctx = Context::new(&mut *self.reporter, plan);
+            let result = f(unsafe { ctx.transmute() }).await;
+            if let Some(o) = ctx.check_outcome(result) {
                 outcome = o;
                 break;
             }
@@ -139,7 +141,9 @@ impl TestInner {
 
         let mut outcome = Outcome::Passed;
         for plan in self.plans {
-            if let Err(o) = { Context::new(&mut *self.reporter, plan).run_blocking(f) } {
+            let mut ctx = Context::new(&mut *self.reporter, plan);
+            let result = f(unsafe { ctx.transmute() });
+            if let Some(o) = ctx.check_outcome(result) {
                 outcome = o;
                 break;
             }

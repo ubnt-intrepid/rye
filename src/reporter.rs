@@ -19,10 +19,6 @@ pub(crate) enum Outcome {
         location: &'static Location,
         reason: String,
     },
-    AssertionFailed {
-        location: &'static Location,
-        message: String,
-    },
 }
 
 #[allow(missing_docs)]
@@ -59,9 +55,7 @@ impl Summary {
     pub(crate) fn append(&mut self, result: TestCaseSummary) {
         match result.outcome {
             Outcome::Passed => self.passed.push(result),
-            Outcome::Errored(..) | Outcome::AssertionFailed { .. } | Outcome::Failed { .. } => {
-                self.failed.push(result)
-            }
+            Outcome::Errored(..) | Outcome::Failed { .. } => self.failed.push(result),
             Outcome::Skipped { .. } => self.skipped.push(result),
         }
     }

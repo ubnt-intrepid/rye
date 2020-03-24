@@ -4,24 +4,7 @@ use crate::{
     termination::Termination,
     test::{SectionId, TestPlan},
 };
-use futures_core::future::Future;
 use std::{fmt, marker::PhantomData, ptr::NonNull};
-
-#[derive(Debug)]
-enum ExitReason {
-    Skipped {
-        location: &'static Location,
-        reason: String,
-    },
-    Failed {
-        location: &'static Location,
-        reason: String,
-    },
-    AssertionFailed {
-        location: &'static Location,
-        message: String,
-    },
-}
 
 #[doc(hidden)] // private API.
 #[repr(transparent)]
@@ -44,7 +27,7 @@ pub struct Context<'a> {
     #[allow(dead_code)]
     reporter: &'a mut (dyn Reporter + Send),
     current_section: Option<&'static Section>,
-    exit_reason: Option<ExitReason>,
+    outcome: Option<Outcome>,
     _marker: PhantomData<fn(&'a ()) -> &'a ()>,
 }
 
@@ -54,13 +37,13 @@ impl<'a> Context<'a> {
             plan,
             reporter,
             current_section: None,
-            exit_reason: None,
+            outcome: None,
             _marker: PhantomData,
         }
     }
 
     #[inline]
-    unsafe fn transmute(&mut self) -> ContextPtr {
+    pub(crate) unsafe fn transmute(&mut self) -> ContextPtr {
         ContextPtr(NonNull::from(&mut *self).cast::<Context<'static>>())
     }
 
@@ -69,37 +52,10 @@ impl<'a> Context<'a> {
         self.current_section.map(|section| section.name)
     }
 
-    pub(crate) async fn run_async<Fut>(&mut self, f: fn(ContextPtr) -> Fut) -> Result<(), Outcome>
-    where
-        Fut: Future<Output = anyhow::Result<()>>,
-    {
-        let outcome = f(unsafe { self.transmute() }).await;
-        self.check_outcome(outcome)
-    }
-
-    pub(crate) fn run_blocking(
-        &mut self,
-        f: fn(ContextPtr) -> anyhow::Result<()>,
-    ) -> Result<(), Outcome> {
-        let outcome = f(unsafe { self.transmute() });
-        self.check_outcome(outcome)
-    }
-
-    fn check_outcome(&mut self, result: anyhow::Result<()>) -> Result<(), Outcome> {
+    pub(crate) fn check_outcome(&mut self, result: anyhow::Result<()>) -> Option<Outcome> {
         match result {
-            Ok(()) => match self.exit_reason.take() {
-                Some(ExitReason::Skipped { location, reason }) => {
-                    Err(Outcome::Skipped { location, reason })
-                }
-                Some(ExitReason::Failed { location, reason }) => {
-                    Err(Outcome::Failed { location, reason })
-                }
-                Some(ExitReason::AssertionFailed { location, message }) => {
-                    Err(Outcome::AssertionFailed { location, message })
-                }
-                None => Ok(()),
-            },
-            Err(err) => Err(Outcome::Errored(err)),
+            Ok(()) => self.outcome.take(),
+            Err(err) => Some(Outcome::Errored(err)),
         }
     }
 
@@ -124,8 +80,8 @@ impl<'a> Context<'a> {
     where
         T: Termination,
     {
-        debug_assert!(self.exit_reason.is_none());
-        self.exit_reason.replace(ExitReason::Skipped {
+        debug_assert!(self.outcome.is_none());
+        self.outcome.replace(Outcome::Skipped {
             location,
             reason: reason.to_string(),
         });
@@ -138,28 +94,10 @@ impl<'a> Context<'a> {
     where
         T: Termination,
     {
-        debug_assert!(self.exit_reason.is_none());
-        self.exit_reason.replace(ExitReason::Failed {
+        debug_assert!(self.outcome.is_none());
+        self.outcome.replace(Outcome::Failed {
             location,
             reason: reason.to_string(),
-        });
-        T::exit()
-    }
-
-    #[doc(hidden)] // private API.
-    #[inline(never)]
-    pub fn assertion_failed<T>(
-        &mut self,
-        location: &'static Location,
-        message: fmt::Arguments<'_>,
-    ) -> T
-    where
-        T: Termination,
-    {
-        debug_assert!(self.exit_reason.is_none());
-        self.exit_reason.replace(ExitReason::AssertionFailed {
-            location,
-            message: message.to_string(),
         });
         T::exit()
     }
@@ -237,11 +175,7 @@ macro_rules! __fail {
 macro_rules! __require {
     ($ctx:ident, $e:expr) => {
         if !($e) {
-            const LOCATION: $crate::_internal::Location = $crate::_internal::location!();
-            return $ctx.assertion_failed(
-                &LOCATION,
-                format_args!(concat!("assertion failed: ", stringify!($e))),
-            );
+            $crate::__fail!($ctx, concat!("assertion failed: ", stringify!($e)));
         }
     };
 }
