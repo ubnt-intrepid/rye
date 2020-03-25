@@ -4,14 +4,7 @@ const no_sections: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    fn no_sections(__ctx: &mut __rye::Context<'_>) {
-        #[allow(unused_imports)]
-        use __rye::prelude::*;
-
-        let mut vec = vec![0usize; 5];
-        assert_eq!(vec.len(), 5);
-        assert!(vec.capacity() >= 5);
-    }
+    fn no_sections(_: &mut Context<'_>) {}
 
     struct __TestCase;
 

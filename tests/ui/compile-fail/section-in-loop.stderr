@@ -1,23 +1,17 @@
 error: section cannot be described at here
  --> $DIR/section-in-loop.rs:6:9
   |
-6 | /         section!("section", {
-7 | |             assert!(true);
-8 | |         });
-  | |__________^
+6 |         section!(cx, "section", {});
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: section cannot be described at here
-  --> $DIR/section-in-loop.rs:15:9
+  --> $DIR/section-in-loop.rs:13:9
    |
-15 | /         section!("section", {
-16 | |             assert!(true);
-17 | |         });
-   | |__________^
+13 |         section!(cx, "section", {});
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: section cannot be described at here
-  --> $DIR/section-in-loop.rs:24:9
+  --> $DIR/section-in-loop.rs:20:9
    |
-24 | /         section!("section", {
-25 | |             assert!(true);
-26 | |         });
-   | |__________^
+20 |         section!(cx, "section", {});
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^

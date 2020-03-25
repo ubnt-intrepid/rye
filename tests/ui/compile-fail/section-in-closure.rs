@@ -1,10 +1,8 @@
 fn main() {}
 
 #[rye::test]
-fn section_in_closure() {
+fn section_in_closure(cx: &mut rye::Context<'_>) {
     std::convert::identity(|| {
-        section!("section", {
-            assert!(true);
-        });
+        section!(cx, "section", {});
     });
 }

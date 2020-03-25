@@ -5,16 +5,13 @@ const attributes: &dyn path::to::rye::_internal::TestCase = {
     use path::to::rye::_internal as __rye;
 
     #[allow(missing_docs)]
-    fn attributes(__ctx: &mut __rye::Context<'_>) {
-        #[allow(unused_imports)]
-        use __rye::prelude::*;
-
+    fn attributes(ctx: &mut Context<'_>) {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
         assert!(vec.capacity() >= 5);
 
-        __rye::enter_section!(
-            __ctx,
+        __rye::section!(
+            ctx,
             0u64,
             "with unused variable",
             #[allow(unused_variables)]

@@ -4,13 +4,10 @@ const return_result: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    fn return_result(__ctx: &mut __rye::Context<'_>) -> std::io::Result<()>
+    fn return_result(_: &mut Context<'_>) -> std::io::Result<()>
     where
         std::io::Result<()>: __rye::Termination
     {
-        #[allow(unused_imports)]
-        use __rye::prelude::*;
-
         Ok(())
     }
 

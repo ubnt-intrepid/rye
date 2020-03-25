@@ -144,6 +144,7 @@ mod termination;
 mod test;
 
 pub use crate::{
+    context::Context,
     executor::TestExecutor,
     termination::Termination,
     test::{TestCase, TestDesc},
@@ -159,9 +160,12 @@ pub mod _internal {
     pub use crate::{
         __cfg_frameworks as cfg_frameworks, //
         __cfg_harness as cfg_harness,
-        __enter_section as enter_section,
+        __fail as fail,
         __location as location,
         __register_test_case as register_test_case,
+        __require as require,
+        __section as section,
+        __skip as skip,
         __test_fn as test_fn,
         __test_name as test_name,
         context::{Context, Section},
@@ -171,14 +175,6 @@ pub mod _internal {
     };
     pub use paste;
     pub use std::{boxed::Box, concat, module_path, result::Result, stringify};
-
-    pub mod prelude {
-        pub use crate::{
-            __fail as fail, //
-            __require as require,
-            __skip as skip,
-        };
-    }
 
     #[cfg(feature = "harness")]
     pub use linkme;

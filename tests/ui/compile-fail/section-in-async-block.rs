@@ -1,10 +1,8 @@
 fn main() {}
 
 #[rye::test]
-fn section_in_async_block() {
+fn section_in_async_block(cx: &mut rye::Context<'_>) {
     let _ = std::convert::identity(async {
-        section!("section", {
-            assert!(true);
-        });
+        section!(cx, "section", {});
     });
 }

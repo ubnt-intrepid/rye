@@ -4,10 +4,7 @@ const ignore_inner_items: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    fn ignore_inner_items(__ctx: &mut __rye::Context<'_>) {
-        #[allow(unused_imports)]
-        use __rye::prelude::*;
-
+    fn ignore_inner_items(_: &mut Context<'_>) {
         fn inner() {
             section!("section1", {
                 assert!(1 + 1 == 2);

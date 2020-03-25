@@ -1,7 +1,5 @@
 error: section cannot be described at here
  --> $DIR/section-in-closure.rs:6:9
   |
-6 | /         section!("section", {
-7 | |             assert!(true);
-8 | |         });
-  | |__________^
+6 |         section!(cx, "section", {});
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^

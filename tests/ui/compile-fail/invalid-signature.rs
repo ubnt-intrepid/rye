@@ -1,7 +1,7 @@
 fn main() {}
 
 #[rye::test]
-fn has_input(x: u32) {}
+fn has_type_param<T>() {}
 
 #[rye::test]
-fn has_generics<T>() {}
+fn has_const_param<const N: usize>() {}

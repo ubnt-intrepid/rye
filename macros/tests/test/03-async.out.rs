@@ -4,15 +4,12 @@ const case_async: &dyn ::rye::_internal::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_internal as __rye;
 
-    async fn case_async(__ctx: &mut __rye::Context<'_>) {
-        #[allow(unused_imports)]
-        use __rye::prelude::*;
-
+    async fn case_async(ctx: &mut Context<'_>) {
         let mut vec = vec![0usize; 5];
         assert_eq!(vec.len(), 5);
         assert!(vec.capacity() >= 5);
 
-        __rye::enter_section!(__ctx, 0u64, "resizing bigger changes size and capacity", {
+        __rye::section!(ctx, 0u64, "resizing bigger changes size and capacity", {
             vec.resize(10, 0);
             assert_eq!(vec.len(), 10);
             assert!(vec.capacity() >= 5);

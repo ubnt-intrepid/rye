@@ -128,7 +128,7 @@ pub struct Section {
 
 #[doc(hidden)] // private API.
 #[macro_export]
-macro_rules! __enter_section {
+macro_rules! __section {
     ( $ctx:ident, $id:expr, $name:expr, $(#[$attr:meta])* $block:block ) => {
         $(#[$attr])*
         {

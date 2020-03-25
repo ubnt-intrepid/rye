@@ -220,8 +220,8 @@ mod tests {
     fn no_section() {
         #[crate::test]
         #[rye(crate = crate)]
-        fn test_case() {
-            append_history(__ctx, "test");
+        fn test_case(ctx: &mut Context<'_>) {
+            append_history(ctx, "test");
         }
 
         let history = run_test(test_case);
@@ -232,14 +232,14 @@ mod tests {
     fn one_section() {
         #[crate::test]
         #[rye(crate = crate)]
-        fn test_case() {
-            append_history(__ctx, "setup");
+        fn test_case(ctx: &mut Context<'_>) {
+            append_history(ctx, "setup");
 
-            section!("section1", {
-                append_history(__ctx, "section1");
+            section!(ctx, "section1", {
+                append_history(ctx, "section1");
             });
 
-            append_history(__ctx, "teardown");
+            append_history(ctx, "teardown");
         }
 
         let history = run_test(test_case);
@@ -257,18 +257,18 @@ mod tests {
     fn multi_section() {
         #[crate::test]
         #[rye(crate = crate)]
-        fn test_case() {
-            append_history(__ctx, "setup");
+        fn test_case(ctx: &mut Context<'_>) {
+            append_history(ctx, "setup");
 
-            section!("section1", {
-                append_history(__ctx, "section1");
+            section!(ctx, "section1", {
+                append_history(ctx, "section1");
             });
 
-            section!("section2", {
-                append_history(__ctx, "section2");
+            section!(ctx, "section2", {
+                append_history(ctx, "section2");
             });
 
-            append_history(__ctx, "teardown");
+            append_history(ctx, "teardown");
         }
 
         let history = run_test(test_case);
@@ -291,28 +291,28 @@ mod tests {
     fn nested_section() {
         #[crate::test]
         #[rye(crate = crate)]
-        fn test_case() {
-            append_history(__ctx, "setup");
+        fn test_case(ctx: &mut Context<'_>) {
+            append_history(ctx, "setup");
 
-            section!("section1", {
-                append_history(__ctx, "section1:setup");
+            section!(ctx, "section1", {
+                append_history(ctx, "section1:setup");
 
-                section!("section2", {
-                    append_history(__ctx, "section2");
+                section!(ctx, "section2", {
+                    append_history(ctx, "section2");
                 });
 
-                section!("section3", {
-                    append_history(__ctx, "section3");
+                section!(ctx, "section3", {
+                    append_history(ctx, "section3");
                 });
 
-                append_history(__ctx, "section1:teardown");
+                append_history(ctx, "section1:teardown");
             });
 
-            section!("section4", {
-                append_history(__ctx, "section4");
+            section!(ctx, "section4", {
+                append_history(ctx, "section4");
             });
 
-            append_history(__ctx, "teardown");
+            append_history(ctx, "teardown");
         }
 
         let history = run_test(test_case);
@@ -343,37 +343,37 @@ mod tests {
     fn smoke_async() {
         #[crate::test]
         #[rye(crate = crate)]
-        async fn test_case() {
+        async fn test_case(ctx: &mut Context<'_>) {
             use futures_test::future::FutureTestExt as _;
 
-            append_history(__ctx, "setup");
+            append_history(ctx, "setup");
             async {}.pending_once().await;
 
-            section!("section1", {
-                append_history(__ctx, "section1:setup");
+            section!(ctx, "section1", {
+                append_history(ctx, "section1:setup");
                 async {}.pending_once().await;
 
-                section!("section2", {
+                section!(ctx, "section2", {
                     async {}.pending_once().await;
-                    append_history(__ctx, "section2");
+                    append_history(ctx, "section2");
                 });
 
-                section!("section3", {
+                section!(ctx, "section3", {
                     async {}.pending_once().await;
-                    append_history(__ctx, "section3");
+                    append_history(ctx, "section3");
                 });
 
                 async {}.pending_once().await;
-                append_history(__ctx, "section1:teardown");
+                append_history(ctx, "section1:teardown");
             });
 
-            section!("section4", {
+            section!(ctx, "section4", {
                 async {}.pending_once().await;
-                append_history(__ctx, "section4");
+                append_history(ctx, "section4");
             });
 
             async {}.pending_once().await;
-            append_history(__ctx, "teardown");
+            append_history(ctx, "teardown");
         }
 
         let history = run_test(test_case);

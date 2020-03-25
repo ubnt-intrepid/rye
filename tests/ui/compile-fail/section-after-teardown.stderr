@@ -1,11 +1,11 @@
 error: section cannot be described after teardown
   --> $DIR/section-after-teardown.rs:14:5
    |
-14 |     section!("section3", {});
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |     section!(cx, "section3", {});
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: section cannot be described after teardown
   --> $DIR/section-after-teardown.rs:29:9
    |
-29 |         section!("section3", {});
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+29 |         section!(cx, "section3", {});
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,28 +1,22 @@
 fn main() {}
 
 #[rye::test]
-fn section_in_loop() {
+fn section_in_loop(cx: &mut rye::Context<'_>) {
     loop {
-        section!("section", {
-            assert!(true);
-        });
+        section!(cx, "section", {});
     }
 }
 
 #[rye::test]
-fn section_in_for_loop() {
+fn section_in_for_loop(cx: &mut rye::Context<'_>) {
     for _ in 0..10 {
-        section!("section", {
-            assert!(true);
-        });
+        section!(cx, "section", {});
     }
 }
 
 #[rye::test]
-fn section_in_while_loop() {
+fn section_in_while_loop(cx: &mut rye::Context<'_>) {
     while false {
-        section!("section", {
-            assert!(true);
-        });
+        section!(cx, "section", {});
     }
 }
