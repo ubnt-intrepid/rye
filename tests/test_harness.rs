@@ -4,13 +4,10 @@ use futures::{
     executor::{LocalPool, LocalSpawner},
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
-use rye::{
-    executor::{AsyncTestFn, BlockingTestFn, LocalAsyncTestFn, TestExecutor},
-    runner::TestRunner,
-};
+use rye::executor::{AsyncTestFn, BlockingTestFn, LocalAsyncTestFn, TestExecutor};
 
 fn main() -> anyhow::Result<()> {
-    let mut runner = TestRunner::new();
+    let mut runner = rye::TestRunner::new();
 
     let mut pool = LocalPool::new();
     let mut executor = DefaultTestExecutor {

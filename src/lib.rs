@@ -134,19 +134,15 @@ teardown
 #![forbid(clippy::unimplemented, clippy::todo)]
 
 pub mod executor;
-pub mod report;
-pub mod runner;
 
 mod context;
 mod location;
+mod report;
+mod runner;
 mod termination;
 mod test;
 
-pub use crate::{
-    context::Context,
-    termination::Termination,
-    test::{TestCase, TestDesc},
-};
+pub use crate::{context::Context, runner::TestRunner, termination::Termination};
 
 pub use rye_macros::test;
 
