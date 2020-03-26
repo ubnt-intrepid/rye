@@ -2,10 +2,10 @@
 
 use futures::{
     executor::{LocalPool, LocalSpawner},
-    future::{Future, RemoteHandle},
+    future::Future,
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
-use rye::{report::TestCaseSummary, runner::TestRunner, TestExecutor};
+use rye::{runner::TestRunner, TestExecutor};
 
 fn main() -> anyhow::Result<()> {
     let mut runner = TestRunner::new();
@@ -25,27 +25,25 @@ struct DefaultTestExecutor {
 }
 
 impl TestExecutor for DefaultTestExecutor {
-    type Handle = RemoteHandle<TestCaseSummary>;
-
-    fn spawn<Fut>(&mut self, fut: Fut) -> Self::Handle
+    fn spawn<Fut>(&mut self, fut: Fut)
     where
-        Fut: Future<Output = TestCaseSummary> + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
     {
-        self.spawner.spawn_with_handle(fut).unwrap()
+        self.spawner.spawn(fut).unwrap();
     }
 
-    fn spawn_local<Fut>(&mut self, fut: Fut) -> Self::Handle
+    fn spawn_local<Fut>(&mut self, fut: Fut)
     where
-        Fut: Future<Output = TestCaseSummary> + 'static,
+        Fut: Future<Output = ()> + 'static,
     {
-        self.spawner.spawn_local_with_handle(fut).unwrap()
+        self.spawner.spawn_local(fut).unwrap();
     }
 
-    fn spawn_blocking<F>(&mut self, f: F) -> Self::Handle
+    fn spawn_blocking<F>(&mut self, f: F)
     where
-        F: FnOnce() -> TestCaseSummary + Send + 'static,
+        F: FnOnce() + Send + 'static,
     {
-        self.spawner.spawn_with_handle(async move { f() }).unwrap()
+        self.spawner.spawn(async move { f() }).unwrap();
     }
 }
 

@@ -19,7 +19,8 @@ targets = [ "x86_64-unknown-linux-gnu" ]
 rye-macros = { version = "=0.1.0-dev", path = "./macros" }
 anyhow = "1"
 futures-core = "0.3"
-futures-util = { version = "0.3", default-features = false, features = [ "std" ] }
+futures-channel = "0.3"
+futures-util = { version = "0.3", default-features = false, features = [ "std", "channel" ] }
 getopts = "0.2"
 linkme = "0.2"
 paste = "0.1"
