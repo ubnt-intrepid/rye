@@ -73,7 +73,7 @@ pub(crate) fn test_harness(input: TokenStream) -> TokenStream {
         #[cfg(any(test, trybuild))]
         fn #main_id () -> Result<(), impl std::fmt::Debug> {
             use #crate_path::_internal::Termination;
-            let t = #test_runner(&#crate_path::_internal::TEST_CASES[..]);
+            let t = #test_runner();
             Termination::into_result(t)
         }
     }

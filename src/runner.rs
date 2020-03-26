@@ -3,7 +3,7 @@
 use crate::{
     executor::{TestExecutor, TestExecutorExt as _},
     report::{Outcome, Reporter, Summary, TestCaseSummary},
-    test::{TestCase, TestDesc},
+    test::{TestCase, TestDesc, TEST_CASES},
 };
 use getopts::Options;
 use std::{
@@ -313,11 +313,7 @@ impl TestRunner {
     }
 
     #[inline]
-    pub async fn run<'a, T: ?Sized>(
-        &'a mut self,
-        tests: &'a [&'a dyn TestCase],
-        runner: &'a mut T,
-    ) -> anyhow::Result<()>
+    pub async fn run<'a, T: ?Sized>(&'a mut self, executor: &'a mut T) -> anyhow::Result<()>
     where
         T: TestExecutor,
     {
@@ -330,7 +326,7 @@ impl TestRunner {
         let mut registered_tests = vec![];
         let mut filtered_out_tests = vec![];
         let mut unique_test_names = HashSet::new();
-        for test in tests {
+        for test in TEST_CASES {
             let desc = test.desc();
             let filtered_out = args.is_filtered_out(desc.name());
 
@@ -385,7 +381,7 @@ impl TestRunner {
         let mut handles = vec![];
         for test in registered_tests.drain(..) {
             let reporter = reporter.clone();
-            handles.push(runner.spawn_test(test, reporter));
+            handles.push(executor.spawn_test(test, reporter));
         }
         let results = futures_util::future::join_all(handles).await;
         for result in results {

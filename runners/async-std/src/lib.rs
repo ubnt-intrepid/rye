@@ -1,14 +1,13 @@
 use async_std::task;
 use futures::future::{Future, FutureExt as _, LocalBoxFuture};
-use rye::{report::TestCaseSummary, runner::TestRunner, TestCase, TestExecutor};
+use rye::{report::TestCaseSummary, runner::TestRunner, TestExecutor};
 
-pub fn runner(tests: &[&dyn TestCase]) {
+pub fn runner() {
     let mut runner = TestRunner::new();
 
     task::block_on(async {
         let mut executor = AsyncStdTestRunner { _p: () };
-
-        runner.run(tests, &mut executor).await.unwrap();
+        runner.run(&mut executor).await.unwrap();
     })
 }
 

@@ -167,12 +167,9 @@ pub mod _internal {
         context::{Context, Section},
         location::Location,
         termination::Termination,
-        test::{TestCase, TestDesc, TestFn, TestName, TestPlan},
+        test::{TestCase, TestDesc, TestFn, TestName, TestPlan, TEST_CASES},
     };
     pub use linkme;
     pub use paste;
     pub use std::{boxed::Box, concat, module_path, result::Result, stringify};
-
-    #[linkme::distributed_slice]
-    pub static TEST_CASES: [&'static dyn TestCase] = [..];
 }

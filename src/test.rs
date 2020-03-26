@@ -1,5 +1,10 @@
 use crate::{context::ContextPtr, location::Location};
 use futures_core::future::{BoxFuture, LocalBoxFuture};
+use linkme::distributed_slice;
+
+#[doc(hidden)] // private API.
+#[distributed_slice]
+pub static TEST_CASES: [&'static dyn TestCase] = [..];
 
 #[allow(missing_docs)]
 pub trait TestCase: Send + Sync {

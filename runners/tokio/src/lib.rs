@@ -3,14 +3,14 @@ use futures::{
     task::{self, Poll},
 };
 use pin_project_lite::pin_project;
-use rye::{report::TestCaseSummary, runner::TestRunner, TestCase, TestExecutor};
+use rye::{report::TestCaseSummary, runner::TestRunner, TestExecutor};
 use std::pin::Pin;
 use tokio::{
     runtime::{self, Handle},
     task::{JoinHandle as RawJoinHandle, LocalSet},
 };
 
-pub fn runner(tests: &[&dyn TestCase]) {
+pub fn runner() {
     let mut runner = TestRunner::new();
 
     let mut rt = runtime::Builder::new()
@@ -27,7 +27,7 @@ pub fn runner(tests: &[&dyn TestCase]) {
     };
 
     local_set
-        .block_on(&mut rt, runner.run(tests, &mut executor))
+        .block_on(&mut rt, runner.run(&mut executor))
         .unwrap();
 }
 

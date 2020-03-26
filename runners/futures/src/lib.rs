@@ -4,17 +4,15 @@ use futures::{
     future::{Future, FutureExt as _, RemoteHandle},
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
-use rye::{report::TestCaseSummary, runner::TestRunner, TestCase, TestExecutor};
+use rye::{report::TestCaseSummary, runner::TestRunner, TestExecutor};
 use std::{io, thread};
 
-pub fn runner(tests: &[&dyn TestCase]) {
+pub fn runner() {
     let mut runner = TestRunner::new();
 
     let mut local_pool = LocalPool::new();
     let mut executor = FuturesTestRunner::new(local_pool.spawner()).unwrap();
-    local_pool
-        .run_until(runner.run(tests, &mut executor))
-        .unwrap();
+    local_pool.run_until(runner.run(&mut executor)).unwrap();
 }
 
 struct FuturesTestRunner {
