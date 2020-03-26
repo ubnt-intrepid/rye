@@ -1,5 +1,3 @@
-#![cfg_attr(docs, feature(doc_cfg))]
-
 extern crate proc_macro;
 
 mod test;
@@ -14,7 +12,6 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// Generate the main function for running the test cases.
-#[cfg_attr(docs, doc(cfg(feature = "harness")))]
 #[proc_macro]
 pub fn test_harness(input: TokenStream) -> TokenStream {
     crate::test_harness::test_harness(input.into()).into()

@@ -15,18 +15,13 @@ all-features = true
 rustdoc-args = [ "--cfg", "docs" ]
 targets = [ "x86_64-unknown-linux-gnu" ]
 
-[features]
-default = [ "harness" ]
-harness = [ "linkme" ]
-frameworks = []
-
 [dependencies]
 rye-macros = { version = "=0.1.0-dev", path = "./macros" }
 anyhow = "1"
 futures-core = "0.3"
 futures-util = { version = "0.3", default-features = false, features = [ "std" ] }
 getopts = "0.2"
-linkme = { version = "0.2", optional = true }
+linkme = "0.2"
 paste = "0.1"
 pin-project = "0.4"
 termcolor = "1"
@@ -47,12 +42,6 @@ default-features = false
 name = "test_harness"
 path = "tests/test_harness.rs"
 harness = false
-required-features = [ "harness" ]
-
-[[test]]
-name = "test_frameworks"
-path = "tests/test_frameworks.rs"
-required-features = [ "frameworks" ]
 
 [workspace]
 members = [

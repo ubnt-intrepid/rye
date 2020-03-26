@@ -132,7 +132,6 @@ teardown
 #![doc(html_root_url = "https://docs.rs/rye/0.1.0-dev")]
 #![deny(missing_docs)]
 #![forbid(clippy::unimplemented, clippy::todo)]
-#![cfg_attr(docs, feature(doc_cfg))]
 
 pub mod report;
 pub mod runner;
@@ -152,15 +151,12 @@ pub use crate::{
 
 pub use rye_macros::test;
 
-#[cfg(feature = "harness")]
 pub use rye_macros::test_harness;
 
 #[doc(hidden)] // private API.
 pub mod _internal {
     pub use crate::{
-        __cfg_frameworks as cfg_frameworks, //
-        __cfg_harness as cfg_harness,
-        __fail as fail,
+        __fail as fail, //
         __location as location,
         __register_test_case as register_test_case,
         __require as require,
@@ -173,13 +169,10 @@ pub mod _internal {
         termination::Termination,
         test::{TestCase, TestDesc, TestFn, TestName, TestPlan},
     };
+    pub use linkme;
     pub use paste;
     pub use std::{boxed::Box, concat, module_path, result::Result, stringify};
 
-    #[cfg(feature = "harness")]
-    pub use linkme;
-
-    #[cfg(feature = "harness")]
     #[linkme::distributed_slice]
     pub static TEST_CASES: [&'static dyn TestCase] = [..];
 }

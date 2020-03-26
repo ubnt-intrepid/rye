@@ -55,12 +55,6 @@ jobs:
         command: test
         args: --workspace
 
-    - name: Run tests (with frameworks)
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: --no-default-features --features frameworks --test test_frameworks
-
     - name: Install grcov
       run: |
         curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -

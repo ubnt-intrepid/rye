@@ -130,44 +130,10 @@ macro_rules! __test_name {
 macro_rules! __register_test_case {
     ($target:ident) => {
         $crate::_internal::paste::item! {
-            $crate::_internal::cfg_harness! {
-                #[$crate::_internal::linkme::distributed_slice($crate::_internal::TEST_CASES)]
-                #[linkme(crate = $crate::_internal::linkme)]
-                #[allow(non_upper_case_globals)]
-                static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestCase = $target;
-            }
-            $crate::_internal::cfg_frameworks! {
-                #[test_case]
-                const [< __TEST_CASE_FRAMEWORKS__ $target >]: &dyn $crate::_internal::TestCase = $target;
-            }
+            #[$crate::_internal::linkme::distributed_slice($crate::_internal::TEST_CASES)]
+            #[linkme(crate = $crate::_internal::linkme)]
+            #[allow(non_upper_case_globals)]
+            static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestCase = $target;
         }
     };
-}
-
-#[doc(hidden)] // private API.
-#[cfg(not(feature = "harness"))]
-#[macro_export]
-macro_rules! __cfg_harness {
-    ($($item:item)*) => {};
-}
-
-#[doc(hidden)] // private API.
-#[cfg(feature = "harness")]
-#[macro_export]
-macro_rules! __cfg_harness {
-    ($($item:item)*) => ( $($item)* );
-}
-
-#[doc(hidden)] // private API.
-#[cfg(not(feature = "frameworks"))]
-#[macro_export]
-macro_rules! __cfg_frameworks {
-    ($($item:item)*) => {};
-}
-
-#[doc(hidden)] // private API.
-#[cfg(feature = "frameworks")]
-#[macro_export]
-macro_rules! __cfg_frameworks {
-    ($($item:item)*) => ( $($item)* );
 }
