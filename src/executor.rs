@@ -173,7 +173,7 @@ mod tests {
         report::Summary,
         test::{TestCase, TestDesc, TestFn},
     };
-    use futures_executor::block_on;
+    use futures::executor::block_on;
     use scoped_tls_async::{scoped_thread_local, ScopedKeyExt as _};
     use std::cell::RefCell;
 

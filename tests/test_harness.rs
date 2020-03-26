@@ -1,7 +1,53 @@
 #![allow(clippy::len_zero)]
 
 rye::test_harness! {
-    #![test_runner(rye_runner_futures::runner)]
+    #![test_runner(crate::runner)]
+}
+
+use futures::{
+    executor::{LocalPool, LocalSpawner},
+    future::{Future, RemoteHandle},
+    task::{LocalSpawnExt as _, SpawnExt as _},
+};
+use rye::{report::TestCaseSummary, runner::TestRunner, TestExecutor};
+
+fn runner() {
+    let mut runner = TestRunner::new();
+
+    let mut pool = LocalPool::new();
+    let mut executor = DefaultTestExecutor {
+        spawner: pool.spawner(),
+    };
+    pool.run_until(runner.run(&mut executor)).unwrap();
+}
+
+struct DefaultTestExecutor {
+    spawner: LocalSpawner,
+}
+
+impl TestExecutor for DefaultTestExecutor {
+    type Handle = RemoteHandle<TestCaseSummary>;
+
+    fn spawn<Fut>(&mut self, fut: Fut) -> Self::Handle
+    where
+        Fut: Future<Output = TestCaseSummary> + Send + 'static,
+    {
+        self.spawner.spawn_with_handle(fut).unwrap()
+    }
+
+    fn spawn_local<Fut>(&mut self, fut: Fut) -> Self::Handle
+    where
+        Fut: Future<Output = TestCaseSummary> + 'static,
+    {
+        self.spawner.spawn_local_with_handle(fut).unwrap()
+    }
+
+    fn spawn_blocking<F>(&mut self, f: F) -> Self::Handle
+    where
+        F: FnOnce() -> TestCaseSummary + Send + 'static,
+    {
+        self.spawner.spawn_with_handle(async move { f() }).unwrap()
+    }
 }
 
 #[rye::test]
