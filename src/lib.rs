@@ -151,8 +151,6 @@ pub use crate::{
 
 pub use rye_macros::test;
 
-pub use rye_macros::test_harness;
-
 #[doc(hidden)] // private API.
 pub mod _internal {
     pub use crate::{

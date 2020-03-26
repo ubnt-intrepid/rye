@@ -1,9 +1,5 @@
 #![allow(clippy::len_zero)]
 
-rye::test_harness! {
-    #![test_runner(crate::runner)]
-}
-
 use futures::{
     executor::{LocalPool, LocalSpawner},
     future::{Future, RemoteHandle},
@@ -11,14 +7,17 @@ use futures::{
 };
 use rye::{report::TestCaseSummary, runner::TestRunner, TestExecutor};
 
-fn runner() {
+fn main() -> anyhow::Result<()> {
     let mut runner = TestRunner::new();
 
     let mut pool = LocalPool::new();
     let mut executor = DefaultTestExecutor {
         spawner: pool.spawner(),
     };
-    pool.run_until(runner.run(&mut executor)).unwrap();
+
+    pool.run_until(runner.run(&mut executor))?;
+
+    Ok(())
 }
 
 struct DefaultTestExecutor {
