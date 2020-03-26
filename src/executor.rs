@@ -1,5 +1,7 @@
 //! Abstraction of test execution in the rye.
 
+#![allow(missing_docs)]
+
 use crate::{
     context::{Context, ContextPtr},
     report::{Outcome, Reporter, TestCaseSummary},
@@ -7,29 +9,26 @@ use crate::{
 };
 use futures_channel::oneshot;
 use futures_core::{
-    future::Future,
+    future::{BoxFuture, Future, LocalBoxFuture},
     task::{self, Poll},
 };
-use futures_util::future::{FutureExt as _, RemoteHandle};
-use pin_project::{pin_project, project};
+use pin_project::pin_project;
 use std::pin::Pin;
+
+#[cfg(test)]
+#[allow(dead_code)]
+struct _AssertObjectSafe(std::marker::PhantomData<Box<dyn TestExecutor>>);
 
 /// The executor of test cases.
 pub trait TestExecutor {
     /// Spawn a task to execute the specified test future.
-    fn spawn<Fut>(&mut self, fut: Fut)
-    where
-        Fut: Future<Output = ()> + Send + 'static;
+    fn spawn(&mut self, testfn: AsyncTestFn);
 
     /// Spawn a task to execute the specified test future onto the current thread.
-    fn spawn_local<Fut>(&mut self, fut: Fut)
-    where
-        Fut: Future<Output = ()> + 'static;
+    fn spawn_local(&mut self, testfn: LocalAsyncTestFn);
 
     /// Spawn a task to execute the specified test function that may block the running thread.
-    fn spawn_blocking<F>(&mut self, f: F)
-    where
-        F: FnOnce() + Send + 'static;
+    fn spawn_blocking(&mut self, testfn: BlockingTestFn);
 }
 
 impl<T: ?Sized> TestExecutor for &mut T
@@ -37,27 +36,18 @@ where
     T: TestExecutor,
 {
     #[inline]
-    fn spawn<Fut>(&mut self, fut: Fut)
-    where
-        Fut: Future<Output = ()> + Send + 'static,
-    {
-        (**self).spawn(fut)
+    fn spawn(&mut self, testfn: AsyncTestFn) {
+        (**self).spawn(testfn)
     }
 
     #[inline]
-    fn spawn_local<Fut>(&mut self, fut: Fut)
-    where
-        Fut: Future<Output = ()> + 'static,
-    {
-        (**self).spawn_local(fut)
+    fn spawn_local(&mut self, testfn: LocalAsyncTestFn) {
+        (**self).spawn_local(testfn)
     }
 
     #[inline]
-    fn spawn_blocking<F>(&mut self, f: F)
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        (**self).spawn_blocking(f)
+    fn spawn_blocking(&mut self, testfn: BlockingTestFn) {
+        (**self).spawn_blocking(testfn)
     }
 }
 
@@ -66,51 +56,25 @@ where
     T: TestExecutor,
 {
     #[inline]
-    fn spawn<Fut>(&mut self, fut: Fut)
-    where
-        Fut: Future<Output = ()> + Send + 'static,
-    {
-        (**self).spawn(fut)
+    fn spawn(&mut self, testfn: AsyncTestFn) {
+        (**self).spawn(testfn)
     }
 
     #[inline]
-    fn spawn_local<Fut>(&mut self, fut: Fut)
-    where
-        Fut: Future<Output = ()> + 'static,
-    {
-        (**self).spawn_local(fut)
+    fn spawn_local(&mut self, testfn: LocalAsyncTestFn) {
+        (**self).spawn_local(testfn)
     }
 
     #[inline]
-    fn spawn_blocking<F>(&mut self, f: F)
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        (**self).spawn_blocking(f)
-    }
-}
-
-#[pin_project]
-enum HandleKind {
-    Async(#[pin] RemoteHandle<TestCaseSummary>),
-    Blocking(#[pin] oneshot::Receiver<TestCaseSummary>),
-}
-
-impl HandleKind {
-    #[project]
-    fn poll_inner(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<TestCaseSummary> {
-        #[project]
-        match self.project() {
-            HandleKind::Async(handle) => handle.poll(cx),
-            HandleKind::Blocking(rx) => rx.poll(cx).map(|res| res.unwrap()),
-        }
+    fn spawn_blocking(&mut self, testfn: BlockingTestFn) {
+        (**self).spawn_blocking(testfn)
     }
 }
 
 #[pin_project]
 pub(crate) struct Handle {
     #[pin]
-    kind: HandleKind,
+    rx: oneshot::Receiver<TestCaseSummary>,
     desc: &'static TestDesc,
 }
 
@@ -119,7 +83,10 @@ impl Future for Handle {
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         let me = self.project();
-        me.kind.poll_inner(cx)
+        match futures_util::ready!(me.rx.poll(cx)) {
+            Ok(summary) => Poll::Ready(summary),
+            Err(..) => todo!("report cancellation"),
+        }
     }
 }
 
@@ -128,41 +95,72 @@ pub(crate) trait TestExecutorExt: TestExecutor {
     where
         R: Reporter + Send + 'static,
     {
-        let mut inner = TestInner {
+        let inner = TestInner {
             desc: test.desc(),
             plans: test.test_plans(),
             reporter: Box::new(reporter),
         };
 
-        let kind = match test.test_fn() {
+        let (tx, rx) = oneshot::channel();
+        match test.test_fn() {
             TestFn::Async(f) => {
-                let (remote, handle) = async move { inner.run_async(f).await }.remote_handle();
-                self.spawn(remote);
-                HandleKind::Async(handle)
+                self.spawn(AsyncTestFn { inner, f, tx });
             }
             TestFn::AsyncLocal(f) => {
-                let (remote, handle) = async move { inner.run_async(f).await }.remote_handle();
-                self.spawn_local(remote);
-                HandleKind::Async(handle)
+                self.spawn_local(LocalAsyncTestFn { inner, f, tx });
             }
             TestFn::Blocking(f) => {
-                let (tx, rx) = oneshot::channel();
-                self.spawn_blocking(move || {
-                    let summary = inner.run_blocking(f);
-                    let _ = tx.send(summary);
-                });
-                HandleKind::Blocking(rx)
+                self.spawn_blocking(BlockingTestFn { inner, f, tx });
             }
-        };
+        }
 
         Handle {
-            kind,
+            rx,
             desc: test.desc(),
         }
     }
 }
 
 impl<E: TestExecutor + ?Sized> TestExecutorExt for E {}
+
+pub struct AsyncTestFn {
+    inner: TestInner,
+    f: fn(ContextPtr) -> BoxFuture<'static, anyhow::Result<()>>,
+    tx: oneshot::Sender<TestCaseSummary>,
+}
+
+impl AsyncTestFn {
+    pub async fn run(mut self) {
+        let summary = self.inner.run_async(self.f).await;
+        let _ = self.tx.send(summary);
+    }
+}
+
+pub struct LocalAsyncTestFn {
+    inner: TestInner,
+    f: fn(ContextPtr) -> LocalBoxFuture<'static, anyhow::Result<()>>,
+    tx: oneshot::Sender<TestCaseSummary>,
+}
+
+impl LocalAsyncTestFn {
+    pub async fn run(mut self) {
+        let summary = self.inner.run_async(self.f).await;
+        let _ = self.tx.send(summary);
+    }
+}
+
+pub struct BlockingTestFn {
+    inner: TestInner,
+    f: fn(ContextPtr) -> anyhow::Result<()>,
+    tx: oneshot::Sender<TestCaseSummary>,
+}
+
+impl BlockingTestFn {
+    pub fn run(mut self) {
+        let summary = self.inner.run_blocking(self.f);
+        let _ = self.tx.send(summary);
+    }
+}
 
 struct TestInner {
     desc: &'static TestDesc,

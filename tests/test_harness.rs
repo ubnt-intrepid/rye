@@ -2,10 +2,12 @@
 
 use futures::{
     executor::{LocalPool, LocalSpawner},
-    future::Future,
     task::{LocalSpawnExt as _, SpawnExt as _},
 };
-use rye::{runner::TestRunner, TestExecutor};
+use rye::{
+    executor::{AsyncTestFn, BlockingTestFn, LocalAsyncTestFn, TestExecutor},
+    runner::TestRunner,
+};
 
 fn main() -> anyhow::Result<()> {
     let mut runner = TestRunner::new();
@@ -25,25 +27,20 @@ struct DefaultTestExecutor {
 }
 
 impl TestExecutor for DefaultTestExecutor {
-    fn spawn<Fut>(&mut self, fut: Fut)
-    where
-        Fut: Future<Output = ()> + Send + 'static,
-    {
-        self.spawner.spawn(fut).unwrap();
+    fn spawn(&mut self, testfn: AsyncTestFn) {
+        self.spawner
+            .spawn(async move { testfn.run().await })
+            .unwrap();
     }
 
-    fn spawn_local<Fut>(&mut self, fut: Fut)
-    where
-        Fut: Future<Output = ()> + 'static,
-    {
-        self.spawner.spawn_local(fut).unwrap();
+    fn spawn_local(&mut self, testfn: LocalAsyncTestFn) {
+        self.spawner
+            .spawn_local(async move { testfn.run().await })
+            .unwrap();
     }
 
-    fn spawn_blocking<F>(&mut self, f: F)
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        self.spawner.spawn(async move { f() }).unwrap();
+    fn spawn_blocking(&mut self, testfn: BlockingTestFn) {
+        self.spawner.spawn(async move { testfn.run() }).unwrap();
     }
 }
 

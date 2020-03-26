@@ -133,18 +133,17 @@ teardown
 #![deny(missing_docs)]
 #![forbid(clippy::unimplemented, clippy::todo)]
 
+pub mod executor;
 pub mod report;
 pub mod runner;
 
 mod context;
-mod executor;
 mod location;
 mod termination;
 mod test;
 
 pub use crate::{
     context::Context,
-    executor::TestExecutor,
     termination::Termination,
     test::{TestCase, TestDesc},
 };
