@@ -138,11 +138,11 @@ pub mod executor;
 mod context;
 mod location;
 mod report;
-mod runner;
+mod session;
 mod termination;
 mod test;
 
-pub use crate::{context::Context, runner::TestRunner, termination::Termination};
+pub use crate::{context::Context, session::Session, termination::Termination};
 pub use rye_macros::{test, test_main};
 
 /// Generate test harness.
@@ -152,8 +152,8 @@ macro_rules! test_harness {
         #[$crate::test_main]
         #[rye(crate = $crate)]
         $( #[rye(block_on = $block_on)] )?
-        async fn main(runner: &mut $crate::TestRunner<'_>) -> impl $crate::Termination {
-            runner.run().await
+        async fn main(sess: &mut $crate::Session<'_>) -> impl $crate::Termination {
+            sess.run().await
         }
     };
 }
@@ -184,7 +184,7 @@ pub mod _test_reexports {
 pub mod _test_main_reexports {
     pub use crate::{
         executor::block_on as default_block_on, //
-        runner::TestRunner,
+        session::SessionData,
         termination::exit,
     };
 }

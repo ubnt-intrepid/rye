@@ -299,26 +299,39 @@ impl Reporter for ConsoleReporter {
     }
 }
 
-pub struct TestRunner<'a> {
+pub struct SessionData {
     parser: Parser,
-    executor: &'a mut dyn TestExecutor,
 }
 
-impl<'a> TestRunner<'a> {
+impl SessionData {
     #[allow(clippy::new_without_default)]
     #[inline]
-    pub fn new(executor: &'a mut dyn TestExecutor) -> Self {
+    pub fn new() -> Self {
         Self {
             parser: Parser::new(std::env::args()),
-            executor,
         }
     }
 
     #[inline]
+    pub fn session<'a>(&'a mut self, executor: &'a mut dyn TestExecutor) -> Session<'a> {
+        Session {
+            data: self,
+            executor,
+        }
+    }
+}
+
+pub struct Session<'a> {
+    data: &'a mut SessionData,
+    executor: &'a mut dyn TestExecutor,
+}
+
+impl Session<'_> {
+    #[inline]
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        let args = self.parser.parse()?;
+        let args = self.data.parser.parse()?;
         if args.show_help {
-            self.parser.print_usage();
+            self.data.parser.print_usage();
             return Ok(());
         }
 

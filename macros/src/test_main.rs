@@ -94,8 +94,8 @@ pub(crate) fn test_main(_args: TokenStream, item: TokenStream) -> TokenStream {
 
             __rye::exit(#block_on(|mut exec| {
                 async move {
-                    let mut runner = __rye::TestRunner::new(&mut *exec);
-                    #ident(&mut runner).await
+                    let mut data = __rye::SessionData::new();
+                    #ident(&mut data.session(&mut *exec)).await
                 }
             }));
         }
