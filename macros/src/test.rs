@@ -168,6 +168,7 @@ fn expand_builtins(item: &mut ItemFn) -> Vec<Section> {
         next_section_id: 0,
         parent: None,
         forbidden_sections: false,
+        forbidden_builtins: false,
         block_state: BlockState::Setup,
     };
     expand.visit_block_mut(&mut *item.block);
@@ -179,6 +180,7 @@ struct ExpandBuiltins {
     next_section_id: SectionId,
     parent: Option<SectionId>,
     forbidden_sections: bool,
+    forbidden_builtins: bool,
     block_state: BlockState,
 }
 
@@ -275,6 +277,16 @@ impl ExpandBuiltins {
         res
     }
 
+    fn forbid_builtins<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let prev = mem::replace(&mut self.forbidden_builtins, true);
+        let res = f(self);
+        self.forbidden_builtins = prev;
+        res
+    }
+
     fn with_block_state<F, R>(&mut self, state: BlockState, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
@@ -312,14 +324,20 @@ impl VisitMut for ExpandBuiltins {
                 || path.is_ident("skip")
                 || path.is_ident("fail")
             => {
-                // FIXME: validate whether the call position is valid.
-                path.segments.insert(
-                    0,
-                    syn::PathSegment {
-                        ident: Ident::new("__rye", Span::call_site()),
-                        arguments: syn::PathArguments::None,
-                    },
-                );
+                if self.forbidden_builtins {
+                    let err = Error::new_spanned(&stmt, "builtin macros cannot be used inside of closure or async block");
+                    let err = err.to_compile_error();
+                    *stmt = syn::parse_quote!(#err);
+                } else {
+                    // TODO: expand builtin macros if desired.
+                    path.segments.insert(
+                        0,
+                        syn::PathSegment {
+                            ident: Ident::new("__rye", Span::call_site()),
+                            arguments: syn::PathArguments::None,
+                        },
+                    );
+                }
             }
 
             Stmt::Item(..) => { /* ignore inner items */ }
@@ -333,6 +351,17 @@ impl VisitMut for ExpandBuiltins {
                     visit_mut::visit_stmt_mut(me, stmt);
                 });
             }
+        }
+    }
+
+    fn visit_expr_mut(&mut self, expr: &mut Expr) {
+        match expr {
+            Expr::Async(..) | Expr::Closure(..) => {
+                self.forbid_builtins(|me| {
+                    visit_mut::visit_expr_mut(me, expr);
+                });
+            }
+            expr => visit_mut::visit_expr_mut(self, expr),
         }
     }
 }

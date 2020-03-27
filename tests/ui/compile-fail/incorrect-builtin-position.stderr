@@ -1,0 +1,11 @@
+error: builtin macros cannot be used inside of closure or async block
+ --> $DIR/incorrect-builtin-position.rs:6:9
+  |
+6 |         skip!();
+  |         ^^^^^^^^
+
+error: builtin macros cannot be used inside of closure or async block
+  --> $DIR/incorrect-builtin-position.rs:13:9
+   |
+13 |         skip!();
+   |         ^^^^^^^^
