@@ -12,12 +12,10 @@ use futures_core::{
     future::{BoxFuture, Future, LocalBoxFuture},
     task::{self, Poll},
 };
+use futures_executor::{LocalPool, LocalSpawner};
+use futures_util::task::{LocalSpawnExt as _, SpawnExt as _};
 use pin_project::pin_project;
 use std::pin::Pin;
-
-#[cfg(test)]
-#[allow(dead_code)]
-struct _AssertObjectSafe(std::marker::PhantomData<Box<dyn TestExecutor>>);
 
 /// The executor of test cases.
 pub trait TestExecutor {
@@ -90,8 +88,8 @@ impl Future for Handle {
     }
 }
 
-pub(crate) trait TestExecutorExt: TestExecutor {
-    fn spawn_test<R>(&mut self, test: &dyn TestCase, reporter: R) -> Handle
+impl dyn TestExecutor + '_ {
+    pub(crate) fn spawn_test<R>(&mut self, test: &dyn TestCase, reporter: R) -> Handle
     where
         R: Reporter + Send + 'static,
     {
@@ -121,7 +119,36 @@ pub(crate) trait TestExecutorExt: TestExecutor {
     }
 }
 
-impl<E: TestExecutor + ?Sized> TestExecutorExt for E {}
+#[doc(hidden)] // TODO: dox
+pub fn block_on<Fut: Future>(f: impl FnOnce(Box<dyn TestExecutor>) -> Fut) -> Fut::Output {
+    let mut pool = LocalPool::new();
+    let exec = DefaultTestExecutor {
+        spawner: pool.spawner(),
+    };
+    pool.run_until(f(Box::new(exec)))
+}
+
+struct DefaultTestExecutor {
+    spawner: LocalSpawner,
+}
+
+impl TestExecutor for DefaultTestExecutor {
+    fn spawn(&mut self, testfn: AsyncTestFn) {
+        self.spawner
+            .spawn(async move { testfn.run().await })
+            .unwrap();
+    }
+
+    fn spawn_local(&mut self, testfn: LocalAsyncTestFn) {
+        self.spawner
+            .spawn_local(async move { testfn.run().await })
+            .unwrap();
+    }
+
+    fn spawn_blocking(&mut self, testfn: BlockingTestFn) {
+        self.spawner.spawn(async move { testfn.run() }).unwrap();
+    }
+}
 
 pub struct AsyncTestFn {
     inner: TestInner,

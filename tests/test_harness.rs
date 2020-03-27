@@ -1,45 +1,6 @@
 #![allow(clippy::len_zero)]
 
-use futures::{
-    executor::{LocalPool, LocalSpawner},
-    task::{LocalSpawnExt as _, SpawnExt as _},
-};
-use rye::executor::{AsyncTestFn, BlockingTestFn, LocalAsyncTestFn, TestExecutor};
-
-fn main() -> anyhow::Result<()> {
-    let mut runner = rye::TestRunner::new();
-
-    let mut pool = LocalPool::new();
-    let mut executor = DefaultTestExecutor {
-        spawner: pool.spawner(),
-    };
-
-    pool.run_until(runner.run(&mut executor))?;
-
-    Ok(())
-}
-
-struct DefaultTestExecutor {
-    spawner: LocalSpawner,
-}
-
-impl TestExecutor for DefaultTestExecutor {
-    fn spawn(&mut self, testfn: AsyncTestFn) {
-        self.spawner
-            .spawn(async move { testfn.run().await })
-            .unwrap();
-    }
-
-    fn spawn_local(&mut self, testfn: LocalAsyncTestFn) {
-        self.spawner
-            .spawn_local(async move { testfn.run().await })
-            .unwrap();
-    }
-
-    fn spawn_blocking(&mut self, testfn: BlockingTestFn) {
-        self.spawner.spawn(async move { testfn.run() }).unwrap();
-    }
-}
+rye::test_harness!();
 
 #[rye::test]
 fn case_sync(ctx: &mut rye::Context<'_>) {

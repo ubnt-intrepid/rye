@@ -41,3 +41,12 @@ mod sealed {
 
     impl<E> Sealed for Result<(), E> where E: Into<anyhow::Error> {}
 }
+
+#[allow(missing_docs)]
+pub fn exit(t: impl Termination) -> ! {
+    let code = match Termination::into_result(t) {
+        Ok(()) => 0,
+        Err(_) => 101,
+    };
+    std::process::exit(code);
+}

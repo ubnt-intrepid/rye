@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use crate::{
-    executor::{TestExecutor, TestExecutorExt as _},
+    executor::TestExecutor,
     report::{Outcome, Reporter, Summary, TestCaseSummary},
     test::{TestCase, TestDesc, TEST_CASES},
 };
@@ -299,24 +299,23 @@ impl Reporter for ConsoleReporter {
     }
 }
 
-pub struct TestRunner {
+pub struct TestRunner<'a> {
     parser: Parser,
+    executor: &'a mut dyn TestExecutor,
 }
 
-impl TestRunner {
+impl<'a> TestRunner<'a> {
     #[allow(clippy::new_without_default)]
     #[inline]
-    pub fn new() -> Self {
+    pub fn new(executor: &'a mut dyn TestExecutor) -> Self {
         Self {
             parser: Parser::new(std::env::args()),
+            executor,
         }
     }
 
     #[inline]
-    pub async fn run<'a, T: ?Sized>(&'a mut self, executor: &'a mut T) -> anyhow::Result<()>
-    where
-        T: TestExecutor,
-    {
+    pub async fn run(&mut self) -> anyhow::Result<()> {
         let args = self.parser.parse()?;
         if args.show_help {
             self.parser.print_usage();
@@ -381,7 +380,7 @@ impl TestRunner {
         let mut handles = vec![];
         for test in registered_tests.drain(..) {
             let reporter = reporter.clone();
-            handles.push(executor.spawn_test(test, reporter));
+            handles.push(self.executor.spawn_test(test, reporter));
         }
         let results = futures_util::future::join_all(handles).await;
         for result in results {

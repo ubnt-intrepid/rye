@@ -144,7 +144,20 @@ mod test;
 
 pub use crate::{context::Context, runner::TestRunner, termination::Termination};
 
-pub use rye_macros::test;
+pub use rye_macros::{test, test_main};
+
+/// Generate test harness.
+#[macro_export]
+macro_rules! test_harness {
+    ( $(block_on = $block_on:path)? ) => {
+        #[$crate::test_main]
+        #[rye(crate = $crate)]
+        $( #[rye(block_on = $block_on)] )?
+        async fn main(runner: &mut $crate::TestRunner<'_>) -> impl $crate::Termination {
+            runner.run().await
+        }
+    };
+}
 
 #[doc(hidden)] // private API.
 pub mod _internal {
@@ -165,4 +178,13 @@ pub mod _internal {
     pub use linkme;
     pub use paste;
     pub use std::{boxed::Box, concat, module_path, result::Result, stringify};
+}
+
+#[doc(hidden)] // private API.
+pub mod _test_main_reexports {
+    pub use crate::{
+        executor::block_on as default_block_on, //
+        runner::TestRunner,
+        termination::exit,
+    };
 }
