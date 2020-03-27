@@ -136,6 +136,7 @@ teardown
 pub mod executor;
 
 mod context;
+mod global;
 mod location;
 mod report;
 mod session;
@@ -161,11 +162,8 @@ macro_rules! test_harness {
 #[doc(hidden)] // private API.
 pub mod _test_reexports {
     pub use crate::{
-        __fail as fail, //
-        __location as location,
-        __require as require,
+        __location as location, //
         __section as section,
-        __skip as skip,
         __test_case as test_case,
         __test_fn as test_fn,
         __test_name as test_name,
@@ -184,6 +182,7 @@ pub mod _test_reexports {
 pub mod _test_main_reexports {
     pub use crate::{
         executor::block_on as default_block_on, //
+        global::install_globals,
         session::SessionData,
         termination::exit,
     };

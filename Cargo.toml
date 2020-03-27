@@ -24,6 +24,7 @@ futures-executor = "0.3"
 futures-util = { version = "0.3", default-features = false, features = [ "std", "channel" ] }
 getopts = "0.2"
 linkme = "0.2"
+maybe-unwind = "0.3"
 pin-project = "0.4"
 termcolor = "1"
 

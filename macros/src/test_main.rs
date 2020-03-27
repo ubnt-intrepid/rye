@@ -92,6 +92,8 @@ pub(crate) fn test_main(_args: TokenStream, item: TokenStream) -> TokenStream {
 
             #item
 
+            __rye::install_globals();
+
             __rye::exit(#block_on(|mut exec| {
                 async move {
                     let mut data = __rye::SessionData::new();

@@ -4,6 +4,7 @@ use crate::{
     location::Location,
     test::{TestCase, TestDesc},
 };
+use maybe_unwind::Unwind;
 
 #[derive(Debug)]
 pub(crate) enum Outcome {
@@ -17,6 +18,7 @@ pub(crate) enum Outcome {
         location: &'static Location,
         reason: String,
     },
+    Panicked(Unwind),
 }
 
 #[allow(missing_docs)]
@@ -53,7 +55,9 @@ impl Summary {
     pub(crate) fn append(&mut self, result: TestCaseSummary) {
         match result.outcome {
             Outcome::Passed => self.passed.push(result),
-            Outcome::Errored(..) | Outcome::Failed { .. } => self.failed.push(result),
+            Outcome::Errored(..) | Outcome::Failed { .. } | Outcome::Panicked(..) => {
+                self.failed.push(result)
+            }
             Outcome::Skipped { .. } => self.skipped.push(result),
         }
     }

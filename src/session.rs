@@ -215,7 +215,9 @@ impl ConsoleReporter {
     ) -> io::Result<()> {
         let status = match summary.outcome {
             Outcome::Passed => colored("ok").fg(Color::Green),
-            Outcome::Errored(..) | Outcome::Failed { .. } => colored("FAILED").fg(Color::Red),
+            Outcome::Errored(..) | Outcome::Failed { .. } | Outcome::Panicked(..) => {
+                colored("FAILED").fg(Color::Red)
+            }
             Outcome::Skipped { .. } => colored("skipped").fg(Color::Yellow),
         };
         write!(w, "test {} ... ", summary.desc.name(),)?;
@@ -239,6 +241,9 @@ impl ConsoleReporter {
                 match result.outcome {
                     Outcome::Errored(ref err) => {
                         writeln!(w, "{:?}", err)?;
+                    }
+                    Outcome::Panicked(ref unwind) => {
+                        writeln!(w, "{:#}", unwind)?;
                     }
                     Outcome::Failed {
                         ref location,

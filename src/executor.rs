@@ -14,8 +14,9 @@ use futures_core::{
 };
 use futures_executor::{LocalPool, LocalSpawner};
 use futures_util::task::{LocalSpawnExt as _, SpawnExt as _};
+use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _};
 use pin_project::pin_project;
-use std::pin::Pin;
+use std::{panic::AssertUnwindSafe, pin::Pin};
 
 /// The executor of test cases.
 pub trait TestExecutor {
@@ -205,7 +206,9 @@ impl TestInner {
         let mut outcome = Outcome::Passed;
         for plan in self.plans {
             let mut ctx = Context::new(&mut *self.reporter, plan);
-            let result = f(unsafe { ctx.transmute() }).await;
+            let result = AssertUnwindSafe(f(unsafe { ctx.transmute() }))
+                .maybe_unwind()
+                .await;
             if let Some(o) = ctx.check_outcome(result) {
                 outcome = o;
                 break;
@@ -221,7 +224,7 @@ impl TestInner {
         let mut outcome = Outcome::Passed;
         for plan in self.plans {
             let mut ctx = Context::new(&mut *self.reporter, plan);
-            let result = f(unsafe { ctx.transmute() });
+            let result = maybe_unwind(AssertUnwindSafe(|| f(unsafe { ctx.transmute() })));
             if let Some(o) = ctx.check_outcome(result) {
                 outcome = o;
                 break;

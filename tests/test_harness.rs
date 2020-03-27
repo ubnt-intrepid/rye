@@ -2,6 +2,14 @@
 
 rye::test_harness!();
 
+macro_rules! require {
+    ($ctx:ident, $e:expr) => {{
+        if !($e) {
+            rye::fail!($ctx, concat!("assertion failed: ", stringify!($e)));
+        }
+    }};
+}
+
 #[rye::test]
 fn case_sync(ctx: &mut rye::Context<'_>) {
     let mut vec = vec![0usize; 5];
@@ -132,7 +140,7 @@ fn return_result(ctx: &mut rye::Context<'_>) -> anyhow::Result<()> {
 #[rye::test]
 fn expensive_test(ctx: &mut rye::Context<'_>) {
     if std::env::var("RUN_EXPENSIVE_TESTS").is_err() {
-        skip!(ctx, "set RUN_EXPENSIVE_TESTS=true to be enabled");
+        rye::skip!(ctx, "set RUN_EXPENSIVE_TESTS=true to be enabled");
     }
 
     // do expensive tests ...
@@ -141,7 +149,7 @@ fn expensive_test(ctx: &mut rye::Context<'_>) {
 #[rye::test]
 fn expensive_test_fallible(ctx: &mut rye::Context<'_>) -> anyhow::Result<()> {
     if std::env::var("RUN_EXPENSIVE_TESTS").is_err() {
-        skip!(ctx, "set RUN_EXPENSIVE_TESTS=true to be enabled");
+        rye::skip!(ctx, "set RUN_EXPENSIVE_TESTS=true to be enabled");
     }
 
     // do expensive tests ...

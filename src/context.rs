@@ -1,9 +1,9 @@
 use crate::{
     location::Location,
     report::{Outcome, Reporter},
-    termination::Termination,
     test::{SectionId, TestPlan},
 };
+use maybe_unwind::Unwind;
 use std::{fmt, marker::PhantomData, ptr::NonNull};
 
 #[doc(hidden)] // private API.
@@ -52,10 +52,20 @@ impl<'a> Context<'a> {
         self.current_section.map(|section| section.name)
     }
 
-    pub(crate) fn check_outcome(&mut self, result: anyhow::Result<()>) -> Option<Outcome> {
+    pub(crate) fn check_outcome(
+        &mut self,
+        result: Result<anyhow::Result<()>, Unwind>,
+    ) -> Option<Outcome> {
         match result {
-            Ok(()) => self.outcome.take(),
-            Err(err) => Some(Outcome::Errored(err)),
+            Ok(Ok(())) => {
+                debug_assert!(self.outcome.is_none());
+                None
+            }
+            Ok(Err(err)) => Some(Outcome::Errored(err)),
+            Err(unwind) => match self.outcome.take() {
+                outcome @ Some(..) => outcome,
+                None => Some(Outcome::Panicked(unwind)),
+            },
         }
     }
 
@@ -74,32 +84,31 @@ impl<'a> Context<'a> {
         self.current_section = enter.last_section;
     }
 
+    #[inline]
+    fn exit(&mut self) -> ! {
+        panic!("test function is explicitly terminated")
+    }
+
     #[doc(hidden)] // private API.
     #[inline(never)]
-    pub fn skip<T>(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) -> T
-    where
-        T: Termination,
-    {
+    pub fn skip(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) -> ! {
         debug_assert!(self.outcome.is_none());
         self.outcome.replace(Outcome::Skipped {
             location,
             reason: reason.to_string(),
         });
-        T::exit()
+        self.exit()
     }
 
     #[doc(hidden)] // private API.
     #[inline(never)]
-    pub fn fail<T>(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) -> T
-    where
-        T: Termination,
-    {
+    pub fn fail(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) -> ! {
         debug_assert!(self.outcome.is_none());
         self.outcome.replace(Outcome::Failed {
             location,
             reason: reason.to_string(),
         });
-        T::exit()
+        self.exit()
     }
 }
 
@@ -122,4 +131,34 @@ pub struct Section {
     pub id: SectionId,
     pub name: &'static str,
     pub location: Location,
+}
+
+/// Mark the current test case as skipped and then terminate its execution.
+///
+/// This macro can usually be used to disable some test cases that may not
+/// success depending on the runtime context, such as network access or a
+/// certain secret variables is not set.
+#[macro_export]
+macro_rules! skip {
+    ( $ctx:ident ) => {
+        $crate::skip!($ctx, "explicitly skipped");
+    };
+    ( $ctx:ident, $($arg:tt)+ ) => {{
+        use $crate::_test_reexports as __rye;
+        const LOCATION: __rye::Location = __rye::location!();
+        $ctx.skip(&LOCATION, __rye::format_args!($($arg)+))
+    }};
+}
+
+/// Mark the current test case as failed and then terminate its execution.
+#[macro_export]
+macro_rules! fail {
+    ($ctx:ident) => {
+        $crate::fail!($ctx:ident, "explicitly failed");
+    };
+    ($ctx:ident, $($arg:tt)+) => {{
+        use $crate::_test_reexports as __rye;
+        const LOCATION: __rye::Location = __rye::location!();
+        $ctx.fail(&LOCATION, __rye::format_args!($($arg)+))
+    }};
 }
