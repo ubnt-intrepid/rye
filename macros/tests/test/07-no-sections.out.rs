@@ -31,4 +31,7 @@ const no_sections: &dyn ::rye::_test_reexports::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_test_reexports::register_test_case!(no_sections);
+::rye::_test_reexports::test_case! {
+    #[allow(non_upper_case_globals)]
+    static __TEST_CASE_no_sections: &dyn ::rye::_test_reexports::TestCase = no_sections;
+}

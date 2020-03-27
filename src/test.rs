@@ -132,14 +132,11 @@ macro_rules! __test_fn {
 
 #[doc(hidden)] // private API.
 #[macro_export]
-macro_rules! __register_test_case {
-    ($target:ident) => {
-        $crate::_test_reexports::paste_item! {
-            #[$crate::_test_reexports::distributed_slice($crate::_test_reexports::TEST_CASES)]
-            #[linkme(crate = $crate::_test_reexports::linkme)]
-            #[allow(non_upper_case_globals)]
-            static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_test_reexports::TestCase = $target;
-        }
+macro_rules! __test_case {
+    ( $item:item ) => {
+        #[$crate::_test_reexports::distributed_slice($crate::_test_reexports::TEST_CASES)]
+        #[linkme(crate = $crate::_test_reexports::linkme)]
+        $item
     };
 }
 

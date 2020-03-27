@@ -376,6 +376,8 @@ impl ToTokens for Generated<'_> {
             (None, ..) => Ident::new("blocking", Span::call_site()),
         };
 
+        let test_case_id = quote::format_ident!("__TEST_CASE_{}", ident);
+
         tokens.append_all(vec![quote! {
             #[cfg(any(test, trybuild))]
             #[allow(non_upper_case_globals)]
@@ -404,7 +406,10 @@ impl ToTokens for Generated<'_> {
             };
 
             #[cfg(any(test, trybuild))]
-            #crate_path::_test_reexports::register_test_case!(#ident);
+            #crate_path::_test_reexports::test_case! {
+                #[allow(non_upper_case_globals)]
+                static #test_case_id: &dyn #crate_path::_test_reexports::TestCase = #ident;
+            }
         }]);
     }
 }

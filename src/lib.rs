@@ -163,10 +163,10 @@ pub mod _test_reexports {
     pub use crate::{
         __fail as fail, //
         __location as location,
-        __register_test_case as register_test_case,
         __require as require,
         __section as section,
         __skip as skip,
+        __test_case as test_case,
         __test_fn as test_fn,
         __test_name as test_name,
         context::{Context, Section},
@@ -175,7 +175,6 @@ pub mod _test_reexports {
         test::{TestCase, TestDesc, TestFn, TestName, TestPlan, TEST_CASES},
     };
     pub use linkme::{self, distributed_slice};
-    pub use paste::item as paste_item;
     pub use std::{
         boxed::Box, column, concat, file, format_args, line, module_path, result::Result, stringify,
     };

@@ -46,4 +46,7 @@ const attributes: &dyn path::to::rye::_test_reexports::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-path::to::rye::_test_reexports::register_test_case!(attributes);
+path::to::rye::_test_reexports::test_case! {
+    #[allow(non_upper_case_globals)]
+    static __TEST_CASE_attributes: &dyn path::to::rye::_test_reexports::TestCase = attributes;
+}

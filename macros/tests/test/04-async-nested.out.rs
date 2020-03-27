@@ -47,4 +47,7 @@ const case_async_nested: &dyn ::rye::_test_reexports::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_test_reexports::register_test_case!(case_async_nested);
+::rye::_test_reexports::test_case! {
+    #[allow(non_upper_case_globals)]
+    static __TEST_CASE_case_async_nested: &dyn ::rye::_test_reexports::TestCase = case_async_nested;
+}

@@ -37,4 +37,7 @@ const ignore_inner_items: &dyn ::rye::_test_reexports::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_test_reexports::register_test_case!(ignore_inner_items);
+::rye::_test_reexports::test_case! {
+    #[allow(non_upper_case_globals)]
+    static __TEST_CASE_ignore_inner_items: &dyn ::rye::_test_reexports::TestCase = ignore_inner_items;
+}
