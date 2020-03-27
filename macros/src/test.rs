@@ -7,7 +7,7 @@ use syn::{
     parse::{Error, Parse, ParseStream, Parser as _, Result},
     spanned::Spanned as _,
     visit_mut::{self, VisitMut},
-    Attribute, Block, Expr, Ident, Item, ItemFn, Macro, Path, Stmt, Token,
+    Attribute, Block, Expr, ExprMacro, Ident, Item, ItemFn, ItemMacro, Macro, Path, Stmt, Token,
 };
 
 macro_rules! try_quote {
@@ -168,6 +168,7 @@ fn expand_builtins(item: &mut ItemFn) -> Vec<Section> {
         next_section_id: 0,
         parent: None,
         forbidden_sections: false,
+        block_state: BlockState::Setup,
     };
     expand.visit_block_mut(&mut *item.block);
     expand.sections.into_iter().map(|(_k, v)| v).collect()
@@ -178,6 +179,13 @@ struct ExpandBuiltins {
     next_section_id: SectionId,
     parent: Option<SectionId>,
     forbidden_sections: bool,
+    block_state: BlockState,
+}
+
+enum BlockState {
+    Setup,
+    Sections,
+    Teardown,
 }
 
 impl ExpandBuiltins {
@@ -187,6 +195,18 @@ impl ExpandBuiltins {
                 mac,
                 "section cannot be described at here",
             ));
+        }
+
+        match self.block_state {
+            BlockState::Setup | BlockState::Sections => {
+                self.block_state = BlockState::Sections;
+            }
+            BlockState::Teardown => {
+                return Err(Error::new_spanned(
+                    mac,
+                    "section cannot be described after teardown",
+                ));
+            }
         }
 
         let (ctx, name, mut block) =
@@ -254,76 +274,64 @@ impl ExpandBuiltins {
         self.forbidden_sections = prev;
         res
     }
-}
 
-fn is_builtin_macro(path: &Path) -> bool {
-    match path.get_ident() {
-        Some(id) if id == "require" || id == "skip" || id == "fail" => true,
-        _ => false,
+    fn with_block_state<F, R>(&mut self, state: BlockState, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let prev = mem::replace(&mut self.block_state, state);
+        let res = f(self);
+        self.block_state = prev;
+        res
     }
 }
 
 impl VisitMut for ExpandBuiltins {
     fn visit_block_mut(&mut self, block: &mut Block) {
-        enum State {
-            Setup,
-            Sections,
-            Teardown,
-        }
+        self.with_block_state(BlockState::Setup, |me| {
+            visit_mut::visit_block_mut(me, block);
+        });
+    }
 
-        let mut state = State::Setup;
-        let err_section_after_teardown = |stmt: &Stmt| -> Stmt {
-            let err = Error::new_spanned(stmt, "section cannot be described after teardown")
-                .to_compile_error();
-            syn::parse_quote!(#err)
-        };
+    fn visit_stmt_mut(&mut self, stmt: &mut Stmt) {
+        match stmt {
+            #[rustfmt::skip]
+            | Stmt::Expr(Expr::Macro(ExprMacro { attrs, mac, .. }))
+            | Stmt::Semi(Expr::Macro(ExprMacro { attrs, mac, .. }), _)
+            | Stmt::Item(Item::Macro(ItemMacro { attrs, mac, .. }))
+                if mac.path.is_ident("section") =>
+            {
+                *stmt = self.expand_section(attrs, mac);
+            }
 
-        for stmt in &mut block.stmts {
-            match stmt {
-                Stmt::Expr(Expr::Macro(expr)) | Stmt::Semi(Expr::Macro(expr), _)
-                    if expr.mac.path.is_ident("section") =>
-                {
-                    *stmt = match state {
-                        State::Setup | State::Sections => {
-                            state = State::Sections;
-                            self.expand_section(&expr.attrs[..], &expr.mac)
-                        }
-                        State::Teardown => err_section_after_teardown(&stmt),
-                    };
+            #[rustfmt::skip]
+            | Stmt::Expr(Expr::Macro(ExprMacro { mac: Macro { path, .. }, .. }))
+            | Stmt::Semi(Expr::Macro(ExprMacro { mac: Macro { path, .. }, .. }), _)
+            | Stmt::Item(Item::Macro(ItemMacro { mac: Macro { path, .. }, ..}))
+                if path.is_ident("require")
+                || path.is_ident("skip")
+                || path.is_ident("fail")
+            => {
+                // FIXME: validate whether the call position is valid.
+                path.segments.insert(
+                    0,
+                    syn::PathSegment {
+                        ident: Ident::new("__rye", Span::call_site()),
+                        arguments: syn::PathArguments::None,
+                    },
+                );
+            }
+
+            Stmt::Item(..) => { /* ignore inner items */ }
+
+            stmt => {
+                match self.block_state {
+                    BlockState::Setup | BlockState::Teardown => (),
+                    BlockState::Sections => self.block_state = BlockState::Teardown,
                 }
-                Stmt::Item(Item::Macro(item)) if item.mac.path.is_ident("section") => {
-                    *stmt = match state {
-                        State::Setup | State::Sections => {
-                            state = State::Sections;
-                            self.expand_section(&item.attrs[..], &item.mac)
-                        }
-                        State::Teardown => err_section_after_teardown(&stmt),
-                    };
-                }
-                Stmt::Expr(Expr::Macro(expr)) | Stmt::Semi(Expr::Macro(expr), _)
-                    if is_builtin_macro(&expr.mac.path) =>
-                {
-                    // FIXME: validate whether the call position is valid.
-                    expr.mac.path.segments.insert(
-                        0,
-                        syn::PathSegment {
-                            ident: Ident::new("__rye", Span::call_site()),
-                            arguments: syn::PathArguments::None,
-                        },
-                    );
-                }
-                Stmt::Item(..) => {
-                    // ignore inner items
-                }
-                _ => {
-                    match state {
-                        State::Setup | State::Teardown => (),
-                        State::Sections => state = State::Teardown,
-                    }
-                    self.forbid_sections(|me| {
-                        visit_mut::visit_stmt_mut(me, stmt);
-                    });
-                }
+                self.forbid_sections(|me| {
+                    visit_mut::visit_stmt_mut(me, stmt);
+                });
             }
         }
     }
