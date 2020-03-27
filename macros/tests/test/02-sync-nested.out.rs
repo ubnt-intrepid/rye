@@ -1,8 +1,8 @@
 #[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const case_sync_nested: &dyn ::rye::_internal::TestCase = {
+const case_sync_nested: &dyn ::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
-    use ::rye::_internal as __rye;
+    use ::rye::_test_reexports as __rye;
 
     fn case_sync_nested(ctx: &mut Context<'_>) {
         let mut vec = vec![0usize; 5];
@@ -47,4 +47,4 @@ const case_sync_nested: &dyn ::rye::_internal::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_internal::register_test_case!(case_sync_nested);
+::rye::_test_reexports::register_test_case!(case_sync_nested);

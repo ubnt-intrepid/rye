@@ -1,12 +1,12 @@
+#![allow(missing_docs)]
+
 use crate::{context::ContextPtr, location::Location};
 use futures_core::future::{BoxFuture, LocalBoxFuture};
 use linkme::distributed_slice;
 
-#[doc(hidden)] // private API.
 #[distributed_slice]
 pub static TEST_CASES: [&'static dyn TestCase] = [..];
 
-#[allow(missing_docs)]
 pub trait TestCase: Send + Sync {
     fn desc(&self) -> &'static TestDesc;
 
@@ -56,7 +56,6 @@ impl TestDesc {
     }
 }
 
-#[doc(hidden)] // private API.
 #[derive(Debug)]
 pub struct TestPlan {
     pub target: Option<SectionId>,
@@ -71,7 +70,6 @@ impl TestPlan {
 
 pub(crate) type SectionId = u64;
 
-#[allow(missing_docs)]
 #[derive(Debug)]
 pub enum TestFn {
     Async(fn(ContextPtr) -> BoxFuture<'static, anyhow::Result<()>>),
@@ -79,32 +77,6 @@ pub enum TestFn {
     Blocking(fn(ContextPtr) -> anyhow::Result<()>),
 }
 
-#[doc(hidden)] // private API.
-#[macro_export]
-macro_rules! __test_fn {
-    (@async $path:path) => {
-        $crate::_internal::TestFn::Async(|mut ctx_ptr| {
-            use $crate::_internal::{Box, Termination};
-            Box::pin(async move { Termination::into_result($path(ctx_ptr.as_mut()).await) })
-        })
-    };
-
-    (@async_local $path:path) => {
-        $crate::_internal::TestFn::AsyncLocal(|mut ctx_ptr| {
-            use $crate::_internal::{Box, Termination};
-            Box::pin(async move { Termination::into_result($path(ctx_ptr.as_mut()).await) })
-        })
-    };
-
-    (@blocking $path:path) => {
-        $crate::_internal::TestFn::Blocking(|mut ctx_ptr| {
-            use $crate::_internal::Termination;
-            Termination::into_result($path(ctx_ptr.as_mut()))
-        })
-    };
-}
-
-#[doc(hidden)] // private API
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct TestName {
     pub raw: &'static str,
@@ -116,29 +88,132 @@ impl AsRef<str> for TestName {
     }
 }
 
+// ==== private macros ====
+
 #[doc(hidden)] // private API.
 #[macro_export]
 macro_rules! __test_name {
-    ($name:ident) => {
-        $crate::_internal::TestName {
-            raw: $crate::_internal::concat!(
-                $crate::_internal::module_path!(),
-                "::",
-                $crate::_internal::stringify!($name),
-            ),
+    ($name:ident) => {{
+        use $crate::_test_reexports as __rye;
+        __rye::TestName {
+            raw: __rye::concat!(__rye::module_path!(), "::", __rye::stringify!($name)),
         }
-    };
+    }};
+}
+
+#[doc(hidden)] // private API.
+#[macro_export]
+macro_rules! __test_fn {
+    (@async $path:path) => {{
+        use $crate::_test_reexports as __rye;
+        __rye::TestFn::Async(|mut ctx_ptr| {
+            __rye::Box::pin(async move {
+                __rye::Termination::into_result($path(ctx_ptr.as_mut()).await)
+            })
+        })
+    }};
+
+    (@async_local $path:path) => {{
+        use $crate::_test_reexports as __rye;
+        __rye::TestFn::AsyncLocal(|mut ctx_ptr| {
+            __rye::Box::pin(async move {
+                __rye::Termination::into_result($path(ctx_ptr.as_mut()).await)
+            })
+        })
+    }};
+
+    (@blocking $path:path) => {{
+        use $crate::_test_reexports as __rye;
+        __rye::TestFn::Blocking(|mut ctx_ptr| {
+            __rye::Termination::into_result($path(ctx_ptr.as_mut()))
+        })
+    }};
 }
 
 #[doc(hidden)] // private API.
 #[macro_export]
 macro_rules! __register_test_case {
     ($target:ident) => {
-        $crate::_internal::paste::item! {
-            #[$crate::_internal::linkme::distributed_slice($crate::_internal::TEST_CASES)]
-            #[linkme(crate = $crate::_internal::linkme)]
+        $crate::_test_reexports::paste_item! {
+            #[$crate::_test_reexports::distributed_slice($crate::_test_reexports::TEST_CASES)]
+            #[linkme(crate = $crate::_test_reexports::linkme)]
             #[allow(non_upper_case_globals)]
-            static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_internal::TestCase = $target;
+            static [< __TEST_CASE_HARNESS__ $target >]: &dyn $crate::_test_reexports::TestCase = $target;
         }
     };
+}
+
+#[doc(hidden)] // private API.
+#[macro_export]
+macro_rules! __location {
+    () => {{
+        use $crate::_test_reexports as __rye;
+        __rye::Location {
+            file: __rye::file!(),
+            line: __rye::line!(),
+            column: __rye::column!(),
+        }
+    }};
+}
+
+#[doc(hidden)] // private API.
+#[macro_export]
+macro_rules! __section {
+    ( $ctx:ident, $id:expr, $name:expr, $(#[$attr:meta])* $block:block ) => {
+        $(#[$attr])*
+        {
+            use $crate::_test_reexports as __rye;
+
+            const SECTION: __rye::Section = __rye::Section {
+                id: $id,
+                name: $name,
+                location: __rye::location!(),
+            };
+            let section = $ctx.enter_section(&SECTION);
+            if section.enabled() {
+                $block
+            }
+            $ctx.leave_section(section);
+        }
+    };
+}
+
+#[doc(hidden)] // private API.
+#[macro_export]
+macro_rules! __skip {
+    ( $ctx:ident ) => {
+        $crate::__skip!($ctx, "explicitly skipped");
+    };
+    ( $ctx:ident, $($arg:tt)+ ) => {{
+        use $crate::_test_reexports as __rye;
+        const LOCATION: __rye::Location = __rye::location!();
+        return $ctx.skip(&LOCATION, __rye::format_args!($($arg)+));
+    }};
+}
+
+#[doc(hidden)] // private API.
+#[macro_export]
+macro_rules! __fail {
+    ($ctx:ident) => {
+        $crate::__fail!($ctx:ident, "explicitly failed");
+    };
+    ($ctx:ident, $($arg:tt)+) => {{
+        use $crate::_test_reexports as __rye;
+        const LOCATION: __rye::Location = __rye::location!();
+        return $ctx.fail(&LOCATION, __rye::format_args!($($arg)+));
+    }};
+}
+
+#[doc(hidden)] // private API.
+#[macro_export]
+macro_rules! __require {
+    ($ctx:ident, $e:expr) => {{
+        use $crate::_test_reexports as __rye;
+        if !($e) {
+            $crate::__fail!(
+                $ctx,
+                __rye::concat!("assertion failed: ", __rye::stringify!($e))
+            );
+        }
+    }};
 }

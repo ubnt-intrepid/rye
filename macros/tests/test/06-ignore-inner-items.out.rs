@@ -1,8 +1,8 @@
 #[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const ignore_inner_items: &dyn ::rye::_internal::TestCase = {
+const ignore_inner_items: &dyn ::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
-    use ::rye::_internal as __rye;
+    use ::rye::_test_reexports as __rye;
 
     fn ignore_inner_items(_: &mut Context<'_>) {
         fn inner() {
@@ -37,4 +37,4 @@ const ignore_inner_items: &dyn ::rye::_internal::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_internal::register_test_case!(ignore_inner_items);
+::rye::_test_reexports::register_test_case!(ignore_inner_items);

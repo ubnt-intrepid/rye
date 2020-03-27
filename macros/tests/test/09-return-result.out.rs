@@ -1,8 +1,8 @@
 #[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const return_result: &dyn ::rye::_internal::TestCase = {
+const return_result: &dyn ::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
-    use ::rye::_internal as __rye;
+    use ::rye::_test_reexports as __rye;
 
     fn return_result(_: &mut Context<'_>) -> std::io::Result<()>
     where
@@ -35,4 +35,4 @@ const return_result: &dyn ::rye::_internal::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_internal::register_test_case!(return_result);
+::rye::_test_reexports::register_test_case!(return_result);

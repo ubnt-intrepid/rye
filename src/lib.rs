@@ -143,7 +143,6 @@ mod termination;
 mod test;
 
 pub use crate::{context::Context, runner::TestRunner, termination::Termination};
-
 pub use rye_macros::{test, test_main};
 
 /// Generate test harness.
@@ -160,7 +159,7 @@ macro_rules! test_harness {
 }
 
 #[doc(hidden)] // private API.
-pub mod _internal {
+pub mod _test_reexports {
     pub use crate::{
         __fail as fail, //
         __location as location,
@@ -175,9 +174,11 @@ pub mod _internal {
         termination::Termination,
         test::{TestCase, TestDesc, TestFn, TestName, TestPlan, TEST_CASES},
     };
-    pub use linkme;
-    pub use paste;
-    pub use std::{boxed::Box, concat, module_path, result::Result, stringify};
+    pub use linkme::{self, distributed_slice};
+    pub use paste::item as paste_item;
+    pub use std::{
+        boxed::Box, column, concat, file, format_args, line, module_path, result::Result, stringify,
+    };
 }
 
 #[doc(hidden)] // private API.

@@ -103,16 +103,6 @@ struct Params {
 }
 
 impl Params {
-    fn reexport_internal_module(&self) -> syn::Item {
-        let crate_path = &self.crate_path;
-        syn::parse_quote! {
-            #[allow(unused_imports)]
-            use #crate_path::_internal as __rye;
-        }
-    }
-}
-
-impl Params {
     fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut crate_path = None;
 
@@ -378,7 +368,6 @@ impl ToTokens for Generated<'_> {
         let crate_path = &self.params.crate_path;
         let item = &*self.item;
         let ident = &self.item.sig.ident;
-        let rye_reexport = &self.params.reexport_internal_module();
         let location = quote_spanned!(self.item.sig.span() => __rye::location!());
 
         let test_fn_id = match (self.item.sig.asyncness, self.args.sendness) {
@@ -390,9 +379,12 @@ impl ToTokens for Generated<'_> {
         tokens.append_all(vec![quote! {
             #[cfg(any(test, trybuild))]
             #[allow(non_upper_case_globals)]
-            const #ident: &dyn #crate_path::_internal::TestCase = {
-                #rye_reexport
+            const #ident: &dyn #crate_path::_test_reexports::TestCase = {
+                #[allow(unused_imports)]
+                use #crate_path::_test_reexports as __rye;
+
                 #item
+
                 struct __TestCase;
                 impl __rye::TestCase for __TestCase {
                     fn desc(&self) -> &'static __rye::TestDesc {
@@ -412,7 +404,7 @@ impl ToTokens for Generated<'_> {
             };
 
             #[cfg(any(test, trybuild))]
-            #crate_path::_internal::register_test_case!(#ident);
+            #crate_path::_test_reexports::register_test_case!(#ident);
         }]);
     }
 }

@@ -1,8 +1,8 @@
 #[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const attributes: &dyn path::to::rye::_internal::TestCase = {
+const attributes: &dyn path::to::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
-    use path::to::rye::_internal as __rye;
+    use path::to::rye::_test_reexports as __rye;
 
     #[allow(missing_docs)]
     fn attributes(ctx: &mut Context<'_>) {
@@ -46,4 +46,4 @@ const attributes: &dyn path::to::rye::_internal::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-path::to::rye::_internal::register_test_case!(attributes);
+path::to::rye::_test_reexports::register_test_case!(attributes);

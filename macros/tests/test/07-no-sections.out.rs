@@ -1,8 +1,8 @@
 #[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const no_sections: &dyn ::rye::_internal::TestCase = {
+const no_sections: &dyn ::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
-    use ::rye::_internal as __rye;
+    use ::rye::_test_reexports as __rye;
 
     fn no_sections(_: &mut Context<'_>) {}
 
@@ -31,4 +31,4 @@ const no_sections: &dyn ::rye::_internal::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_internal::register_test_case!(no_sections);
+::rye::_test_reexports::register_test_case!(no_sections);

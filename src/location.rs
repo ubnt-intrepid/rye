@@ -13,15 +13,3 @@ impl fmt::Display for Location {
         write!(f, "{}:{}:{}", self.file, self.line, self.column)
     }
 }
-
-#[doc(hidden)] // private API.
-#[macro_export]
-macro_rules! __location {
-    () => {
-        $crate::_internal::Location {
-            file: file!(),
-            line: line!(),
-            column: column!(),
-        }
-    };
-}

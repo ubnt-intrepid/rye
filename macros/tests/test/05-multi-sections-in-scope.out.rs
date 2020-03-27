@@ -1,8 +1,8 @@
 #[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const multi_section_in_scope: &dyn ::rye::_internal::TestCase = {
+const multi_section_in_scope: &dyn ::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
-    use ::rye::_internal as __rye;
+    use ::rye::_test_reexports as __rye;
 
     fn multi_section_in_scope(ctx: &mut Context<'_>) {
         __rye::section!(ctx, 0u64, "section1", {
@@ -60,4 +60,4 @@ const multi_section_in_scope: &dyn ::rye::_internal::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_internal::register_test_case!(multi_section_in_scope);
+::rye::_test_reexports::register_test_case!(multi_section_in_scope);
