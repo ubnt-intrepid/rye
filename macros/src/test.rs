@@ -4,7 +4,7 @@ use quote::{quote, quote_spanned, ToTokens, TokenStreamExt as _};
 use std::mem;
 use syn::{
     ext::IdentExt as _,
-    parse::{Error, Parse, ParseStream, Parser as _, Result},
+    parse::{Error, Parse, ParseStream, Result},
     spanned::Spanned as _,
     visit_mut::{self, VisitMut},
     Attribute, Block, Expr, ExprMacro, Ident, Item, ItemFn, ItemMacro, Macro, Path, Stmt, Token,
@@ -245,16 +245,14 @@ impl ExpandBuiltins {
             me.visit_block_mut(&mut *block);
         });
 
-        Stmt::parse.parse2(quote_spanned! { mac.span() =>
+        Ok(Stmt::Item(Item::Verbatim(quote_spanned! { mac.span() =>
             __rye::section!(#ctx, #section_id, #name, #(#attrs)* #block);
-        })
+        })))
     }
 
     fn expand_section(&mut self, attrs: &[Attribute], mac: &Macro) -> Stmt {
-        self.try_expand_section(attrs, mac).unwrap_or_else(|err| {
-            let err = err.to_compile_error();
-            syn::parse_quote!(#err)
-        })
+        self.try_expand_section(attrs, mac)
+            .unwrap_or_else(|err| Stmt::Item(Item::Verbatim(err.to_compile_error())))
     }
 
     fn enter_section<F, R>(&mut self, section_id: SectionId, f: F) -> R
@@ -326,8 +324,7 @@ impl VisitMut for ExpandBuiltins {
             => {
                 if self.forbidden_builtins {
                     let err = Error::new_spanned(&stmt, "builtin macros cannot be used inside of closure or async block");
-                    let err = err.to_compile_error();
-                    *stmt = syn::parse_quote!(#err);
+                    *stmt = Stmt::Item(Item::Verbatim(err.to_compile_error()));
                 } else {
                     // TODO: expand builtin macros if desired.
                     path.segments.insert(
@@ -455,6 +452,7 @@ impl ToTokens for Generated<'_> {
 mod tests {
     use super::*;
     use std::path::Path;
+    use syn::parse::Parser as _;
 
     fn parse_items(input: ParseStream) -> Result<Vec<Item>> {
         let mut items = vec![];
