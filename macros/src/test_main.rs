@@ -77,6 +77,11 @@ pub(crate) fn test_main(_args: TokenStream, item: TokenStream) -> TokenStream {
 
     let ident = &item.sig.ident;
 
+    if item.sig.asyncness.is_none() {
+        let err = Error::new_spanned(&item, "non-async function is not accepted");
+        return err.to_compile_error();
+    }
+
     let crate_path = params
         .crate_path
         .unwrap_or_else(|| syn::parse_quote!(::rye));

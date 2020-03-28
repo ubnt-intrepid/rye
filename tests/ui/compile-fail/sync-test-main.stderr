@@ -1,0 +1,5 @@
+error: non-async function is not accepted
+ --> $DIR/sync-test-main.rs:4:1
+  |
+4 | fn test_main() {}
+  | ^^^^^^^^^^^^^^^^^
