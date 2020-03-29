@@ -18,8 +18,62 @@ use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _};
 use pin_project::pin_project;
 use std::{panic::AssertUnwindSafe, pin::Pin};
 
-/// The executor of test cases.
-pub trait TestExecutor {
+/// The runtime for driving the test application.
+pub trait Runtime {
+    /// The value for spawning test cases.
+    type Spawner: Spawner;
+
+    /// Create the instance of `Spawner`.
+    fn spawner(&self) -> Self::Spawner;
+
+    /// Run a future and wait for its result.
+    fn block_on<Fut>(&mut self, fut: Fut) -> Fut::Output
+    where
+        Fut: Future;
+}
+
+impl<T: ?Sized> Runtime for &mut T
+where
+    T: Runtime,
+{
+    type Spawner = T::Spawner;
+
+    #[inline]
+    fn spawner(&self) -> Self::Spawner {
+        (**self).spawner()
+    }
+
+    #[inline]
+    fn block_on<Fut>(&mut self, fut: Fut) -> Fut::Output
+    where
+        Fut: Future,
+    {
+        (**self).block_on(fut)
+    }
+}
+
+impl<T: ?Sized> Runtime for Box<T>
+where
+    T: Runtime,
+{
+    type Spawner = T::Spawner;
+
+    #[inline]
+    fn spawner(&self) -> Self::Spawner {
+        (**self).spawner()
+    }
+
+    #[inline]
+    fn block_on<Fut>(&mut self, fut: Fut) -> Fut::Output
+    where
+        Fut: Future,
+    {
+        (**self).block_on(fut)
+    }
+}
+
+/// The value for spawning test cases.
+pub trait Spawner {
     /// Spawn a task to execute the specified test future.
     fn spawn(&mut self, testfn: AsyncTestFn);
 
@@ -30,9 +84,9 @@ pub trait TestExecutor {
     fn spawn_blocking(&mut self, testfn: BlockingTestFn);
 }
 
-impl<T: ?Sized> TestExecutor for &mut T
+impl<T: ?Sized> Spawner for &mut T
 where
-    T: TestExecutor,
+    T: Spawner,
 {
     #[inline]
     fn spawn(&mut self, testfn: AsyncTestFn) {
@@ -50,9 +104,9 @@ where
     }
 }
 
-impl<T: ?Sized> TestExecutor for Box<T>
+impl<T: ?Sized> Spawner for Box<T>
 where
-    T: TestExecutor,
+    T: Spawner,
 {
     #[inline]
     fn spawn(&mut self, testfn: AsyncTestFn) {
@@ -89,7 +143,7 @@ impl Future for Handle {
     }
 }
 
-impl dyn TestExecutor + '_ {
+impl dyn Spawner + '_ {
     pub(crate) fn spawn_test<R>(&mut self, test: &dyn TestCase, reporter: R) -> Handle
     where
         R: Reporter + Send + 'static,
@@ -120,20 +174,41 @@ impl dyn TestExecutor + '_ {
     }
 }
 
-#[doc(hidden)] // TODO: dox
-pub fn block_on<Fut: Future>(f: impl FnOnce(Box<dyn TestExecutor>) -> Fut) -> Fut::Output {
-    let mut pool = LocalPool::new();
-    let exec = DefaultTestExecutor {
-        spawner: pool.spawner(),
-    };
-    pool.run_until(f(Box::new(exec)))
+/// Create an instance of `Runtime` used by the default test harness.
+pub fn default_runtime() -> impl Runtime {
+    DefaultRuntime {
+        pool: LocalPool::new(),
+    }
 }
 
-struct DefaultTestExecutor {
+struct DefaultRuntime {
+    pool: LocalPool,
+}
+
+impl Runtime for DefaultRuntime {
+    type Spawner = DefaultSpawner;
+
+    #[inline]
+    fn spawner(&self) -> Self::Spawner {
+        DefaultSpawner {
+            spawner: self.pool.spawner(),
+        }
+    }
+
+    #[inline]
+    fn block_on<Fut>(&mut self, fut: Fut) -> Fut::Output
+    where
+        Fut: Future,
+    {
+        self.pool.run_until(fut)
+    }
+}
+
+struct DefaultSpawner {
     spawner: LocalSpawner,
 }
 
-impl TestExecutor for DefaultTestExecutor {
+impl Spawner for DefaultSpawner {
     fn spawn(&mut self, testfn: AsyncTestFn) {
         self.spawner
             .spawn(async move { testfn.run().await })

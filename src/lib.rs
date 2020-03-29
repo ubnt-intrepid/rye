@@ -133,7 +133,7 @@ teardown
 #![deny(missing_docs)]
 #![forbid(clippy::unimplemented, clippy::todo)]
 
-pub mod executor;
+pub mod runtime;
 
 mod context;
 mod global;
@@ -149,10 +149,10 @@ pub use rye_macros::{test, test_main};
 /// Generate test harness.
 #[macro_export]
 macro_rules! test_harness {
-    ( $(block_on = $block_on:path)? ) => {
+    ( $(runtime = $runtime:path)? ) => {
         #[$crate::test_main]
         #[rye(crate = $crate)]
-        $( #[rye(block_on = $block_on)] )?
+        $( #[rye(runtime = $runtime)] )?
         async fn main(sess: &mut $crate::Session<'_>) -> impl $crate::Termination {
             sess.run().await
         }
@@ -181,8 +181,8 @@ pub mod _test_reexports {
 #[doc(hidden)] // private API.
 pub mod _test_main_reexports {
     pub use crate::{
-        executor::block_on as default_block_on, //
         global::install_globals,
+        runtime::{default_runtime, Runtime},
         session::SessionData,
         termination::exit,
     };

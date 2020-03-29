@@ -17,13 +17,13 @@ macro_rules! try_quote {
 
 #[derive(Default)]
 struct Params {
-    block_on: Option<Path>,
+    runtime: Option<Path>,
     crate_path: Option<Path>,
 }
 
 impl Params {
     fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
-        let mut block_on: Option<Path> = None;
+        let mut runtime: Option<Path> = None;
         let mut crate_path: Option<Path> = None;
 
         let mut errors: Option<Error> = None;
@@ -34,10 +34,10 @@ impl Params {
 
             let res = attr.parse_args_with(|input: ParseStream| -> Result<()> {
                 match input.call(Ident::parse_any)? {
-                    id if id == "block_on" => {
+                    id if id == "runtime" => {
                         let _: Token![=] = input.parse()?;
                         let value = input.call(Path::parse_mod_style)?;
-                        block_on.replace(value);
+                        runtime.replace(value);
                         Ok(())
                     }
                     id if id == "crate" => {
@@ -65,7 +65,7 @@ impl Params {
         }
 
         Ok(Self {
-            block_on,
+            runtime,
             crate_path,
         })
     }
@@ -86,9 +86,10 @@ pub(crate) fn test_main(_args: TokenStream, item: TokenStream) -> TokenStream {
         .crate_path
         .unwrap_or_else(|| syn::parse_quote!(::rye));
 
-    let block_on = params
-        .block_on
-        .unwrap_or_else(|| syn::parse_quote!(__rye::default_block_on));
+    let runtime = params
+        .runtime
+        .unwrap_or_else(|| syn::parse_quote!(__rye::default_runtime));
+    // TODO: add type check.
 
     quote! {
         fn #ident() {
@@ -99,11 +100,12 @@ pub(crate) fn test_main(_args: TokenStream, item: TokenStream) -> TokenStream {
 
             __rye::install_globals();
 
-            __rye::exit(#block_on(|mut exec| {
-                async move {
-                    let mut data = __rye::SessionData::new();
-                    #ident(&mut data.session(&mut *exec)).await
-                }
+            use __rye::Runtime as _;
+            let mut rt = #runtime();
+            let mut spawner = rt.spawner();
+            __rye::exit(rt.block_on(async move {
+                let mut data = __rye::SessionData::new();
+                #ident(&mut data.session(&mut spawner)).await
             }));
         }
     }

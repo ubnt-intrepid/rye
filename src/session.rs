@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 
 use crate::{
-    executor::TestExecutor,
     report::{Outcome, Reporter, Summary, TestCaseSummary},
+    runtime::Spawner,
     test::{TestCase, TestDesc, TEST_CASES},
 };
 use getopts::Options;
@@ -318,17 +318,17 @@ impl SessionData {
     }
 
     #[inline]
-    pub fn session<'a>(&'a mut self, executor: &'a mut dyn TestExecutor) -> Session<'a> {
+    pub fn session<'a>(&'a mut self, spawner: &'a mut dyn Spawner) -> Session<'a> {
         Session {
             data: self,
-            executor,
+            spawner,
         }
     }
 }
 
 pub struct Session<'a> {
     data: &'a mut SessionData,
-    executor: &'a mut dyn TestExecutor,
+    spawner: &'a mut dyn Spawner,
 }
 
 impl Session<'_> {
@@ -398,7 +398,7 @@ impl Session<'_> {
         let mut handles = vec![];
         for test in registered_tests.drain(..) {
             let reporter = reporter.clone();
-            handles.push(self.executor.spawn_test(test, reporter));
+            handles.push(self.spawner.spawn_test(test, reporter));
         }
         let results = futures_util::future::join_all(handles).await;
         for result in results {
