@@ -135,15 +135,15 @@ teardown
 
 pub mod runtime;
 
-mod context;
+#[macro_use]
+mod macros;
 mod global;
-mod location;
 mod report;
 mod session;
 mod termination;
 mod test;
 
-pub use crate::{context::Context, session::Session, termination::Termination};
+pub use crate::{session::Session, termination::Termination, test::Context};
 pub use rye_macros::{test, test_main};
 
 /// Generate test harness.
@@ -159,31 +159,31 @@ macro_rules! test_harness {
     };
 }
 
-#[doc(hidden)] // private API.
-pub mod _test_reexports {
-    pub use crate::{
-        __location as location, //
-        __section as section,
-        __test_case as test_case,
-        __test_fn as test_fn,
-        __test_name as test_name,
-        context::{Context, Section},
-        location::Location,
-        termination::Termination,
-        test::{TestCase, TestDesc, TestFn, TestName, TestPlan, TEST_CASES},
-    };
-    pub use linkme::{self, distributed_slice};
-    pub use std::{
-        boxed::Box, column, concat, file, format_args, line, module_path, result::Result, stringify,
-    };
-}
+hidden_item! {
+    pub mod _test_reexports {
+        pub use crate::{
+            __location as location, //
+            __section as section,
+            __test_case as test_case,
+            __test_fn as test_fn,
+            __test_name as test_name,
+            termination::Termination,
+            test::{
+                Context, Location, Section, TestCase, TestDesc, TestFn, TestName, TestPlan, TEST_CASES,
+            },
+        };
+        pub use linkme::{self, distributed_slice};
+        pub use std::{
+            boxed::Box, column, concat, file, format_args, line, module_path, result::Result, stringify,
+        };
+    }
 
-#[doc(hidden)] // private API.
-pub mod _test_main_reexports {
-    pub use crate::{
-        global::install_globals,
-        runtime::{default_runtime, Runtime},
-        session::SessionData,
-        termination::exit,
-    };
+    pub mod _test_main_reexports {
+        pub use crate::{
+            global::install_globals,
+            runtime::{default_runtime, Runtime},
+            session::SessionData,
+            termination::exit,
+        };
+    }
 }

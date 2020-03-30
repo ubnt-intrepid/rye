@@ -1,9 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::{
-    location::Location,
-    test::{TestCase, TestDesc},
-};
+use crate::test::{Location, TestCase, TestDesc};
 use maybe_unwind::Unwind;
 
 #[derive(Debug)]
@@ -21,14 +18,12 @@ pub(crate) enum Outcome {
     Panicked(Unwind),
 }
 
-#[allow(missing_docs)]
 #[derive(Debug)]
 pub struct TestCaseSummary {
     pub(crate) desc: &'static TestDesc,
     pub(crate) outcome: Outcome,
 }
 
-#[allow(missing_docs)]
 #[derive(Debug)]
 pub struct Summary {
     pub(crate) passed: Vec<TestCaseSummary>,

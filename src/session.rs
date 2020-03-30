@@ -398,7 +398,8 @@ impl Session<'_> {
         let mut handles = vec![];
         for test in registered_tests.drain(..) {
             let reporter = reporter.clone();
-            handles.push(self.spawner.spawn_test(test, reporter));
+            let handle = test.spawn(&mut *self.spawner, reporter)?;
+            handles.push(handle);
         }
         let results = futures_util::future::join_all(handles).await;
         for result in results {
