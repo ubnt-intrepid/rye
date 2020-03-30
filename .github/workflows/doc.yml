@@ -55,18 +55,12 @@ jobs:
         CARGO_NET_OFFLINE: false
 
     # TODO:
-    # * restrict network access during building docs.
     # * restrict all write access expect target/
-    - name: Build API docs (macros)
-      uses: actions-rs/cargo@v1
-      with:
-        command: doc
-        args: -p rye-macros --no-deps
     - name: Build API docs
       uses: actions-rs/cargo@v1
       with:
         command: doc
-        args: -p rye --no-deps --all-features
+        args: --workspace --no-deps
     - run: rm -fv target/doc/.lock
 
     - name: Upload artifact

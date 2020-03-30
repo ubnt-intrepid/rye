@@ -144,7 +144,12 @@ mod termination;
 mod test;
 
 pub use crate::{session::Session, termination::Termination, test::Context};
-pub use rye_macros::{test, test_main};
+
+/// Generate a single test case.
+pub use rye_macros::test;
+
+/// Define a test main function.
+pub use rye_macros::test_main;
 
 /// Generate test harness.
 #[macro_export]
