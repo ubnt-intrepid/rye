@@ -48,4 +48,5 @@ harness = false
 members = [
   ".",
   "macros",
+  "runtime/tokio",
 ]
