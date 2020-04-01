@@ -1,7 +1,14 @@
 use std::time::Duration;
 use tokio::{task, time::delay_for};
 
-rye::test_harness!(runtime = rye_runtime_tokio::runtime);
+rye::test_harness!();
+
+#[rye::test_main]
+#[rye(runtime = rye_runtime_tokio::runtime)]
+async fn test_main(sess: &mut rye::Session<'_>) -> anyhow::Result<()> {
+    sess.run().await?;
+    Ok(())
+}
 
 #[rye::test]
 async fn with_timer(_: &mut rye::Context<'_>) {

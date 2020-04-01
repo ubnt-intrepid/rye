@@ -142,6 +142,7 @@ mod report;
 mod session;
 mod termination;
 mod test;
+mod test_main;
 
 pub use crate::{session::Session, termination::Termination, test::Context};
 
@@ -154,12 +155,9 @@ pub use rye_macros::test_main;
 /// Generate test harness.
 #[macro_export]
 macro_rules! test_harness {
-    ( $(runtime = $runtime:path)? ) => {
-        #[$crate::test_main]
-        #[rye(crate = $crate)]
-        $( #[rye(runtime = $runtime)] )?
-        async fn main(sess: &mut $crate::Session<'_>) -> impl $crate::Termination {
-            sess.run().await
+    () => {
+        fn main() {
+            $crate::_test_main_reexports::harness_main();
         }
     };
 }
@@ -174,8 +172,9 @@ hidden_item! {
             __test_name as test_name,
             termination::Termination,
             test::{
-                Context, Location, Section, TestCase, TestDesc, TestFn, TestName, TestPlan, TEST_CASES,
+                Context, Location, Section, TestCase, TestDesc, TestFn, TestName, TestPlan,
             },
+            test_main::TEST_CASES,
         };
         pub use linkme::{self, distributed_slice};
         pub use std::{
@@ -185,10 +184,9 @@ hidden_item! {
 
     pub mod _test_main_reexports {
         pub use crate::{
-            global::install_globals,
             runtime::{default_runtime, Runtime},
-            session::SessionData,
-            termination::exit,
+            test_main::{TestCases, harness_main, test_main_inner},
+            test::TestCase,
         };
     }
 }

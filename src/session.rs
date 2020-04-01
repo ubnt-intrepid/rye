@@ -3,7 +3,7 @@
 use crate::{
     report::{Outcome, Reporter, Summary, TestCaseSummary},
     runtime::Spawner,
-    test::{TestCase, TestDesc, TEST_CASES},
+    test::{TestCase, TestDesc},
 };
 use getopts::Options;
 use std::{
@@ -304,46 +304,49 @@ impl Reporter for ConsoleReporter {
     }
 }
 
-pub struct SessionData {
+pub struct SessionInner<'a> {
     parser: Parser,
+    test_cases: &'a [&'a dyn TestCase],
 }
 
-impl SessionData {
-    #[allow(clippy::new_without_default)]
+impl<'a> SessionInner<'a> {
     #[inline]
-    pub fn new() -> Self {
+    pub(crate) fn new(test_cases: &'a [&'a dyn TestCase]) -> Self {
         Self {
             parser: Parser::new(std::env::args()),
+            test_cases,
         }
     }
 
     #[inline]
-    pub fn session<'a>(&'a mut self, spawner: &'a mut dyn Spawner) -> Session<'a> {
+    pub fn session<'sess>(&'sess mut self, spawner: &'sess mut dyn Spawner) -> Session<'sess> {
         Session {
-            data: self,
+            parser: &mut self.parser,
+            test_cases: self.test_cases,
             spawner,
         }
     }
 }
 
-pub struct Session<'a> {
-    data: &'a mut SessionData,
-    spawner: &'a mut dyn Spawner,
+pub struct Session<'sess> {
+    parser: &'sess mut Parser,
+    test_cases: &'sess [&'sess dyn TestCase],
+    spawner: &'sess mut dyn Spawner,
 }
 
 impl Session<'_> {
     #[inline]
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        let args = self.data.parser.parse()?;
+        let args = self.parser.parse()?;
         if args.show_help {
-            self.data.parser.print_usage();
+            self.parser.print_usage();
             return Ok(());
         }
 
         let mut registered_tests = vec![];
         let mut filtered_out_tests = vec![];
         let mut unique_test_names = HashSet::new();
-        for test in TEST_CASES {
+        for test in self.test_cases {
             let desc = test.desc();
             let filtered_out = args.is_filtered_out(desc.name());
 

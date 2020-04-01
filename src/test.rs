@@ -10,13 +10,9 @@ use futures_core::{
     future::{BoxFuture, Future, LocalBoxFuture},
     task::{self, Poll},
 };
-use linkme::distributed_slice;
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use pin_project::pin_project;
 use std::{fmt, marker::PhantomData, panic::AssertUnwindSafe, pin::Pin, ptr::NonNull};
-
-#[distributed_slice]
-pub static TEST_CASES: [&'static dyn TestCase] = [..];
 
 #[allow(missing_docs)]
 #[derive(Debug)]

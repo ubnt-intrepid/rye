@@ -2,6 +2,12 @@
 
 rye::test_harness!();
 
+#[rye::test_main]
+async fn test_main(sess: &mut rye::Session<'_>) -> anyhow::Result<()> {
+    sess.run().await?;
+    Ok(())
+}
+
 macro_rules! require {
     ($ctx:ident, $e:expr) => {{
         if !($e) {
