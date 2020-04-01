@@ -3,21 +3,21 @@
 use crate::{
     global::install_globals, session::SessionInner, termination::Termination, test::TestCase,
 };
-use linkme::distributed_slice;
 
-#[distributed_slice]
+#[cfg(feature = "harness")]
+#[linkme::distributed_slice]
 pub static TEST_CASES: [&'static dyn TestCase] = [..];
 
 pub type TestCases<'a> = &'a [&'a dyn TestCase];
 
 extern "Rust" {
     #[link_name = "__rye_test_main"]
-    fn test_main(_: TestCases<'_>);
+    fn __rye_test_main(_: TestCases<'_>);
 }
 
-pub fn harness_main() {
+pub fn test_runner(test_cases: TestCases<'_>) {
     unsafe {
-        test_main(&*TEST_CASES);
+        __rye_test_main(test_cases);
     }
 }
 
@@ -32,4 +32,15 @@ where
     let res = f(&mut session);
 
     crate::termination::exit(res)
+}
+
+/// Generate test harness.
+#[cfg(feature = "harness")]
+#[macro_export]
+macro_rules! test_harness {
+    () => {
+        fn main() {
+            $crate::_test_main_reexports::test_runner(&*$crate::_test_main_reexports::TEST_CASES);
+        }
+    };
 }

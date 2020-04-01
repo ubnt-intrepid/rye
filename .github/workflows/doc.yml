@@ -56,11 +56,16 @@ jobs:
 
     # TODO:
     # * restrict all write access expect target/
+    - name: Build API docs (workspace)
+      uses: actions-rs/cargo@v1
+      with:
+        command: doc
+        args: --no-deps --workspace
     - name: Build API docs
       uses: actions-rs/cargo@v1
       with:
         command: doc
-        args: --workspace --no-deps
+        args: --no-deps -p rye --all-features
     - run: rm -fv target/doc/.lock
 
     - name: Upload artifact

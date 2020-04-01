@@ -152,15 +152,8 @@ pub use rye_macros::test;
 /// Define a test main function.
 pub use rye_macros::test_main;
 
-/// Generate test harness.
-#[macro_export]
-macro_rules! test_harness {
-    () => {
-        fn main() {
-            $crate::_test_main_reexports::harness_main();
-        }
-    };
-}
+#[cfg(feature = "frameworks")]
+pub use test_main::test_runner;
 
 hidden_item! {
     pub mod _test_reexports {
@@ -174,19 +167,25 @@ hidden_item! {
             test::{
                 Context, Location, Section, TestCase, TestDesc, TestFn, TestName, TestPlan,
             },
-            test_main::TEST_CASES,
         };
-        pub use linkme::{self, distributed_slice};
         pub use std::{
             boxed::Box, column, concat, file, format_args, line, module_path, result::Result, stringify,
+        };
+
+        #[cfg(feature = "harness")]
+        pub use {
+            crate::test_main::TEST_CASES,
+            linkme::{self, distributed_slice},
         };
     }
 
     pub mod _test_main_reexports {
         pub use crate::{
             runtime::{default_runtime, Runtime},
-            test_main::{TestCases, harness_main, test_main_inner},
-            test::TestCase,
+            test_main::{TestCases, test_main_inner},
         };
+
+        #[cfg(feature = "harness")]
+        pub use crate::test_main::{TEST_CASES, test_runner};
     }
 }

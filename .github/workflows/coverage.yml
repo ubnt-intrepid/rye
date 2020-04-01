@@ -55,6 +55,12 @@ jobs:
         command: test
         args: --workspace
 
+    - name: Run tests (frameworks)
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --test test_frameworks --no-default-features --features=frameworks
+
     - name: Install grcov
       run: |
         sudo apt-get update
