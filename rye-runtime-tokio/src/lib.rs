@@ -1,11 +1,12 @@
 use futures::future::{BoxFuture, Future, LocalBoxFuture};
+use rye_runtime as rt;
 use std::rc::Rc;
 use tokio::{
     runtime::{Handle, Runtime},
     task::LocalSet,
 };
 
-pub fn runtime() -> impl rye::runtime::Runtime {
+pub fn runtime() -> impl rt::Runtime {
     // TODO: configure
     let rt = Runtime::new().expect("failed to start Tokio runtime");
     let locals = Rc::new(LocalSet::new());
@@ -17,7 +18,7 @@ struct TokioRuntime {
     locals: Rc<LocalSet>,
 }
 
-impl rye::runtime::Runtime for TokioRuntime {
+impl rt::Runtime for TokioRuntime {
     type Spawner = TokioSpawner;
 
     fn spawner(&self) -> Self::Spawner {
@@ -40,7 +41,7 @@ struct TokioSpawner {
     locals: Rc<LocalSet>,
 }
 
-impl rye::runtime::Spawner for TokioSpawner {
+impl rt::Spawner for TokioSpawner {
     fn spawn(&mut self, fut: BoxFuture<'static, ()>) -> anyhow::Result<()> {
         self.handle.spawn(fut);
         Ok(())
@@ -57,7 +58,3 @@ impl rye::runtime::Spawner for TokioSpawner {
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[export_name = "__rye_test_main"]
-fn dummy_test_main(_: rye::_test_main_reexports::TestCases<'_>) {}

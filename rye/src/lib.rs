@@ -133,8 +133,6 @@ teardown
 #![deny(missing_docs)]
 #![forbid(clippy::unimplemented, clippy::todo)]
 
-pub mod runtime;
-
 #[macro_use]
 mod macros;
 mod global;
@@ -180,8 +178,8 @@ hidden_item! {
     }
 
     pub mod _test_main_reexports {
+        pub use rye_runtime::{default_runtime, Runtime};
         pub use crate::{
-            runtime::{default_runtime, Runtime},
             test_main::{TestCases, test_main_inner},
         };
 

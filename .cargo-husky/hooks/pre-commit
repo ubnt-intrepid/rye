@@ -8,9 +8,6 @@ cd $DIR
 if cargo fmt --version >/dev/null; then
     (set -x; cargo fmt --all -- --check)
 fi
-if rustfmt --version >/dev/null; then
-    (set -x; rustfmt --edition=2018 --check tests/ui/**/*.rs)
-fi
 
 if cargo clippy --version >/dev/null; then
     (set -x; cargo clippy --workspace --all-targets)

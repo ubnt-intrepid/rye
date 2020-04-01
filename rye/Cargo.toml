@@ -1,0 +1,59 @@
+[package]
+name = "rye"
+version = "0.1.0-dev"
+description = """
+A custom unit testing framework inspired by Catch2.
+"""
+authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ubnt-intrepid/rye.git"
+readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [ "--cfg", "docs" ]
+targets = [ "x86_64-unknown-linux-gnu" ]
+
+[features]
+default = [ "harness" ]
+harness = [ "linkme" ]
+frameworks = []
+
+[dependencies]
+rye-macros = { version = "=0.1.0-dev", path = "../rye-macros" }
+rye-runtime = { version = "=0.1.0-dev", path = "../rye-runtime" }
+
+anyhow = "1"
+futures-core = "0.3"
+futures-channel = "0.3"
+futures-executor = "0.3"
+futures-util = { version = "0.3", default-features = false, features = [ "std", "channel" ] }
+getopts = "0.2"
+maybe-unwind = "0.3"
+pin-project = "0.4"
+termcolor = "1"
+
+linkme = { version = "0.2", optional = true }
+
+[dev-dependencies]
+futures = "0.3"
+futures-test = "0.3"
+scoped-tls-async = { git = "https://github.com/ubnt-intrepid/scoped-tls-async.git" }
+trybuild = "1"
+
+[dev-dependencies.cargo-husky]
+version = "1.5"
+features = [ "user-hooks" ]
+default-features = false
+
+[[test]]
+name = "test_harness"
+path = "tests/test_harness.rs"
+harness = false
+required-features = [ "harness" ]
+
+[[test]]
+name = "test_frameworks"
+path = "tests/test_frameworks.rs"
+required-features = [ "frameworks" ]

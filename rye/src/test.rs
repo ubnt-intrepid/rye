@@ -2,7 +2,6 @@
 
 use crate::{
     report::{Outcome, Reporter, TestCaseSummary},
-    runtime::Spawner,
     termination::Termination,
 };
 use futures_channel::oneshot;
@@ -12,6 +11,7 @@ use futures_core::{
 };
 use maybe_unwind::{maybe_unwind, FutureMaybeUnwindExt as _, Unwind};
 use pin_project::pin_project;
+use rye_runtime::Spawner;
 use std::{fmt, marker::PhantomData, panic::AssertUnwindSafe, pin::Pin, ptr::NonNull};
 
 #[allow(missing_docs)]

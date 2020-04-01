@@ -59,7 +59,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --test test_frameworks --no-default-features --features=frameworks
+        args: -p rye --test test_frameworks --no-default-features --features=frameworks
 
     - name: Install grcov
       run: |

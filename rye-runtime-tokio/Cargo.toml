@@ -6,12 +6,13 @@ authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-rye = { version = "0.1.0-dev", path = "../.." }
+rye-runtime = { version = "0.1.0-dev", path = "../rye-runtime" }
 anyhow = "1"
 futures = "0.3"
 tokio = { version = "0.2", features = [ "blocking", "rt-threaded", "rt-util" ] }
 
 [dev-dependencies]
+rye = { version = "0.1.0-dev", path = "../rye" }
 tokio = { version = "0.2", features = [ "full" ] }
 
 [[test]]

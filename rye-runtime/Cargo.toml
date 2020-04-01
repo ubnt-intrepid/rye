@@ -1,0 +1,12 @@
+[package]
+name = "rye-runtime"
+version = "0.1.0-dev"
+publish = false
+authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1"
+futures-core = "0.3"
+futures-executor = "0.3"
+futures-util = { version = "0.3", default-features = false, features = [ "std" ] }

@@ -2,10 +2,10 @@
 
 use crate::{
     report::{Outcome, Reporter, Summary, TestCaseSummary},
-    runtime::Spawner,
     test::{TestCase, TestDesc},
 };
 use getopts::Options;
+use rye_runtime::Spawner;
 use std::{
     collections::HashSet,
     fmt,
