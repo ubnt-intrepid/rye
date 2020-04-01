@@ -3,6 +3,7 @@
 use crate::{
     report::{Outcome, Reporter, TestCaseSummary},
     runtime::Spawner,
+    termination::Termination,
 };
 use futures_channel::oneshot;
 use futures_core::{
@@ -292,21 +293,18 @@ impl<'a> Context<'a> {
         result: Result<anyhow::Result<()>, Unwind>,
     ) -> Option<Outcome> {
         match result {
-            Ok(Ok(())) => {
-                debug_assert!(self.outcome.is_none());
-                None
-            }
+            Ok(Ok(())) => self.outcome.take(),
             Ok(Err(err)) => Some(Outcome::Errored(err)),
-            Err(unwind) => match self.outcome.take() {
-                outcome @ Some(..) => outcome,
-                None => Some(Outcome::Panicked(unwind)),
-            },
+            Err(unwind) => Some(Outcome::Panicked(unwind)),
         }
     }
 
     #[inline]
-    fn exit(&mut self) -> ! {
-        panic!("test function is explicitly terminated")
+    fn exit<T>(&mut self) -> T
+    where
+        T: Termination,
+    {
+        T::exit()
     }
 }
 
@@ -326,8 +324,10 @@ hidden_item! {
         }
 
 
-        #[inline(never)]
-        pub fn skip(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) -> ! {
+        pub fn skip<T>(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) -> T
+        where
+            T: Termination,
+        {
             debug_assert!(self.outcome.is_none());
             self.outcome.replace(Outcome::Skipped {
                 location,
@@ -336,8 +336,10 @@ hidden_item! {
             self.exit()
         }
 
-        #[inline(never)]
-        pub fn fail(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) -> ! {
+        pub fn fail<T>(&mut self, location: &'static Location, reason: fmt::Arguments<'_>) -> T
+        where
+            T: Termination,
+        {
             debug_assert!(self.outcome.is_none());
             self.outcome.replace(Outcome::Failed {
                 location,
@@ -379,7 +381,7 @@ macro_rules! skip {
     ( $ctx:ident, $($arg:tt)+ ) => {{
         use $crate::_test_reexports as __rye;
         const LOCATION: __rye::Location = __rye::location!();
-        $ctx.skip(&LOCATION, __rye::format_args!($($arg)+))
+        return $ctx.skip(&LOCATION, __rye::format_args!($($arg)+));
     }};
 }
 
@@ -392,7 +394,7 @@ macro_rules! fail {
     ($ctx:ident, $($arg:tt)+) => {{
         use $crate::_test_reexports as __rye;
         const LOCATION: __rye::Location = __rye::location!();
-        $ctx.fail(&LOCATION, __rye::format_args!($($arg)+))
+        return $ctx.fail(&LOCATION, __rye::format_args!($($arg)+));
     }};
 }
 
