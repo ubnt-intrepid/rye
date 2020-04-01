@@ -57,3 +57,7 @@ impl rye::runtime::Spawner for TokioSpawner {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[export_name = "__rye_test_main"]
+fn dummy_test_main(_: rye::_test_main_reexports::TestCases<'_>) {}
