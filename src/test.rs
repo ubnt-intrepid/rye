@@ -102,22 +102,6 @@ where
 }
 
 impl dyn TestCase + '_ {
-    #[cfg(test)]
-    pub(crate) async fn run<R>(&self, reporter: &mut R) -> TestCaseSummary
-    where
-        R: Reporter + Send + 'static,
-    {
-        let mut inner = TestInner {
-            desc: self.desc(),
-            plans: self.test_plans(),
-        };
-        match self.test_fn() {
-            TestFn::Async(f) => inner.run_async(reporter, f).await,
-            TestFn::AsyncLocal(f) => inner.run_async(reporter, f).await,
-            TestFn::Blocking(f) => inner.run_blocking(reporter, f),
-        }
-    }
-
     pub(crate) fn spawn<R>(&self, spawner: &mut dyn Spawner, reporter: R) -> anyhow::Result<Handle>
     where
         R: Reporter + Send + 'static,
@@ -277,11 +261,6 @@ impl<'a> Context<'a> {
     #[inline]
     pub(crate) unsafe fn transmute(&mut self) -> ContextPtr {
         ContextPtr(NonNull::from(&mut *self).cast::<Context<'static>>())
-    }
-
-    #[cfg(test)]
-    pub(crate) fn current_section_name(&self) -> Option<&'static str> {
-        self.current_section.map(|section| section.name)
     }
 
     pub(crate) fn check_outcome(
@@ -496,12 +475,29 @@ mod tests {
     use scoped_tls_async::{scoped_thread_local, ScopedKeyExt as _};
     use std::cell::RefCell;
 
+    impl dyn TestCase + '_ {
+        async fn run<R>(&self, reporter: &mut R) -> TestCaseSummary
+        where
+            R: Reporter + Send + 'static,
+        {
+            let mut inner = TestInner {
+                desc: self.desc(),
+                plans: self.test_plans(),
+            };
+            match self.test_fn() {
+                TestFn::Async(f) => inner.run_async(reporter, f).await,
+                TestFn::AsyncLocal(f) => inner.run_async(reporter, f).await,
+                TestFn::Blocking(f) => inner.run_blocking(reporter, f),
+            }
+        }
+    }
+
     type HistoryLog = (&'static str, Option<&'static str>);
 
     scoped_thread_local!(static HISTORY: RefCell<Vec<HistoryLog>>);
 
     fn append_history(ctx: &mut Context<'_>, msg: &'static str) {
-        let current_section = ctx.current_section_name();
+        let current_section = ctx.current_section.map(|section| section.name);
         HISTORY.with(|history| history.borrow_mut().push((msg, current_section)));
     }
 

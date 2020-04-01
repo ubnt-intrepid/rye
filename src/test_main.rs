@@ -44,3 +44,7 @@ macro_rules! test_harness {
         }
     };
 }
+
+#[cfg(test)]
+#[export_name = "__rye_test_main"]
+fn dummy_test_main(_: TestCases<'_>) {}
