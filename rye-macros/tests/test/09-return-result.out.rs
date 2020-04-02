@@ -35,7 +35,7 @@ const return_result: &dyn ::rye::_test_reexports::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_test_reexports::test_case! {
+::rye::__test_case! {
     #[allow(non_upper_case_globals)]
     static __TEST_CASE_return_result: &dyn ::rye::_test_reexports::TestCase = return_result;
 }

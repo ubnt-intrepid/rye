@@ -18,7 +18,6 @@ targets = [ "x86_64-unknown-linux-gnu" ]
 [features]
 default = [ "harness" ]
 harness = [ "linkme" ]
-frameworks = []
 
 [dependencies]
 rye-macros = { version = "=0.1.0-dev", path = "../rye-macros" }
@@ -52,8 +51,3 @@ name = "test_harness"
 path = "tests/test_harness.rs"
 harness = false
 required-features = [ "harness" ]
-
-[[test]]
-name = "test_frameworks"
-path = "tests/test_frameworks.rs"
-required-features = [ "frameworks" ]

@@ -135,12 +135,12 @@ teardown
 
 #[macro_use]
 mod macros;
-mod global;
+mod harness;
 mod report;
+mod runner;
 mod session;
 mod termination;
 mod test;
-mod test_main;
 
 pub use crate::{session::Session, termination::Termination, test::Context};
 
@@ -150,15 +150,15 @@ pub use rye_macros::test;
 /// Define a test main function.
 pub use rye_macros::test_main;
 
-#[cfg(feature = "frameworks")]
-pub use test_main::test_runner;
+#[doc(hidden)]
+pub use runner::test_runner;
 
 hidden_item! {
+    /// Re-exported items for #[test]
     pub mod _test_reexports {
         pub use crate::{
             __location as location, //
             __section as section,
-            __test_case as test_case,
             __test_fn as test_fn,
             __test_name as test_name,
             termination::Termination,
@@ -169,21 +169,40 @@ hidden_item! {
         pub use std::{
             boxed::Box, column, concat, file, format_args, line, module_path, result::Result, stringify,
         };
-
-        #[cfg(feature = "harness")]
-        pub use {
-            crate::test_main::TEST_CASES,
-            linkme::{self, distributed_slice},
-        };
     }
 
+    /// Re-exported items for #[test_main]
     pub mod _test_main_reexports {
         pub use rye_runtime::{default_runtime, Runtime};
         pub use crate::{
-            test_main::{TestCases, test_main_inner},
+            runner::{TestCases, test_main_inner},
         };
-
-        #[cfg(feature = "harness")]
-        pub use crate::test_main::{TEST_CASES, test_runner};
     }
+
+    /// Re-exported items for test_harness!() and __test_case_harness!()
+    #[cfg(feature = "harness")]
+    pub mod _test_harness_reexports {
+        pub use {
+            crate::harness::{TEST_CASES, main},
+            linkme::{self, distributed_slice},
+        };
+    }
+}
+
+#[doc(hidden)] // private API
+#[cfg(feature = "harness")]
+#[macro_export]
+macro_rules! __test_case {
+    ( $item:item ) => {
+        $crate::__test_case_harness!($item);
+    };
+}
+
+#[doc(hidden)] // private API
+#[cfg(not(feature = "harness"))]
+#[macro_export]
+macro_rules! __test_case {
+    ( $item:item ) => {
+        /* stub */
+    };
 }

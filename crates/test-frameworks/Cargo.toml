@@ -1,0 +1,11 @@
+[package]
+name = "test-frameworks"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[workspace]
+
+[dev-dependencies]
+rye = { package = "rye-frameworks", path = "../../rye-frameworks" }
+anyhow = "1"

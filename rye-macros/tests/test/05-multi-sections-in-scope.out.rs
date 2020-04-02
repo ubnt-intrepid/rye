@@ -60,7 +60,7 @@ const multi_section_in_scope: &dyn ::rye::_test_reexports::TestCase = {
 };
 
 #[cfg(any(test, trybuild))]
-::rye::_test_reexports::test_case! {
+::rye::__test_case! {
     #[allow(non_upper_case_globals)]
     static __TEST_CASE_multi_section_in_scope: &dyn ::rye::_test_reexports::TestCase = multi_section_in_scope;
 }

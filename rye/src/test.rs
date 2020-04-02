@@ -415,22 +415,6 @@ macro_rules! __test_fn {
 
 #[doc(hidden)] // private API
 #[macro_export]
-macro_rules! __test_case {
-    ( $item:item ) => {
-        $crate::__cfg_harness! {
-            #[$crate::_test_reexports::distributed_slice($crate::_test_reexports::TEST_CASES)]
-            #[linkme(crate = $crate::_test_reexports::linkme)]
-            $item
-        }
-        $crate::__cfg_frameworks! {
-            #[test_case]
-            $item
-        }
-    };
-}
-
-#[doc(hidden)] // private API
-#[macro_export]
 macro_rules! __location {
     () => {{
         use $crate::_test_reexports as __rye;
@@ -464,7 +448,7 @@ macro_rules! __section {
     };
 }
 
-#[cfg(all(test, not(feature = "frameworks")))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{

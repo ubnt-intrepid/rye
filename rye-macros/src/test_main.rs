@@ -92,6 +92,7 @@ pub(crate) fn test_main(_args: TokenStream, item: TokenStream) -> TokenStream {
     // TODO: add type check.
 
     quote! {
+        #[cfg(any(test, trybuild))]
         #[export_name = "__rye_test_main"]
         fn #ident(test_cases: #crate_path::_test_main_reexports::TestCases) {
             #[allow(unused_imports)]
@@ -103,10 +104,9 @@ pub(crate) fn test_main(_args: TokenStream, item: TokenStream) -> TokenStream {
                 use __rye::Runtime as _;
                 let mut rt = #runtime();
                 let mut spawner = rt.spawner();
-                let res = rt.block_on(async move {
+                rt.block_on(async move {
                     #ident(&mut sess.session(&mut spawner)).await
-                });
-                res
+                })
             });
         }
     }

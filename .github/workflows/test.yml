@@ -77,10 +77,3 @@ jobs:
       with:
         command: test
         args: --workspace
-
-    - name: Run tests (frameworks)
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: -p rye --test test_frameworks --no-default-features --features=frameworks
-      if: contains(matrix.conf.toolchain, 'nightly')
