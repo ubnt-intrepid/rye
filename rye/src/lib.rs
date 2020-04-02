@@ -188,31 +188,3 @@ hidden_item! {
         };
     }
 }
-
-#[doc(hidden)] // private API
-#[cfg(feature = "harness")]
-#[macro_export]
-macro_rules! __test_case {
-    ( $item:item ) => {
-        $crate::__test_case_harness!($item);
-    };
-}
-
-#[doc(hidden)] // private API
-#[cfg(all(not(feature = "harness"), feature = "frameworks"))]
-#[macro_export]
-macro_rules! __test_case {
-    ( $item:item ) => {
-        #[test_case]
-        $item
-    };
-}
-
-#[doc(hidden)] // private API
-#[cfg(all(not(feature = "harness"), not(feature = "frameworks")))]
-#[macro_export]
-macro_rules! __test_case {
-    ( $item:item ) => {
-        /* stub */
-    };
-}
