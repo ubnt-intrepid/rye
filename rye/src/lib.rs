@@ -199,7 +199,17 @@ macro_rules! __test_case {
 }
 
 #[doc(hidden)] // private API
-#[cfg(not(feature = "harness"))]
+#[cfg(all(not(feature = "harness"), feature = "frameworks"))]
+#[macro_export]
+macro_rules! __test_case {
+    ( $item:item ) => {
+        #[test_case]
+        $item
+    };
+}
+
+#[doc(hidden)] // private API
+#[cfg(all(not(feature = "harness"), not(feature = "frameworks")))]
 #[macro_export]
 macro_rules! __test_case {
     ( $item:item ) => {

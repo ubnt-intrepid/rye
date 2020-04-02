@@ -1,9 +1,0 @@
-[package]
-name = "rye-frameworks"
-version = "0.1.0-dev"
-publish = false
-authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
-edition = "2018"
-
-[dependencies]
-rye = { version = "=0.1.0-dev", path = "../rye", default-features = false }

@@ -7,5 +7,5 @@ edition = "2018"
 [workspace]
 
 [dev-dependencies]
-rye = { package = "rye-frameworks", path = "../../rye-frameworks" }
+rye = { path = "../../rye", default-features = false, features = [ "frameworks" ] }
 anyhow = "1"

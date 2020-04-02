@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "rye",
-  "rye-frameworks",
   "rye-macros",
   "rye-runtime",
   "rye-runtime-tokio",
