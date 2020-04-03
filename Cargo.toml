@@ -1,7 +1,13 @@
 [workspace]
 members = [
-  "rye",
-  "rye-macros",
-  "rye-runtime",
-  "rye-runtime-tokio",
+  "crates/*",
+  "xtask",
+]
+
+default-members = [
+  "crates/*",
+]
+
+exclude = [
+  "testcrates/*",
 ]
