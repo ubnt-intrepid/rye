@@ -14,13 +14,15 @@ jobs:
   Coverage:
     runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
+
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: nightly-2020-03-14  # FIXME: switch to the latest nightly
         override: true
+
     - name: Install grcov
       run: |
         sudo apt-get update
@@ -30,30 +32,30 @@ jobs:
         mv -v ./grcov $HOME/.cargo/bin
         echo ::add-path::$HOME/.cargo/bin
 
+    - name: correct permissions
+      if: contains(matrix.os, 'ubuntu')
+      run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
+
     - name: Generate Cargo.lock
-      uses: actions-rs/cargo@v1
-      with:
-        command: generate-lockfile
+      run: cargo generate-lockfile
+
     - name: Cache cargo registry
       uses: actions/cache@v1
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
     - name: Cache cargo index
       uses: actions/cache@v1
       with:
         path: ~/.cargo/git
         key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-    - name: Fetch cargo dependencies
-      uses: actions-rs/cargo@v1
-      with:
-        command: fetch
 
-    - name: Run tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: ci
-        args: coverage
+    - name: Fetch cargo dependencies
+      run: cargo fetch
+
+    - name: Run coverage tests
+      run: cargo ci coverage
 
     - name: Send report to Codecov
       uses: codecov/codecov-action@v1.0.3

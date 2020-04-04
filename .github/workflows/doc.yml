@@ -17,9 +17,7 @@ jobs:
       image: rustops/crates-build-env:latest
       options: --memory 3221225472
     steps:
-    - uses: actions/checkout@v1
-      with:
-        submodules: true
+    - uses: actions/checkout@v2
 
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
@@ -29,36 +27,33 @@ jobs:
         override: true
 
     - name: Generate Cargo.lock
-      uses: actions-rs/cargo@v1
-      with:
-        command: generate-lockfile
+      run: cargo generate-lockfile
+
     - name: Cache cargo registry
       uses: actions/cache@v1
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
     - name: Cache cargo index
       uses: actions/cache@v1
       with:
         path: ~/.cargo/git
         key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
     - name: Fetch cargo dependencies
-      uses: actions-rs/cargo@v1
-      with:
-        command: fetch
+      run: cargo fetch
 
     # TODO:
     # * restrict all write access expect target/
     - name: Build API docs
-      uses: actions-rs/cargo@v1
-      with:
-        command: ci
-        args: docs
+      run: cargo ci docs
 
     - name: Deply to GitHub Pages
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-      uses: peaceiris/actions-gh-pages@v2.3.1
-      env:
-        ACTIONS_DEPLOY_KEY: ${{ secrets.ACTIONS_DEPLOY_KEY }}
-        PUBLISH_BRANCH: gh-pages
-        PUBLISH_DIR: ./target/doc
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+        publish_branch: gh-pages
+        publish_dir: ./target/doc
+        force_orphan: true
