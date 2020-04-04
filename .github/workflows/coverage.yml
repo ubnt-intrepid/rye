@@ -21,6 +21,14 @@ jobs:
         profile: minimal
         toolchain: nightly-2020-03-14  # FIXME: switch to the latest nightly
         override: true
+    - name: Install grcov
+      run: |
+        sudo apt-get update
+        sudo apt-get install -yqq --no-install-recommends google-perftools
+        curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+        mkdir -pv $HOME/.cargo/bin
+        mv -v ./grcov $HOME/.cargo/bin
+        echo ::add-path::$HOME/.cargo/bin
 
     - name: Generate Cargo.lock
       uses: actions-rs/cargo@v1
@@ -46,19 +54,6 @@ jobs:
       with:
         command: ci
         args: coverage
-
-    - name: Install grcov
-      run: |
-        sudo apt-get update
-        sudo apt-get install -yqq --no-install-recommends google-perftools
-        curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
-        mkdir -pv $HOME/.cargo/bin
-        mv -v ./grcov $HOME/.cargo/bin
-        echo ::add-path::$HOME/.cargo/bin
-
-    - name: Collect coverage
-      uses: actions-rs/grcov@v0.1
-      id: coverage
 
     - name: Send report to Codecov
       uses: codecov/codecov-action@v1.0.3

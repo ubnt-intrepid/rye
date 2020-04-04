@@ -79,11 +79,7 @@ fn do_test() -> anyhow::Result<()> {
 }
 
 fn do_docs() -> anyhow::Result<()> {
-    let target_dir = env::var_os("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| project_root().join("target"));
-
-    let doc_dir = target_dir.join("doc");
+    let doc_dir = target_dir().join("doc");
     if doc_dir.exists() {
         fs::remove_dir_all(&doc_dir)?;
     }
@@ -103,12 +99,20 @@ fn do_docs() -> anyhow::Result<()> {
     cargo_rustdoc("rye-runtime").run()?;
     cargo_rustdoc("rye-runtime-tokio").run()?;
 
-    fs::remove_file(target_dir.join("doc").join(".lock"))?;
+    fs::remove_file(doc_dir.join(".lock"))?;
 
     Ok(())
 }
 
 fn do_coverage() -> anyhow::Result<()> {
+    let target_dir = target_dir();
+
+    let cov_dir = target_dir.join("cov");
+    if cov_dir.exists() {
+        fs::remove_dir_all(&cov_dir)?;
+    }
+    fs::create_dir_all(&cov_dir)?;
+
     if let Some((_version, channel, date)) = version_check::triple() {
         anyhow::ensure!(
             channel.is_nightly(),
@@ -135,6 +139,19 @@ fn do_coverage() -> anyhow::Result<()> {
         )
         .run()?;
 
+    if command("grcov").arg("--version").run_silent().is_ok() {
+        command("grcov")
+            .arg(env::current_dir().unwrap_or_else(|_| ".".into()))
+            .arg("--branch")
+            .arg("--ignore-not-existing")
+            .arg("--llvm")
+            .arg("--output-type")
+            .arg("lcov")
+            .arg("--output-file")
+            .arg(cov_dir.join("lcov.info"))
+            .run()?;
+    }
+
     Ok(())
 }
 
@@ -148,21 +165,24 @@ fn run_pre_commit_hook() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn cargo() -> Command {
-    let project_root = project_root();
-    let cargo_env = env::var_os("CARGO")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| env!("CARGO").into());
+fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    let mut command = Command::new(program);
+    command.current_dir(project_root());
+    command.stdin(Stdio::null());
+    command.stdout(Stdio::inherit());
+    command.stderr(Stdio::inherit());
+    command
+}
 
-    let mut cargo = Command::new(cargo_env);
-    cargo.stdin(Stdio::null());
-    cargo.stdout(Stdio::inherit());
-    cargo.stderr(Stdio::inherit());
-    cargo.current_dir(&project_root);
+fn cargo() -> Command {
+    let mut cargo = command(
+        env::var_os("CARGO")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| env!("CARGO").into()),
+    );
     cargo.env("CARGO_INCREMENTAL", "0");
     cargo.env("CARGO_NET_OFFLINE", "true");
     cargo.env("RUST_BACKTRACE", "full");
-
     cargo
 }
 
@@ -199,4 +219,10 @@ fn project_root() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|| env!("CARGO_MANIFEST_DIR").to_owned().into());
     xtask_manifest_dir.ancestors().nth(1).unwrap().to_path_buf()
+}
+
+fn target_dir() -> PathBuf {
+    env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| project_root().join("target"))
 }
