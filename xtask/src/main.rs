@@ -34,6 +34,7 @@ Subcommands:
                 }
             }
         }
+        "pre-commit" => run_pre_commit_hook(),
         _ => {
             eprintln!(
                 "\
@@ -44,10 +45,11 @@ Usage:
     cargo xtask <SUBCOMMAND>
 
 Subcommands:
-        ci      Run CI scripts
+        ci          Run CI scripts
+        pre-commit  Run Git pre-commit hook
 "
             );
-            Ok(())
+            anyhow::bail!("invalid CLI argument")
         }
     }
 }
@@ -133,6 +135,16 @@ fn do_coverage() -> anyhow::Result<()> {
         )
         .run()?;
 
+    Ok(())
+}
+
+fn run_pre_commit_hook() -> anyhow::Result<()> {
+    cargo()
+        .arg("fmt")
+        .arg("--all")
+        .arg("--")
+        .arg("--check")
+        .run()?;
     Ok(())
 }
 

@@ -5,12 +5,6 @@ set -euo pipefail
 DIR=$(cd $(dirname $BASH_SOURCE)/../..; pwd)
 cd $DIR
 
-if cargo fmt --version >/dev/null; then
-    (set -x; cargo fmt --all -- --check)
+if cargo --version >/dev/null; then
+    cargo xtask pre-commit
 fi
-
-if cargo clippy --version >/dev/null; then
-    (set -x; cargo clippy --workspace --all-targets)
-fi
-
-(set -x; cargo test --workspace)
