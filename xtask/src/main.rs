@@ -53,28 +53,14 @@ Subcommands:
 }
 
 fn do_test() -> anyhow::Result<()> {
-    if cargo()
-        .arg("fmt")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .run()
-        .is_ok()
-    {
+    if cargo().args(&["fmt", "--version"]).run_silent().is_ok() {
         cargo() //
             .arg("fmt")
             .args(&["--all", "--", "--check"])
             .run()?;
     }
 
-    if cargo()
-        .arg("clippy")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .run()
-        .is_ok()
-    {
+    if cargo().args(&["clippy", "--version"]).run_silent().is_ok() {
         cargo()
             .arg("clippy")
             .arg("--all-targets")
@@ -170,12 +156,23 @@ fn cargo() -> Command {
 
 trait CommandExt {
     fn run(&mut self) -> anyhow::Result<()>;
+    fn run_silent(&mut self) -> anyhow::Result<()>;
 }
 
 impl CommandExt for Command {
     fn run(&mut self) -> anyhow::Result<()> {
         eprintln!("[cargo-xtask] {:#?}", self);
         let st = self.status()?;
+        anyhow::ensure!(
+            st.success(),
+            "Subprocess failed with the exit code {}",
+            st.code().unwrap_or(0),
+        );
+        Ok(())
+    }
+
+    fn run_silent(&mut self) -> anyhow::Result<()> {
+        let st = self.stdout(Stdio::null()).stderr(Stdio::null()).status()?;
         anyhow::ensure!(
             st.success(),
             "Subprocess failed with the exit code {}",
