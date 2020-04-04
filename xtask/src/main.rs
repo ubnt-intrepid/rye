@@ -1,7 +1,7 @@
 use pico_args::Arguments;
 use std::{
     env, fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
@@ -54,16 +54,13 @@ Subcommands:
     }
 }
 
-fn run_crate_test(manifest_path: Option<&Path>) -> anyhow::Result<()> {
-    eprintln!(
-        "[cargo-xtask] run_crate_test(manifest_path = {:?})",
-        manifest_path
-    );
+fn run_crate_test(cwd: Option<PathBuf>) -> anyhow::Result<()> {
+    eprintln!("[cargo-xtask] run_crate_test(cwd = {:?})", cwd);
 
     let cargo = || {
         let mut cargo = crate::cargo();
-        if let Some(path) = manifest_path {
-            cargo.current_dir(path.parent().unwrap());
+        if let Some(ref cwd) = cwd {
+            cargo.current_dir(cwd);
         }
         cargo
     };
@@ -87,39 +84,24 @@ fn run_crate_test(manifest_path: Option<&Path>) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn is_nightly() -> bool {
+    match version_check::Channel::read() {
+        Some(ch) => ch.is_nightly(),
+        _ => false,
+    }
+}
+
 fn do_test() -> anyhow::Result<()> {
     run_crate_test(None)?;
 
-    for manifest_path in testcrates()? {
-        run_crate_test(Some(&manifest_path))?;
+    let testcrates_root = project_root().join("testcrates");
+    run_crate_test(Some(testcrates_root.join("compiletest")))?;
+    run_crate_test(Some(testcrates_root.join("smoke-harness")))?;
+    if is_nightly() {
+        run_crate_test(Some(testcrates_root.join("smoke-frameworks")))?;
     }
 
     Ok(())
-}
-
-fn testcrates() -> anyhow::Result<Vec<PathBuf>> {
-    let mut walkdir = walkdir::WalkDir::new(project_root())
-        .follow_links(false)
-        .same_file_system(true)
-        .into_iter();
-    walkdir.skip_current_dir();
-    walkdir
-        .filter_entry(|entry| {
-            entry.file_name() != "target"
-                && (entry.depth() != 1 || entry.file_name() == "testcrates")
-        })
-        .filter_map(|res| match res {
-            Ok(entry) => {
-                if entry.file_type().is_file() && entry.file_name() == "Cargo.toml" {
-                    Some(Ok(entry.into_path()))
-                } else {
-                    None
-                }
-            }
-            Err(err) => Some(Err(err)),
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(Into::into)
 }
 
 fn do_docs() -> anyhow::Result<()> {

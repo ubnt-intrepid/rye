@@ -10,9 +10,5 @@ mod tests {
     }
 
     #[rye::test]
-    fn it_works() {
-        if 2 + 2 != 4 {
-            rye::fail!("aa");
-        }
-    }
+    fn case1(_: &mut rye::Context<'_>) {}
 }
