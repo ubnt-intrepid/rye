@@ -1,7 +1,7 @@
 use pico_args::Arguments;
 use std::{
     env, fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -54,18 +54,27 @@ Subcommands:
     }
 }
 
-fn do_test() -> anyhow::Result<()> {
+fn run_crate_test(manifest_path: Option<&Path>) -> anyhow::Result<()> {
+    eprintln!(
+        "[cargo-xtask] run_crate_test(manifest_path = {:?})",
+        manifest_path
+    );
+
+    let cargo = || {
+        let mut cargo = crate::cargo();
+        if let Some(path) = manifest_path {
+            cargo.current_dir(path.parent().unwrap());
+        }
+        cargo
+    };
+
     if cargo().args(&["fmt", "--version"]).run_silent().is_ok() {
-        cargo() //
-            .arg("fmt")
-            .args(&["--all", "--", "--check"])
-            .run()?;
+        cargo().args(&["fmt", "--", "--check"]).run()?;
     }
 
     if cargo().args(&["clippy", "--version"]).run_silent().is_ok() {
         cargo()
-            .arg("clippy")
-            .arg("--all-targets")
+            .args(&["clippy", "--all-targets"])
             .env("RUSTFLAGS", "-D warnings")
             .run()?;
     }
@@ -76,6 +85,41 @@ fn do_test() -> anyhow::Result<()> {
         .run()?;
 
     Ok(())
+}
+
+fn do_test() -> anyhow::Result<()> {
+    run_crate_test(None)?;
+
+    for manifest_path in testcrates()? {
+        run_crate_test(Some(&manifest_path))?;
+    }
+
+    Ok(())
+}
+
+fn testcrates() -> anyhow::Result<Vec<PathBuf>> {
+    let mut walkdir = walkdir::WalkDir::new(project_root())
+        .follow_links(false)
+        .same_file_system(true)
+        .into_iter();
+    walkdir.skip_current_dir();
+    walkdir
+        .filter_entry(|entry| {
+            entry.file_name() != "target"
+                && (entry.depth() != 1 || entry.file_name() == "testcrates")
+        })
+        .filter_map(|res| match res {
+            Ok(entry) => {
+                if entry.file_type().is_file() && entry.file_name() == "Cargo.toml" {
+                    Some(Ok(entry.into_path()))
+                } else {
+                    None
+                }
+            }
+            Err(err) => Some(Err(err)),
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Into::into)
 }
 
 fn do_docs() -> anyhow::Result<()> {
@@ -193,25 +237,29 @@ trait CommandExt {
 
 impl CommandExt for Command {
     fn run(&mut self) -> anyhow::Result<()> {
-        eprintln!("[cargo-xtask] {:#?}", self);
-        let st = self.status()?;
-        anyhow::ensure!(
-            st.success(),
-            "Subprocess failed with the exit code {}",
-            st.code().unwrap_or(0),
-        );
-        Ok(())
+        run_impl(self)
     }
 
     fn run_silent(&mut self) -> anyhow::Result<()> {
-        let st = self.stdout(Stdio::null()).stderr(Stdio::null()).status()?;
-        anyhow::ensure!(
-            st.success(),
-            "Subprocess failed with the exit code {}",
-            st.code().unwrap_or(0),
-        );
-        Ok(())
+        self.stdout(Stdio::null()).stderr(Stdio::null());
+        run_impl(self)
     }
+}
+
+fn run_impl(cmd: &mut Command) -> anyhow::Result<()> {
+    if env::var_os("DRY_RUN").is_some() {
+        eprintln!("[cargo-xtask] dry-run: {:#?}", cmd);
+        return Ok(());
+    }
+
+    eprintln!("[cargo-xtask] run: {:#?}", cmd);
+    let st = cmd.status()?;
+    anyhow::ensure!(
+        st.success(),
+        "Subprocess failed with the exit code {}",
+        st.code().unwrap_or(0),
+    );
+    Ok(())
 }
 
 fn project_root() -> PathBuf {
