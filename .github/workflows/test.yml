@@ -30,6 +30,11 @@ jobs:
         rustup set profile minimal
         rustup install stable beta nightly 1.40.0
 
+    - name: Install wasmtime and cargo-wasi
+      run: |
+        curl https://wasmtime.dev/install.sh -sSf | bash
+        cargo +stable install --debug cargo-wasi
+
     - name: Correct permissions
       if: runner.os == 'ubuntu-latest'
       run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/

@@ -1,7 +1,7 @@
 use pico_args::Arguments;
 use std::{
     env, fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -54,7 +54,7 @@ Subcommands:
     }
 }
 
-fn run_crate_test(cwd: Option<PathBuf>) -> anyhow::Result<()> {
+fn run_crate_test(cwd: Option<&Path>) -> anyhow::Result<()> {
     eprintln!("[cargo-xtask] run_crate_test(cwd = {:?})", cwd);
 
     let cargo = || {
@@ -95,10 +95,19 @@ fn do_test() -> anyhow::Result<()> {
     run_crate_test(None)?;
 
     let testcrates_root = project_root().join("testcrates");
-    run_crate_test(Some(testcrates_root.join("compiletest")))?;
-    run_crate_test(Some(testcrates_root.join("smoke-harness")))?;
+    run_crate_test(Some(&testcrates_root.join("compiletest")))?;
+    run_crate_test(Some(&testcrates_root.join("smoke-harness")))?;
     if is_nightly() {
-        run_crate_test(Some(testcrates_root.join("smoke-frameworks")))?;
+        let cwd = testcrates_root.join("smoke-frameworks");
+        run_crate_test(Some(&cwd))?;
+        if cargo().arg("wasi").arg("--version").run_silent().is_ok() {
+            cargo() //
+                .arg("wasi")
+                .arg("test")
+                .env("RUSTFLAGS", "-D warnings")
+                .current_dir(cwd)
+                .run()?;
+        }
     }
 
     Ok(())
