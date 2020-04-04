@@ -39,7 +39,9 @@ linkme = { version = "0.2", optional = true }
 [dev-dependencies]
 futures = "0.3"
 futures-test = "0.3"
+rustversion = "1"
 scoped-tls-async = { git = "https://github.com/ubnt-intrepid/scoped-tls-async.git" }
+trybuild = "1"
 
 [[test]]
 name = "test_harness"
