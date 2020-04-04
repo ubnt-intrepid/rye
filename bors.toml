@@ -1,0 +1,9 @@
+delete_merged_branches = true
+
+status = [
+    "Test (ubuntu-latest)",
+    "Test (macos-latest)",
+    "Test (windows-latest)",
+    "Coverage",
+    "Doc",
+]

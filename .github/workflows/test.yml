@@ -1,10 +1,11 @@
-name: Test
+name: CI
 
 on:
   push:
     branches:
       - master
-  pull_request:
+      - staging
+      - trying
 
 env:
   CARGO_HUSKY_DONT_INSTALL_HOOKS: true
@@ -12,30 +13,25 @@ env:
 
 jobs:
   Test:
+    name: Test
     strategy:
       matrix:
-        conf:
-          - { toolchain: stable  , os: ubuntu-18.04   , components: "rustfmt, clippy" }
-          - { toolchain: beta    , os: ubuntu-18.04   }
-          - { toolchain: nightly , os: ubuntu-18.04   }
-          - { toolchain: 1.40.0  , os: ubuntu-18.04   } # minimum supported toolchain
-          - { toolchain: stable  , os: macos-latest   }
-          - { toolchain: stable  , os: windows-latest }
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
 
-    runs-on: ${{ matrix.conf.os }}
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: ${{ matrix.conf.toolchain }}
-        components: ${{ matrix.conf.components }}
-        override: true
+    - name: Install Rust toolchains
+      run: |
+        rustup set profile minimal
+        rustup install stable beta nightly 1.40.0
 
-    - name: correct permissions
-      if: contains(matrix.os, 'ubuntu')
+    - name: Correct permissions
+      if: runner.os == 'ubuntu-latest'
       run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
 
     - name: Generate Cargo.lock
@@ -56,5 +52,14 @@ jobs:
     - name: Fetch cargo dependencies
       run: cargo fetch
 
-    - name: Run CI test
-      run: cargo ci test
+    - name: Run CI test (stable)
+      run: cargo +stable ci test
+
+    - name: Run CI test (beta)
+      run: cargo +beta ci test
+
+    - name: Run CI test (minimal supported toolchain)
+      run: cargo +1.40.0 ci test
+
+    - name: Run CI test (nightly)
+      run: cargo +nightly ci test

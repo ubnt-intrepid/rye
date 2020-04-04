@@ -1,10 +1,11 @@
-name: Coverage
+name: CI
 
 on:
   push:
     branches:
       - master
-  pull_request:
+      - staging
+      - trying
 
 env:
   CARGO_HUSKY_DONT_INSTALL_HOOKS: true
@@ -12,6 +13,7 @@ env:
 
 jobs:
   Coverage:
+    name: Coverage
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v2
@@ -55,11 +57,11 @@ jobs:
       run: cargo fetch
 
     - name: Run coverage tests
-      run: cargo ci coverage
+      run: cargo ci coverage || true
 
     - name: Send report to Codecov
-      uses: codecov/codecov-action@v1.0.3
-      if: success()
+      if: github.ref == 'refs/heads/master'
+      uses: codecov/codecov-action@v1.0.6
       with:
         file: ./target/cov/lcov.info
         token: ${{ secrets.CODECOV_TOKEN }}
