@@ -9,10 +9,6 @@ on:
 env:
   CARGO_HUSKY_DONT_INSTALL_HOOKS: true
   CARGO_TERM_VERBOSE: true
-  CARGO_INCREMENTAL: '0'
-  CARGO_NET_OFFLINE: true
-  RUST_BACKTRACE: full
-  RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads'
 
 jobs:
   Coverage:
@@ -30,8 +26,6 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: generate-lockfile
-      env:
-        CARGO_NET_OFFLINE: false
     - name: Cache cargo registry
       uses: actions/cache@v1
       with:
@@ -46,14 +40,12 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: fetch
-      env:
-        CARGO_NET_OFFLINE: false
 
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
-        command: test
-        args: --workspace
+        command: ci
+        args: coverage
 
     - name: Install grcov
       run: |
