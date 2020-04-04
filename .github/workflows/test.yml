@@ -24,7 +24,8 @@ jobs:
 
     runs-on: ${{ matrix.conf.os }}
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
+
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
@@ -33,27 +34,27 @@ jobs:
         components: ${{ matrix.conf.components }}
         override: true
 
+    - name: correct permissions
+      if: contains(matrix.os, 'ubuntu')
+      run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
+
     - name: Generate Cargo.lock
-      uses: actions-rs/cargo@v1
-      with:
-        command: generate-lockfile
+      run: cargo generate-lockfile
+
     - name: Cache cargo registry
       uses: actions/cache@v1
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
     - name: Cache cargo index
       uses: actions/cache@v1
       with:
         path: ~/.cargo/git
         key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-    - name: Fetch cargo dependencies
-      uses: actions-rs/cargo@v1
-      with:
-        command: fetch
 
-    - name: Run CI
-      uses: actions-rs/cargo@v1
-      with:
-        command: ci
-        args: test
+    - name: Fetch cargo dependencies
+      run: cargo fetch
+
+    - name: Run CI test
+      run: cargo ci test
