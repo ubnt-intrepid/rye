@@ -95,7 +95,6 @@ fn do_test() -> anyhow::Result<()> {
     run_crate_test(None)?;
 
     let testcrates_root = project_root().join("testcrates");
-    run_crate_test(Some(&testcrates_root.join("compiletest")))?;
     run_crate_test(Some(&testcrates_root.join("smoke-harness")))?;
     if is_nightly() {
         let cwd = testcrates_root.join("smoke-frameworks");

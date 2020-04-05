@@ -1,3 +1,4 @@
+#[rustversion::stable]
 #[test]
 fn compiletest() {
     let t = trybuild::TestCases::new();
