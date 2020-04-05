@@ -43,7 +43,7 @@ jobs:
       run: wasmtime --version
 
     - name: Correct permissions
-      if: runner.os == 'ubuntu-latest'
+      if: contains(runner.os, 'ubuntu')
       run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
 
     - name: Generate Cargo.lock
