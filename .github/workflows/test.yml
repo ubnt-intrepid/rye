@@ -31,6 +31,7 @@ jobs:
         rustup install stable beta nightly 1.40.0
 
     - name: Install wasmtime and cargo-wasi
+      if: "!contains(runner.os, 'windows')"
       run: |
         curl https://wasmtime.dev/install.sh -sSf | bash
         echo ::set-env name=WASMTIME_HOME::$HOME/.wasmtime
