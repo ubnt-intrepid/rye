@@ -1,0 +1,19 @@
+[package]
+name = "smoke-harness"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[workspace]
+
+[dev-dependencies]
+rye = { path = "../../crates/rye", default-features = false, features = [ "harness" ] }
+anyhow = "1"
+
+[lib]
+harness = false
+
+[[test]]
+name = "test_integration"
+path = "tests/test_integration.rs"
+harness = false
