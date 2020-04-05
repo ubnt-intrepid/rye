@@ -1,7 +1,7 @@
 use pico_args::Arguments;
 use std::{
     env, fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -54,18 +54,24 @@ Subcommands:
     }
 }
 
-fn do_test() -> anyhow::Result<()> {
+fn run_crate_test(cwd: Option<&Path>) -> anyhow::Result<()> {
+    eprintln!("[cargo-xtask] run_crate_test(cwd = {:?})", cwd);
+
+    let cargo = || {
+        let mut cargo = crate::cargo();
+        if let Some(ref cwd) = cwd {
+            cargo.current_dir(cwd);
+        }
+        cargo
+    };
+
     if cargo().args(&["fmt", "--version"]).run_silent().is_ok() {
-        cargo() //
-            .arg("fmt")
-            .args(&["--all", "--", "--check"])
-            .run()?;
+        cargo().args(&["fmt", "--", "--check"]).run()?;
     }
 
     if cargo().args(&["clippy", "--version"]).run_silent().is_ok() {
         cargo()
-            .arg("clippy")
-            .arg("--all-targets")
+            .args(&["clippy", "--all-targets"])
             .env("RUSTFLAGS", "-D warnings")
             .run()?;
     }
@@ -74,6 +80,34 @@ fn do_test() -> anyhow::Result<()> {
         .arg("test")
         .env("RUSTFLAGS", "-D warnings")
         .run()?;
+
+    Ok(())
+}
+
+fn is_nightly() -> bool {
+    match version_check::Channel::read() {
+        Some(ch) => ch.is_nightly(),
+        _ => false,
+    }
+}
+
+fn do_test() -> anyhow::Result<()> {
+    run_crate_test(None)?;
+
+    let testcrates_root = project_root().join("testcrates");
+    run_crate_test(Some(&testcrates_root.join("smoke-harness")))?;
+    if is_nightly() {
+        let cwd = testcrates_root.join("smoke-frameworks");
+        run_crate_test(Some(&cwd))?;
+        if cargo().arg("wasi").arg("--version").run_silent().is_ok() {
+            cargo() //
+                .arg("wasi")
+                .arg("test")
+                .env("RUSTFLAGS", "-D warnings")
+                .current_dir(cwd)
+                .run()?;
+        }
+    }
 
     Ok(())
 }
@@ -193,25 +227,29 @@ trait CommandExt {
 
 impl CommandExt for Command {
     fn run(&mut self) -> anyhow::Result<()> {
-        eprintln!("[cargo-xtask] {:#?}", self);
-        let st = self.status()?;
-        anyhow::ensure!(
-            st.success(),
-            "Subprocess failed with the exit code {}",
-            st.code().unwrap_or(0),
-        );
-        Ok(())
+        run_impl(self)
     }
 
     fn run_silent(&mut self) -> anyhow::Result<()> {
-        let st = self.stdout(Stdio::null()).stderr(Stdio::null()).status()?;
-        anyhow::ensure!(
-            st.success(),
-            "Subprocess failed with the exit code {}",
-            st.code().unwrap_or(0),
-        );
-        Ok(())
+        self.stdout(Stdio::null()).stderr(Stdio::null());
+        run_impl(self)
     }
+}
+
+fn run_impl(cmd: &mut Command) -> anyhow::Result<()> {
+    if env::var_os("DRY_RUN").is_some() {
+        eprintln!("[cargo-xtask] dry-run: {:#?}", cmd);
+        return Ok(());
+    }
+
+    eprintln!("[cargo-xtask] run: {:#?}", cmd);
+    let st = cmd.status()?;
+    anyhow::ensure!(
+        st.success(),
+        "Subprocess failed with the exit code {}",
+        st.code().unwrap_or(0),
+    );
+    Ok(())
 }
 
 fn project_root() -> PathBuf {

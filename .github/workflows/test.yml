@@ -30,6 +30,18 @@ jobs:
         rustup set profile minimal
         rustup install stable beta nightly 1.40.0
 
+    - name: Install Wasmtime tools
+      if: "!contains(runner.os, 'windows')"
+      run: |
+        curl https://wasmtime.dev/install.sh -sSf | bash
+        echo ::set-env name=WASMTIME_HOME::$HOME/.wasmtime
+        echo ::add-path::$HOME/.wasmtime/bin
+        cargo +stable install --debug cargo-wasi
+
+    - name: Test Wasmtime installation
+      if: "!contains(runner.os, 'windows')"
+      run: wasmtime --version
+
     - name: Correct permissions
       if: runner.os == 'ubuntu-latest'
       run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
