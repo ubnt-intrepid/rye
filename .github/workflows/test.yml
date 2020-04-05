@@ -33,6 +33,8 @@ jobs:
     - name: Install wasmtime and cargo-wasi
       run: |
         curl https://wasmtime.dev/install.sh -sSf | bash
+        echo ::set-env name=WASMTIME_HOME::$HOME/.wasmtime
+        echo ::add-path::$WASMTIME_HOME/bin
         cargo +stable install --debug cargo-wasi
 
     - name: Correct permissions
