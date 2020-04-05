@@ -35,7 +35,7 @@ jobs:
         echo ::add-path::$HOME/.cargo/bin
 
     - name: correct permissions
-      if: contains(runner.os, 'ubuntu')
+      if: contains(runner.os, 'Linux')
       run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
 
     - name: Generate Cargo.lock
