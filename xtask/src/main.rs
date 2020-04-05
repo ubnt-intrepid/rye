@@ -1,20 +1,19 @@
 use pico_args::Arguments;
-use std::{
-    env, fs,
-    path::{Path, PathBuf},
-    process::{Command, Stdio},
-};
+use std::{fs, path::Path};
+use xtask::{env::Env, process::Subprocess};
 
 fn main() -> anyhow::Result<()> {
+    let env = Env::init()?;
+
     let mut args = Arguments::from_env();
     let subcommand = args.subcommand()?.unwrap_or_default();
     match &*subcommand {
         "ci" => {
             let subcommand = args.subcommand()?.unwrap_or_default();
             match &*subcommand {
-                "test" => do_test(),
-                "docs" => do_docs(),
-                "coverage" => do_coverage(),
+                "test" => do_test(&env),
+                "docs" => do_docs(&env),
+                "coverage" => do_coverage(&env),
                 _ => {
                     eprintln!(
                         "\
@@ -25,7 +24,7 @@ Usage:
     cargo xtask ci <SUBCOMMAND> [FLAGS]
 
 Subcommands:
-        test        run CI flow
+        test        run test
         coverage    run coverage test
         docs        generate API docs
 "
@@ -34,7 +33,7 @@ Subcommands:
                 }
             }
         }
-        "pre-commit" => run_pre_commit_hook(),
+        "pre-commit" => run_pre_commit_hook(&env),
         _ => {
             eprintln!(
                 "\
@@ -54,22 +53,35 @@ Subcommands:
     }
 }
 
-fn run_crate_test(cwd: Option<&Path>) -> anyhow::Result<()> {
-    eprintln!("[cargo-xtask] run_crate_test(cwd = {:?})", cwd);
+fn run_crate_test(env: &Env, cwd: Option<&Path>) -> anyhow::Result<()> {
+    eprintln!("[cargo-xtask] run_crate_test");
+
+    let mut target_dir = env.target_dir().join("ci");
+
+    if let Some(cwd) = cwd {
+        eprintln!(
+            "[cargo-xtask] - specified package location: {})",
+            cwd.display()
+        );
+        target_dir.push(cwd.file_stem().unwrap());
+    }
 
     let cargo = || {
-        let mut cargo = crate::cargo();
-        if let Some(ref cwd) = cwd {
-            cargo.current_dir(cwd);
-        }
-        cargo
+        env.cargo() //
+            .env("CARGO_TARGET_DIR", &target_dir)
+            .if_some(cwd, |cargo, cwd| cargo.current_dir(cwd))
     };
 
-    if cargo().args(&["fmt", "--version"]).run_silent().is_ok() {
+    if cargo().args(&["fmt", "--version"]).silent().run().is_ok() {
         cargo().args(&["fmt", "--", "--check"]).run()?;
     }
 
-    if cargo().args(&["clippy", "--version"]).run_silent().is_ok() {
+    if cargo()
+        .args(&["clippy", "--version"])
+        .silent()
+        .run()
+        .is_ok()
+    {
         cargo()
             .args(&["clippy", "--all-targets"])
             .env("RUSTFLAGS", "-D warnings")
@@ -91,18 +103,24 @@ fn is_nightly() -> bool {
     }
 }
 
-fn do_test() -> anyhow::Result<()> {
-    run_crate_test(None)?;
+fn do_test(env: &Env) -> anyhow::Result<()> {
+    run_crate_test(env, None)?;
 
-    let testcrates_root = project_root().join("testcrates");
-    run_crate_test(Some(&testcrates_root.join("smoke-harness")))?;
+    let testcrates_root = env.project_root().join("testcrates");
+    run_crate_test(env, Some(&testcrates_root.join("smoke-harness")))?;
     if is_nightly() {
         let cwd = testcrates_root.join("smoke-frameworks");
-        run_crate_test(Some(&cwd))?;
-        if cargo().arg("wasi").arg("--version").run_silent().is_ok() {
-            cargo() //
-                .arg("wasi")
-                .arg("test")
+        run_crate_test(env, Some(&cwd))?;
+        if env
+            .cargo()
+            .args(&["wasi", "--version"])
+            .silent()
+            .run()
+            .is_ok()
+        {
+            env.cargo()
+                .args(&["wasi", "test"])
+                .env("CARGO_TARGET_DIR", env.target_dir().join("ci"))
                 .env("RUSTFLAGS", "-D warnings")
                 .current_dir(cwd)
                 .run()?;
@@ -112,34 +130,42 @@ fn do_test() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn do_docs() -> anyhow::Result<()> {
-    let doc_dir = target_dir().join("doc");
+fn do_docs(env: &Env) -> anyhow::Result<()> {
+    let doc_dir = env.target_dir().join("doc");
     if doc_dir.exists() {
         fs::remove_dir_all(&doc_dir)?;
     }
 
-    fn cargo_rustdoc(package: &str) -> Command {
-        let mut cargo = cargo();
-        cargo
+    fn cargo_rustdoc(env: &Env, package: &str) -> Subprocess {
+        env.cargo()
             .arg("rustdoc")
             .arg("--package")
             .arg(package)
-            .arg("--")
-            .args(&["--cfg", "docs"]);
-        cargo
+            .args(&["--", "--cfg", "docs"])
     }
 
-    cargo_rustdoc("rye").run()?;
-    cargo_rustdoc("rye-runtime").run()?;
-    cargo_rustdoc("rye-runtime-tokio").run()?;
+    cargo_rustdoc(env, "rye").run()?;
+    cargo_rustdoc(env, "rye-runtime").run()?;
+    cargo_rustdoc(env, "rye-runtime-tokio").run()?;
 
     fs::remove_file(doc_dir.join(".lock"))?;
 
     Ok(())
 }
 
-fn do_coverage() -> anyhow::Result<()> {
-    let target_dir = target_dir();
+fn do_coverage(env: &Env) -> anyhow::Result<()> {
+    let target_dir = env.target_dir();
+
+    if let Some((_version, channel, date)) = version_check::triple() {
+        if !channel.is_nightly() {
+            eprintln!("[cargo-xtask] coverage test is available only on nightly channel");
+            return Ok(());
+        }
+
+        if !date.at_most("2020-03-14") {
+            eprintln!("[cargo-xtask] warning: coverage test was broken since 2020-03-15");
+        }
+    }
 
     let cov_dir = target_dir.join("cov");
     if cov_dir.exists() {
@@ -147,19 +173,10 @@ fn do_coverage() -> anyhow::Result<()> {
     }
     fs::create_dir_all(&cov_dir)?;
 
-    if let Some((_version, channel, date)) = version_check::triple() {
-        anyhow::ensure!(
-            channel.is_nightly(),
-            "coverage test is available only on nightly channel"
-        );
-        anyhow::ensure!(
-            date.at_most("2020-03-14"),
-            "coverage test was broken since 2020-03-15"
-        );
-    }
-
-    cargo()
+    env.cargo()
         .arg("test")
+        .arg("--target-dir")
+        .arg(&cov_dir)
         .env(
             "RUSTFLAGS",
             "\
@@ -173,9 +190,15 @@ fn do_coverage() -> anyhow::Result<()> {
         )
         .run()?;
 
-    if command("grcov").arg("--version").run_silent().is_ok() {
-        command("grcov")
-            .arg(env::current_dir().unwrap_or_else(|_| ".".into()))
+    if env
+        .subprocess("grcov")
+        .arg("--version")
+        .silent()
+        .run()
+        .is_ok()
+    {
+        env.subprocess("grcov")
+            .arg(env.project_root())
             .arg("--branch")
             .arg("--ignore-not-existing")
             .arg("--llvm")
@@ -189,78 +212,12 @@ fn do_coverage() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_pre_commit_hook() -> anyhow::Result<()> {
-    cargo()
+fn run_pre_commit_hook(env: &Env) -> anyhow::Result<()> {
+    env.cargo()
         .arg("fmt")
         .arg("--all")
         .arg("--")
         .arg("--check")
         .run()?;
     Ok(())
-}
-
-fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
-    let mut command = Command::new(program);
-    command.current_dir(project_root());
-    command.stdin(Stdio::null());
-    command.stdout(Stdio::inherit());
-    command.stderr(Stdio::inherit());
-    command
-}
-
-fn cargo() -> Command {
-    let mut cargo = command(
-        env::var_os("CARGO")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| env!("CARGO").into()),
-    );
-    cargo.env("CARGO_INCREMENTAL", "0");
-    cargo.env("CARGO_NET_OFFLINE", "true");
-    cargo.env("RUST_BACKTRACE", "full");
-    cargo
-}
-
-trait CommandExt {
-    fn run(&mut self) -> anyhow::Result<()>;
-    fn run_silent(&mut self) -> anyhow::Result<()>;
-}
-
-impl CommandExt for Command {
-    fn run(&mut self) -> anyhow::Result<()> {
-        run_impl(self)
-    }
-
-    fn run_silent(&mut self) -> anyhow::Result<()> {
-        self.stdout(Stdio::null()).stderr(Stdio::null());
-        run_impl(self)
-    }
-}
-
-fn run_impl(cmd: &mut Command) -> anyhow::Result<()> {
-    if env::var_os("DRY_RUN").is_some() {
-        eprintln!("[cargo-xtask] dry-run: {:#?}", cmd);
-        return Ok(());
-    }
-
-    eprintln!("[cargo-xtask] run: {:#?}", cmd);
-    let st = cmd.status()?;
-    anyhow::ensure!(
-        st.success(),
-        "Subprocess failed with the exit code {}",
-        st.code().unwrap_or(0),
-    );
-    Ok(())
-}
-
-fn project_root() -> PathBuf {
-    let xtask_manifest_dir = env::var_os("CARGO_MANIFEST_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| env!("CARGO_MANIFEST_DIR").to_owned().into());
-    xtask_manifest_dir.ancestors().nth(1).unwrap().to_path_buf()
-}
-
-fn target_dir() -> PathBuf {
-    env::var_os("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| project_root().join("target"))
 }
