@@ -30,7 +30,7 @@ jobs:
         rustup set profile minimal
         rustup install stable beta nightly 1.40.0
 
-    - name: Install Wasmtime tools
+    - name: Install Wasmtime tools (Unix)
       if: "!contains(runner.os, 'windows')"
       run: |
         curl https://wasmtime.dev/install.sh -sSf | bash
@@ -38,15 +38,33 @@ jobs:
         echo ::add-path::$HOME/.wasmtime/bin
         cargo +stable install --debug cargo-wasi
 
+    - name: Install Wasmtime tools (Windows)
+      if: contains(runner.os, 'windows')
+      shell: bash
+      run: |
+        ZIPFILE=wasmtime-dev-x86_64-windows.zip
+        URL=https://github.com/bytecodealliance/wasmtime/releases/download/dev/$ZIPFILE
+        curl -sLO $URL
+        unzip -j -d wasmtime $ZIPFILE
+        mkdir -pv $HOME/.wasmtime/bin
+        mv -v wasmtime/*.exe $HOME/.wasmtime/bin/
+        echo ::set-env name=WASMTIME_HOME::$HOME/.wasmtime
+        echo ::add-path::$HOME/.wasmtime/bin
+        cargo +stable install --debug cargo-wasi
+
     - name: Test Wasmtime installation
-      if: "!contains(runner.os, 'windows')"
-      run: wasmtime --version
+      shell: bash
+      run: |
+        wasmtime --version
+        cargo wasi --version
 
     - name: Correct permissions
-      if: runner.os == 'ubuntu-latest'
+      if: contains(runner.os, 'ubuntu')
+      shell: bash
       run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
 
     - name: Generate Cargo.lock
+      shell: bash
       run: cargo generate-lockfile
 
     - name: Cache cargo registry
@@ -62,16 +80,21 @@ jobs:
         key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Fetch cargo dependencies
+      shell: bash
       run: cargo fetch
 
     - name: Run CI test (stable)
+      shell: bash
       run: cargo +stable ci test
 
     - name: Run CI test (beta)
+      shell: bash
       run: cargo +beta ci test
 
     - name: Run CI test (minimal supported toolchain)
+      shell: bash
       run: cargo +1.40.0 ci test
 
     - name: Run CI test (nightly)
+      shell: bash
       run: cargo +nightly ci test
