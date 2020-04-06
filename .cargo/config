@@ -1,3 +1,2 @@
 [alias]
 xtask = "run --quiet --package rye-xtask --"
-ci = "xtask ci"
