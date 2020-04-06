@@ -45,6 +45,14 @@ impl Subprocess {
         self
     }
 
+    pub fn if_true(self, cond: bool, f: impl FnOnce(Self) -> Self) -> Self {
+        if cond {
+            f(self)
+        } else {
+            self
+        }
+    }
+
     pub fn if_some<T>(self, val: Option<T>, f: impl FnOnce(Self, T) -> Self) -> Self {
         if let Some(val) = val {
             f(self, val)

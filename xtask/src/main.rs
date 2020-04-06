@@ -33,7 +33,8 @@ Subcommands:
                 }
             }
         }
-        "pre-commit" => run_pre_commit_hook(&env),
+        "fmt" => do_format(&env, FormatMode::Overwrite),
+        "pre-commit" => do_pre_commit_hook(&env),
         _ => {
             eprintln!(
                 "\
@@ -71,10 +72,6 @@ fn run_crate_test(env: &Env, cwd: Option<&Path>) -> anyhow::Result<()> {
             .env("CARGO_TARGET_DIR", &target_dir)
             .if_some(cwd, |cargo, cwd| cargo.current_dir(cwd))
     };
-
-    if cargo().args(&["fmt", "--version"]).silent().run().is_ok() {
-        cargo().args(&["fmt", "--", "--check"]).run()?;
-    }
 
     if cargo()
         .args(&["clippy", "--version"])
@@ -212,12 +209,43 @@ fn do_coverage(env: &Env) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_pre_commit_hook(env: &Env) -> anyhow::Result<()> {
-    env.cargo()
-        .arg("fmt")
-        .arg("--all")
-        .arg("--")
-        .arg("--check")
-        .run()?;
+fn do_pre_commit_hook(env: &Env) -> anyhow::Result<()> {
+    do_format(env, FormatMode::CheckOnly)?;
+    Ok(())
+}
+
+#[derive(Copy, Clone, PartialEq)]
+enum FormatMode {
+    Overwrite,
+    CheckOnly,
+}
+
+fn do_format(env: &Env, mode: FormatMode) -> anyhow::Result<()> {
+    if env
+        .cargo()
+        .args(&["fmt", "--version"])
+        .silent()
+        .run()
+        .is_err()
+    {
+        eprintln!("[cargo-xtask] cargo-fmt is not installed");
+        return Ok(());
+    }
+
+    let cargo_fmt_check = |cwd: Option<&Path>| {
+        env.cargo()
+            .arg("fmt")
+            .if_true(mode == FormatMode::CheckOnly, |cargo| {
+                cargo.args(&["--", "--check"])
+            })
+            .if_some(cwd, |cargo, cwd| cargo.current_dir(cwd))
+            .run()
+    };
+
+    let testcrates = env.project_root().join("testcrates");
+    cargo_fmt_check(None)?;
+    cargo_fmt_check(Some(&testcrates.join("smoke-harness")))?;
+    cargo_fmt_check(Some(&testcrates.join("smoke-frameworks")))?;
+
     Ok(())
 }
