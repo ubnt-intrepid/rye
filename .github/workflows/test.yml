@@ -65,13 +65,13 @@ jobs:
       run: cargo fetch
 
     - name: Run CI test (stable)
-      run: cargo +stable ci test
+      run: cargo +stable xtask test
 
     - name: Run CI test (beta)
-      run: cargo +beta ci test
+      run: cargo +beta xtask test
 
     - name: Run CI test (minimal supported toolchain)
-      run: cargo +1.40.0 ci test
+      run: cargo +1.40.0 xtask test
 
     - name: Run CI test (nightly)
-      run: cargo +nightly ci test
+      run: cargo +nightly xtask test

@@ -1,4 +1,3 @@
-use crate::process::Subprocess;
 use fakeenv::EnvStore;
 use std::{
     ffi::OsStr,
@@ -46,6 +45,10 @@ impl Env {
         &self.target_dir
     }
 
+    pub fn is_git_hook(&self, name: &str) -> bool {
+        std::env::args().next().map_or(false, |s| s.contains(name))
+    }
+
     pub fn subprocess(&self, program: impl AsRef<OsStr>) -> Subprocess {
         let dry_run = self.env_store.var_os("DRY_RUN").is_some();
 
@@ -71,5 +74,87 @@ impl Env {
         .env("CARGO_INCREMENTAL", "0")
         .env("CARGO_NET_OFFLINE", "true")
         .env("RUST_BACKTRACE", "full")
+    }
+}
+
+/// A thin wrapper to improve the convenience of `std::process::Command`.
+pub struct Subprocess {
+    command: Command,
+    dry_run: bool,
+}
+
+impl Subprocess {
+    pub fn arg<S>(mut self, arg: S) -> Self
+    where
+        S: AsRef<OsStr>,
+    {
+        self.command.arg(arg);
+        self
+    }
+
+    pub fn args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        self.command.args(args);
+        self
+    }
+
+    pub fn env<K, V>(mut self, key: K, val: V) -> Self
+    where
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        self.command.env(key, val);
+        self
+    }
+
+    pub fn current_dir<P>(mut self, dir: P) -> Self
+    where
+        P: AsRef<Path>,
+    {
+        self.command.current_dir(dir);
+        self
+    }
+
+    pub fn if_true(self, cond: bool, f: impl FnOnce(Self) -> Self) -> Self {
+        if cond {
+            f(self)
+        } else {
+            self
+        }
+    }
+
+    pub fn if_some<T>(self, val: Option<T>, f: impl FnOnce(Self, T) -> Self) -> Self {
+        if let Some(val) = val {
+            f(self, val)
+        } else {
+            self
+        }
+    }
+
+    pub fn silent(mut self) -> Self {
+        self.command.stdout(Stdio::null());
+        self.command.stderr(Stdio::null());
+        self
+    }
+
+    pub fn run(mut self) -> anyhow::Result<()> {
+        eprintln!("[cargo-xtask] run: {:#?}", self.command);
+
+        if self.dry_run {
+            eprintln!("[cargo-xtask] - skipped");
+            return Ok(());
+        }
+
+        let st = self.command.status()?;
+        anyhow::ensure!(
+            st.success(),
+            "Subprocess failed with the exit code {}",
+            st.code().unwrap_or(0),
+        );
+
+        Ok(())
     }
 }
