@@ -1,4 +1,4 @@
-use crate::{env::Env, format};
+use crate::env::Env;
 use std::{
     env::{consts::EXE_SUFFIX, current_exe},
     fs,
@@ -42,6 +42,5 @@ pub fn install(env: &Env) -> anyhow::Result<()> {
 }
 
 pub fn pre_commit(env: &Env) -> anyhow::Result<()> {
-    format::check(env)?;
-    Ok(())
+    crate::lint::do_lint(env)
 }

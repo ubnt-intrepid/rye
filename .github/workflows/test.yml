@@ -64,14 +64,23 @@ jobs:
     - name: Fetch cargo dependencies
       run: cargo fetch
 
+    - name: Run Lint
+      run: cargo +stable xtask lint
+
     - name: Run CI test (stable)
       run: cargo +stable xtask test
+      env:
+        RUSTFLAGS: "-D warnings"
 
     - name: Run CI test (beta)
       run: cargo +beta xtask test
+      env:
+        RUSTFLAGS: "-D warnings"
 
     - name: Run CI test (minimal supported toolchain)
       run: cargo +1.40.0 xtask test
+      env:
+        RUSTFLAGS: "-D warnings"
 
     - name: Run CI test (nightly)
       run: cargo +nightly xtask test

@@ -1,8 +1,8 @@
 mod coverage;
 mod doc;
 mod env;
-mod format;
 mod hook;
+mod lint;
 mod test;
 
 use crate::env::Env;
@@ -27,8 +27,8 @@ cargo xtask <SUBCOMMAND>
 Subcommands:
     test            Run test
     coverage        Run coverage test
-    docs            Generate API docs
-    fmt             Run rustfmt
+    doc             Generate API docs
+    lint            Run lints
     install-hooks   Install Git hooks
 "
         );
@@ -49,7 +49,7 @@ Subcommands:
         Some("test") => crate::test::do_test(&env),
         Some("doc") => crate::doc::do_doc(&env),
         Some("coverage") => crate::coverage::do_coverage(&env),
-        Some("fmt") => format::format(&env),
+        Some("lint") => lint::do_lint(&env),
         Some("install-hooks") => crate::hook::install(&env),
         Some(s) => {
             show_help();

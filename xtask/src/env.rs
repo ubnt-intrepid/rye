@@ -49,6 +49,13 @@ impl Env {
         std::env::args().next().map_or(false, |s| s.contains(name))
     }
 
+    pub fn is_nightly(&self) -> bool {
+        match version_check::Channel::read() {
+            Some(ch) => ch.is_nightly(),
+            _ => false,
+        }
+    }
+
     pub fn subprocess(&self, program: impl AsRef<OsStr>) -> Subprocess {
         let dry_run = self.env_store.var_os("DRY_RUN").is_some();
 
@@ -116,14 +123,6 @@ impl Subprocess {
     {
         self.command.current_dir(dir);
         self
-    }
-
-    pub fn if_true(self, cond: bool, f: impl FnOnce(Self) -> Self) -> Self {
-        if cond {
-            f(self)
-        } else {
-            self
-        }
     }
 
     pub fn if_some<T>(self, val: Option<T>, f: impl FnOnce(Self, T) -> Self) -> Self {
