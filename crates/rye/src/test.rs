@@ -343,7 +343,7 @@ pub struct Section {
     pub location: Location,
 }
 
-#[cfg(all(test, not(feature = "frameworks")))]
+#[cfg(all(test, not(frameworks)))]
 mod tests {
     use super::*;
     use crate::{
