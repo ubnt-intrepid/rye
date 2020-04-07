@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - staging
+      - trying
+
+env:
+  CARGO_TERM_VERBOSE: true
+  CARGO_INCREMENTAL: '0'
+  RUST_BACKTRACE: short
+
+jobs:
+  Test:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install Rust toolchains
+      run: |
+        rustup set profile minimal
+        rustup install stable beta nightly 1.40.0
+        rustup component add rustfmt clippy --toolchain stable
+
+    - name: Install Wasmtime tools
+      if: "!contains(runner.os, 'windows')"
+      run: |
+        curl https://wasmtime.dev/install.sh -sSf | bash
+        echo ::set-env name=WASMTIME_HOME::$HOME/.wasmtime
+        echo ::add-path::$HOME/.wasmtime/bin
+        cargo +stable install --debug cargo-wasi
+
+    - name: Test Wasmtime installation
+      if: "!contains(runner.os, 'windows')"
+      run: wasmtime --version
+
+    - name: Generate Cargo.lock
+      run: cargo +stable generate-lockfile
+
+    - if: matrix.os == 'ubuntu-latest'
+      run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
+
+    - name: Cache cargo registry
+      uses: actions/cache@v1
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Fetch cargo dependencies
+      run: cargo +stable fetch
+
+    - name: Run Lint
+      run: cargo +stable xtask lint
+      continue-on-error: true
+
+    - name: Run CI test (stable)
+      run: cargo +stable xtask test
+      continue-on-error: true
+
+    - name: Run CI test (beta)
+      run: cargo +beta xtask test
+      continue-on-error: true
+
+    - name: Run CI test (minimal supported toolchain)
+      run: cargo +1.40.0 xtask test
+      continue-on-error: true
+
+    - name: Run CI test (nightly)
+      run: cargo +nightly xtask test
+      continue-on-error: true
+
+    - name: Remove crates.io index
+      shell: bash
+      run: rm -rf ~/.cargo/registry/index
+
+  Coverage:
+    runs-on: ubuntu-18.04
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly-2020-03-14  # FIXME: switch to the latest nightly
+        override: true
+
+    - name: Install grcov
+      run: |
+        sudo apt-get update
+        sudo apt-get install -yqq --no-install-recommends google-perftools
+        curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+        mkdir -pv $HOME/.cargo/bin
+        mv -v ./grcov $HOME/.cargo/bin
+        echo ::add-path::$HOME/.cargo/bin
+
+    - name: Correct permissions
+      run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
+
+    - name: Generate Cargo.lock
+      run: cargo generate-lockfile
+
+    - name: Cache cargo registry
+      uses: actions/cache@v1
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Fetch cargo dependencies
+      run: cargo fetch
+
+    - name: Run coverage tests
+      run: cargo xtask coverage
+      continue-on-error: true
+
+    - if: success()
+      name: Send report to Codecov
+      uses: codecov/codecov-action@v1.0.6
+      with:
+        file: ./target/cov/lcov.info
+        token: ${{ secrets.CODECOV_TOKEN }}

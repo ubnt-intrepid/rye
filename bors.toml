@@ -5,5 +5,4 @@ status = [
     "Test (macos-latest)",
     "Test (windows-latest)",
     "Coverage",
-    "Doc",
 ]

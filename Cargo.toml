@@ -1,13 +1,15 @@
 [workspace]
 members = [
   "crates/*",
+  "testcrates/*",
   "xtask",
 ]
 
+# The packages in testcrates/ are intentionally excluded from the default members
+# because they rely on the *exact* feature flag settings in the dependencies and
+# the workspace-level test always chooses the union of feature flags for each package.
+#
+# The tests must be executed with the cargo option `--package=name`.
 default-members = [
   "crates/*",
-]
-
-exclude = [
-  "testcrates/*",
 ]

@@ -78,9 +78,6 @@ impl Env {
                 .or_else(|| option_env!("CARGO").map(Into::into))
                 .unwrap_or_else(|| "cargo".into()),
         )
-        .env("CARGO_INCREMENTAL", "0")
-        .env("CARGO_NET_OFFLINE", "true")
-        .env("RUST_BACKTRACE", "full")
     }
 }
 
@@ -115,22 +112,6 @@ impl Subprocess {
     {
         self.command.env(key, val);
         self
-    }
-
-    pub fn current_dir<P>(mut self, dir: P) -> Self
-    where
-        P: AsRef<Path>,
-    {
-        self.command.current_dir(dir);
-        self
-    }
-
-    pub fn if_some<T>(self, val: Option<T>, f: impl FnOnce(Self, T) -> Self) -> Self {
-        if let Some(val) = val {
-            f(self, val)
-        } else {
-            self
-        }
     }
 
     pub fn silent(mut self) -> Self {
