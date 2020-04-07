@@ -113,52 +113,29 @@ macro_rules! __section {
 }
 
 #[doc(hidden)] // private API
-#[cfg(feature = "harness")]
-#[macro_export]
-macro_rules! __cfg_harness {
-    ( $( $item:item )* ) => {
-        $( $item )*
-    };
-}
-
-#[doc(hidden)] // private API
-#[cfg(not(feature = "harness"))]
-#[macro_export]
-macro_rules! __cfg_harness {
-    ( $( $item:item )* ) => {
-        /* stub */
-    };
-}
-
-#[doc(hidden)] // private API
-#[cfg(feature = "frameworks")]
-#[macro_export]
-macro_rules! __cfg_frameworks {
-    ( $( $item:item )* ) => {
-        $( $item )*
-    }
-}
-
-#[doc(hidden)] // private API
-#[cfg(not(feature = "frameworks"))]
-#[macro_export]
-macro_rules! __cfg_frameworks {
-    ( $( $item:item )* ) => {
-        /* stub */
-    };
-}
-
-#[doc(hidden)] // private API
+#[cfg(harness)]
 #[macro_export]
 macro_rules! __test_case {
     ( $item:item ) => {
-        $crate::__cfg_harness! {
-            $crate::__test_case_harness!($item);
-        }
+        $crate::__test_case_harness!($item);
+    };
+}
 
-        $crate::__cfg_frameworks! {
-            #[test_case]
-            $item
-        }
+#[doc(hidden)] // private API
+#[cfg(frameworks)]
+#[macro_export]
+macro_rules! __test_case {
+    ( $item:item ) => {
+        #[test_case]
+        $item
+    };
+}
+
+#[doc(hidden)] // private API
+#[cfg(all(not(harness), not(frameworks)))]
+#[macro_export]
+macro_rules! __test_case {
+    ( $item:item ) => {
+        /* stub */
     };
 }

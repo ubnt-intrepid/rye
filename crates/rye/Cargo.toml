@@ -9,6 +9,7 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ubnt-intrepid/rye.git"
 readme = "README.md"
+build = "build.rs"
 
 [package.metadata.docs.rs]
 all-features = true
