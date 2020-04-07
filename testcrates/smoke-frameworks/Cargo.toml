@@ -4,8 +4,6 @@ version = "0.0.0"
 publish = false
 edition = "2018"
 
-[workspace]
-
 [dev-dependencies]
 rye = { path = "../../crates/rye", default-features = false, features = [ "frameworks" ] }
 anyhow = "1"

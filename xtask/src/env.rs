@@ -114,22 +114,6 @@ impl Subprocess {
         self
     }
 
-    pub fn current_dir<P>(mut self, dir: P) -> Self
-    where
-        P: AsRef<Path>,
-    {
-        self.command.current_dir(dir);
-        self
-    }
-
-    pub fn if_some<T>(self, val: Option<T>, f: impl FnOnce(Self, T) -> Self) -> Self {
-        if let Some(val) = val {
-            f(self, val)
-        } else {
-            self
-        }
-    }
-
     pub fn silent(mut self) -> Self {
         self.command.stdout(Stdio::null());
         self.command.stderr(Stdio::null());
