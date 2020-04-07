@@ -78,9 +78,6 @@ impl Env {
                 .or_else(|| option_env!("CARGO").map(Into::into))
                 .unwrap_or_else(|| "cargo".into()),
         )
-        .env("CARGO_INCREMENTAL", "0")
-        .env("CARGO_NET_OFFLINE", "true")
-        .env("RUST_BACKTRACE", "full")
     }
 }
 
