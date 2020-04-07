@@ -3,6 +3,7 @@ name = "smoke-frameworks"
 version = "0.0.0"
 publish = false
 edition = "2018"
+build = "build.rs"
 
 [dev-dependencies]
 rye = { path = "../../crates/rye", default-features = false, features = [ "frameworks" ] }

@@ -28,10 +28,7 @@ pub fn do_lint(env: &Env) -> anyhow::Result<()> {
 
     cargo_lint().run()?;
     cargo_lint().arg("--package=smoke-harness").run()?;
-
-    if env.is_nightly() {
-        cargo_lint().arg("--package=smoke-frameworks").run()?;
-    }
+    cargo_lint().arg("--package=smoke-frameworks").run()?;
 
     Ok(())
 }

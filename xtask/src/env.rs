@@ -45,13 +45,6 @@ impl Env {
         &self.target_dir
     }
 
-    pub fn is_nightly(&self) -> bool {
-        match version_check::Channel::read() {
-            Some(ch) => ch.is_nightly(),
-            _ => false,
-        }
-    }
-
     pub fn subprocess(&self, program: impl AsRef<OsStr>) -> Subprocess {
         let dry_run = self.env_store.var_os("DRY_RUN").is_some();
 

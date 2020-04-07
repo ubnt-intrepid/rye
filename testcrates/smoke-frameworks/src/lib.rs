@@ -1,3 +1,4 @@
+#![cfg(frameworks)]
 #![feature(custom_test_frameworks)]
 #![test_runner(rye::test_runner)]
 
