@@ -1,9 +1,5 @@
 use crate::env::Env;
-use std::{
-    env::{consts::EXE_SUFFIX, current_exe},
-    fs,
-    path::PathBuf,
-};
+use std::{fs, path::PathBuf};
 
 fn resolve_git_dir(env: &Env) -> anyhow::Result<PathBuf> {
     let mut project_root = env.project_root().to_owned();
@@ -23,16 +19,42 @@ fn resolve_git_dir(env: &Env) -> anyhow::Result<PathBuf> {
 
 pub fn install(env: &Env) -> anyhow::Result<()> {
     let hooks_dir = resolve_git_dir(env)?.join("hooks");
-    let me = current_exe()?;
 
     let install = |name: &str| -> anyhow::Result<()> {
-        let hook_path = hooks_dir.join(format!("{}{}", name, EXE_SUFFIX));
         eprintln!(
-            "[cargo-xtask] install {} to {}",
-            me.display(),
-            hook_path.display()
+            "[cargo-xtask] install hook {} to {}",
+            name,
+            hooks_dir.display()
         );
-        fs::copy(&me, hook_path)?;
+
+        let hook_src_dir = env.target_dir().join("xtask");
+        fs::create_dir_all(&hook_src_dir)?;
+
+        let hook_src = hook_src_dir.join(format!("{}.rs", name));
+        fs::write(
+            &hook_src,
+            format!(
+                r#"
+                    fn main() -> std::io::Result<()> {{
+                        let status = std::process::Command::new("cargo")
+                            .arg("xtask")
+                            .arg("{name}")
+                            .status()?;
+                        std::process::exit(status.code().unwrap_or(0));
+                    }}
+                "#,
+                name = name
+            ),
+        )?;
+
+        env.rustc()
+            .arg("--edition=2018")
+            .arg("--crate-type=bin")
+            .arg("--out-dir")
+            .arg(&hooks_dir)
+            .arg(&hook_src)
+            .run()?;
+
         Ok(())
     };
 
@@ -42,5 +64,6 @@ pub fn install(env: &Env) -> anyhow::Result<()> {
 }
 
 pub fn pre_commit(env: &Env) -> anyhow::Result<()> {
+    println!("[cargo-xtask] run pre-commit hook");
     crate::lint::do_lint(env)
 }

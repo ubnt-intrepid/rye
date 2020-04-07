@@ -11,10 +11,6 @@ use pico_args::Arguments;
 fn main() -> anyhow::Result<()> {
     let env = Env::init()?;
 
-    if env.is_git_hook("pre-commit") {
-        return crate::hook::pre_commit(&env);
-    }
-
     let show_help = || {
         eprintln!(
             "\
@@ -30,6 +26,7 @@ Subcommands:
     doc             Generate API docs
     lint            Run lints
     install-hooks   Install Git hooks
+    pre-commit      Run Git pre-commit hook
 "
         );
     };
@@ -51,6 +48,7 @@ Subcommands:
         Some("coverage") => crate::coverage::do_coverage(&env),
         Some("lint") => lint::do_lint(&env),
         Some("install-hooks") => crate::hook::install(&env),
+        Some("pre-commit") => crate::hook::pre_commit(&env),
         Some(s) => {
             show_help();
             anyhow::bail!("invalid subcommand: {}", s);

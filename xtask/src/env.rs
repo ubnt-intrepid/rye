@@ -45,10 +45,6 @@ impl Env {
         &self.target_dir
     }
 
-    pub fn is_git_hook(&self, name: &str) -> bool {
-        std::env::args().next().map_or(false, |s| s.contains(name))
-    }
-
     pub fn is_nightly(&self) -> bool {
         match version_check::Channel::read() {
             Some(ch) => ch.is_nightly(),
@@ -69,6 +65,15 @@ impl Env {
         command.stderr(Stdio::inherit());
 
         Subprocess { command, dry_run }
+    }
+
+    pub fn rustc(&self) -> Subprocess {
+        self.subprocess(
+            self.env_store
+                .var_os("RUSTC")
+                .or_else(|| option_env!("RUSTC").map(Into::into))
+                .unwrap_or_else(|| "rustc".into()),
+        )
     }
 
     pub fn cargo(&self) -> Subprocess {
