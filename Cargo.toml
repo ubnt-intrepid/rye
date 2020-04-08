@@ -3,6 +3,7 @@ members = [
   "crates/*",
   "testcrates/*",
   "xtask",
+  "docs",
 ]
 
 # The packages in testcrates/ are intentionally excluded from the default members
@@ -12,4 +13,5 @@ members = [
 # The tests must be executed with the cargo option `--package=name`.
 default-members = [
   "crates/*",
+  "docs",
 ]
