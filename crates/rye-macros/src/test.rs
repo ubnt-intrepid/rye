@@ -367,38 +367,28 @@ impl ToTokens for Generated<'_> {
         let test_case_id = quote::format_ident!("__TEST_CASE_{}", ident);
 
         tokens.append_all(Some(quote! {
-            #[cfg(any(test, trybuild))]
             #[allow(non_upper_case_globals)]
-            const #ident: &dyn #crate_path::_test_reexports::TestCase = {
+            const #ident: & #crate_path::_test_reexports::TestCase = {
                 #[allow(unused_imports)]
                 use #crate_path::_test_reexports as __rye;
 
                 #item
 
-                struct __TestCase;
-                impl __rye::TestCase for __TestCase {
-                    fn desc(&self) -> &'static __rye::TestDesc {
-                        &__rye::TestDesc {
-                            name: __rye::test_name!(#ident),
-                            location: #location,
-                        }
-                    }
-                    fn test_fn(&self) -> __rye::TestFn {
-                        __rye::test_fn!(@#test_fn_id #ident)
-                    }
-                    fn test_plans(&self) -> &'static [__rye::TestPlan] {
-                        &[ #(#plans,)* ]
-                    }
+                &__rye::TestCase {
+                    desc: __rye::TestDesc {
+                        name: __rye::test_name!(#ident),
+                        location: #location,
+                    },
+                    testfn: __rye::test_fn!(@#test_fn_id #ident),
+                    plans: &[ #(#plans,)* ],
                 }
-                &__TestCase
             };
         }));
 
         tokens.append_all(Some(quote! {
-            #[cfg(any(test, trybuild))]
             #crate_path::__test_case! {
                 #[allow(non_upper_case_globals)]
-                static #test_case_id: &dyn #crate_path::_test_reexports::TestCase = #ident;
+                static #test_case_id: & #crate_path::_test_reexports::TestCase = #ident;
             }
         }));
     }

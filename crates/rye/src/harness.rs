@@ -5,7 +5,7 @@ use linkme::distributed_slice;
 
 #[doc(hidden)]
 #[distributed_slice]
-pub static TEST_CASES: [&'static dyn TestCase] = [..];
+pub static TEST_CASES: [&'static TestCase] = [..];
 
 #[doc(hidden)] // private API.
 #[macro_export]

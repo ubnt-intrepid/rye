@@ -6,23 +6,34 @@ The test case can be registered as a test target by applying the attribute-style
 
 ```rust
 # fn main() {}
-# mod inner {
 #[rye::test]
-fn case1() {
-    assert!(1 + 1 == 2);
+fn case1(cx: &mut rye::Context<'_>) {
+    // ...
 }
-# }
 ```
 
 The type that implements `Termination` can be specified as the output type of the
 test function.
 
 ```rust
+# fn main() {}
+fn do_something(counter: &mut i32) -> anyhow::Result<()> {
+    // ...
+#   *counter += 1;
+#   Ok(())
+}
+
 #[rye::test]
-fn fallible() -> std::io::Result<()> {
+fn fallible(cx: &mut rye::Context<'_>) -> anyhow::Result<()> {
+    let mut counter = 0;
+
+    do_something(&mut counter)?;
+    if counter != 1 {
+        rye::fail!(cx, "assertion failed: counter is not incremented");
+    }
+
     Ok(())
 }
-# fn main() {}
 ```
 
 ```rust,ignore
@@ -40,7 +51,7 @@ The asynchronous functions could be used in test cases.
 ```rust
 # fn main() {}
 #[rye::test]
-async fn case_async() {
+async fn case_async(cx: &mut rye::Context<'_>) {
     let mut counter = 0usize;
 
     async {
@@ -48,7 +59,9 @@ async fn case_async() {
     }
     .await;
 
-    assert_eq!(counter, 1);
+    if counter != 1 {
+        rye::fail!(cx, "assertion failed: count != 1");
+    }
 }
 ```
 
@@ -61,7 +74,7 @@ the attribute `#[test]` as follows:
 # use std::{cell::Cell, rc::Rc};
 # fn main() {}
 #[rye::test(?Send)]
-async fn case_async_nosend() {
+async fn case_async_nosend(cx: &mut rye::Context<'_>) {
     let counter = Rc::new(Cell::new(0usize));
 
     async {

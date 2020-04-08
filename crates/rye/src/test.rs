@@ -78,42 +78,29 @@ impl AsRef<str> for TestName {
     }
 }
 
-pub trait TestCase: Send + Sync {
-    fn desc(&self) -> &'static TestDesc;
-    fn test_fn(&self) -> TestFn;
-    fn test_plans(&self) -> &'static [TestPlan];
+pub struct TestCase {
+    pub desc: TestDesc,
+    pub testfn: TestFn,
+    pub plans: &'static [TestPlan],
 }
 
-impl<T: ?Sized> TestCase for &T
-where
-    T: TestCase,
-{
-    fn desc(&self) -> &'static TestDesc {
-        (**self).desc()
-    }
-
-    fn test_fn(&self) -> TestFn {
-        (**self).test_fn()
-    }
-
-    fn test_plans(&self) -> &'static [TestPlan] {
-        (**self).test_plans()
-    }
-}
-
-impl dyn TestCase + '_ {
-    pub(crate) fn spawn<R>(&self, spawner: &mut dyn Spawner, reporter: R) -> anyhow::Result<Handle>
+impl TestCase {
+    pub(crate) fn spawn<R>(
+        &'static self,
+        spawner: &mut dyn Spawner,
+        reporter: R,
+    ) -> anyhow::Result<Handle>
     where
         R: Reporter + Send + 'static,
     {
         let mut inner = TestInner {
-            desc: self.desc(),
-            plans: self.test_plans(),
+            desc: &self.desc,
+            plans: self.plans,
         };
         let mut reporter = reporter;
 
         let (tx, rx) = oneshot::channel();
-        match self.test_fn() {
+        match self.testfn {
             TestFn::Async(f) => {
                 spawner.spawn(Box::pin(async move {
                     let summary = inner.run_async(&mut reporter, f).await;
@@ -136,7 +123,7 @@ impl dyn TestCase + '_ {
 
         Ok(Handle {
             rx,
-            desc: self.desc(),
+            desc: &self.desc,
         })
     }
 }
@@ -354,16 +341,16 @@ mod tests {
     use scoped_tls_async::{scoped_thread_local, ScopedKeyExt as _};
     use std::cell::RefCell;
 
-    impl dyn TestCase + '_ {
-        async fn run<R>(&self, reporter: &mut R) -> TestCaseSummary
+    impl TestCase {
+        async fn run<R>(&'static self, reporter: &mut R) -> TestCaseSummary
         where
             R: Reporter + Send + 'static,
         {
             let mut inner = TestInner {
-                desc: self.desc(),
-                plans: self.test_plans(),
+                desc: &self.desc,
+                plans: self.plans,
             };
-            match self.test_fn() {
+            match self.testfn {
                 TestFn::Async(f) => inner.run_async(reporter, f).await,
                 TestFn::AsyncLocal(f) => inner.run_async(reporter, f).await,
                 TestFn::Blocking(f) => inner.run_blocking(reporter, f),
@@ -383,13 +370,13 @@ mod tests {
     struct NullReporter;
 
     impl Reporter for NullReporter {
-        fn test_run_starting(&self, _: &[&dyn TestCase]) {}
+        fn test_run_starting(&self, _: &[&TestCase]) {}
         fn test_run_ended(&self, _: &Summary) {}
         fn test_case_starting(&self, _: &TestDesc) {}
         fn test_case_ended(&self, _: &TestCaseSummary) {}
     }
 
-    fn run(t: &dyn TestCase) -> Vec<HistoryLog> {
+    fn run(t: &'static TestCase) -> Vec<HistoryLog> {
         let history = RefCell::new(vec![]);
         let _summary = block_on(HISTORY.set_async(&history, t.run(&mut NullReporter)));
         history.into_inner()
