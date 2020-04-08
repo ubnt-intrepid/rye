@@ -1,8 +1,8 @@
-use crate::env::Env;
-use std::{fs, path::PathBuf};
+use crate::shell::{CreateFlags, Shell};
+use std::path::PathBuf;
 
-fn resolve_git_dir(env: &Env) -> anyhow::Result<PathBuf> {
-    let mut project_root = env.project_root().to_owned();
+fn resolve_git_dir(sh: &Shell) -> anyhow::Result<PathBuf> {
+    let mut project_root = sh.project_root().to_owned();
     if !project_root.has_root() {
         project_root = project_root.canonicalize()?;
     }
@@ -17,8 +17,8 @@ fn resolve_git_dir(env: &Env) -> anyhow::Result<PathBuf> {
     anyhow::bail!("Git directory is not found");
 }
 
-pub fn install(env: &Env) -> anyhow::Result<()> {
-    let hooks_dir = resolve_git_dir(env)?.join("hooks");
+pub fn install(sh: &Shell) -> anyhow::Result<()> {
+    let hooks_dir = resolve_git_dir(sh)?.join("hooks");
 
     let install = |name: &str| -> anyhow::Result<()> {
         eprintln!(
@@ -27,11 +27,11 @@ pub fn install(env: &Env) -> anyhow::Result<()> {
             hooks_dir.display()
         );
 
-        let hook_src_dir = env.target_dir().join("xtask");
-        fs::create_dir_all(&hook_src_dir)?;
+        let hook_src_dir = sh.target_dir().join("xtask");
+        sh.create_dir(&hook_src_dir, CreateFlags::RECURSIVE)?;
 
         let hook_src = hook_src_dir.join(format!("{}.rs", name));
-        fs::write(
+        sh.write(
             &hook_src,
             format!(
                 r#"
@@ -47,7 +47,7 @@ pub fn install(env: &Env) -> anyhow::Result<()> {
             ),
         )?;
 
-        env.rustc()
+        sh.rustc()
             .arg("--edition=2018")
             .arg("--crate-type=bin")
             .arg("--out-dir")
@@ -63,7 +63,7 @@ pub fn install(env: &Env) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn pre_commit(env: &Env) -> anyhow::Result<()> {
+pub fn pre_commit(env: &Shell) -> anyhow::Result<()> {
     println!("[cargo-xtask] run pre-commit hook");
     crate::lint::do_lint(env)
 }

@@ -1,40 +1,44 @@
+use bitflags::bitflags;
 use fakeenv::EnvStore;
 use std::{
     ffi::OsStr,
+    fs,
+    marker::PhantomData,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    rc::Rc,
 };
 
-/// The collection of environment information.
-#[derive(Debug)]
-pub struct Env {
+/// The minimal implementation of shell for xtask scripts.
+pub struct Shell {
     env_store: EnvStore,
     project_root: PathBuf,
     target_dir: PathBuf,
+    _anchor: PhantomData<Rc<()>>, // FIXME: make thread safe
 }
 
-impl Env {
-    pub fn init() -> anyhow::Result<Self> {
-        let env_store = EnvStore::real().to_fake();
+impl Shell {
+    pub fn new() -> Self {
+        let envs = EnvStore::fake();
 
-        let xtask_manifest_dir = env_store
+        let manifest_dir = envs
             .var_os("CARGO_MANIFEST_DIR")
             .map(PathBuf::from)
             .or_else(|| option_env!("CARGO_MANIFEST_DIR").map(PathBuf::from))
-            .unwrap_or_else(|| PathBuf::from("./xtask"));
+            .expect("missing CARGO_MANIFEST_DIR");
+        let project_root = manifest_dir.ancestors().nth(1).unwrap().to_path_buf();
 
-        let project_root = xtask_manifest_dir.ancestors().nth(1).unwrap().to_path_buf();
-
-        let target_dir = env_store
+        let target_dir = envs
             .var_os("CARGO_TARGET_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|| project_root.join("target"));
 
-        Ok(Self {
-            env_store,
+        Self {
+            env_store: envs,
             project_root,
             target_dir,
-        })
+            _anchor: PhantomData,
+        }
     }
 
     pub fn project_root(&self) -> &Path {
@@ -43,6 +47,53 @@ impl Env {
 
     pub fn target_dir(&self) -> &Path {
         &self.target_dir
+    }
+
+    // ```
+    // $ mkdir {{ path }} {{ flags }}
+    // ```
+    pub fn create_dir(&self, path: impl AsRef<Path>, flags: CreateFlags) -> anyhow::Result<()> {
+        if flags.contains(CreateFlags::RECURSIVE) {
+            fs::create_dir_all(path)?;
+        } else {
+            fs::create_dir(path)?;
+        }
+        Ok(())
+    }
+
+    // ```
+    // $ cat << EOF > {{ path }}
+    // {{ content }}
+    // EOF
+    // ```
+    pub fn write(&self, path: impl AsRef<Path>, content: impl AsRef<[u8]>) -> anyhow::Result<()> {
+        fs::write(path, content)?;
+        Ok(())
+    }
+
+    // ```
+    // $ rm {{ path }} {{ flags }}
+    // ```
+    pub fn remove(&self, path: impl AsRef<Path>, flags: RemoveFlags) -> anyhow::Result<()> {
+        let path = path.as_ref();
+
+        if path.is_dir() {
+            if flags.contains(RemoveFlags::RECURSIVE) {
+                fs::remove_dir_all(path)?;
+            } else {
+                fs::remove_dir(path)?;
+            }
+
+            return Ok(());
+        }
+
+        if path.is_file() {
+            fs::remove_file(path)?;
+
+            return Ok(());
+        }
+
+        Ok(())
     }
 
     pub fn subprocess(&self, program: impl AsRef<OsStr>) -> Subprocess {
@@ -76,6 +127,18 @@ impl Env {
                 .or_else(|| option_env!("CARGO").map(Into::into))
                 .unwrap_or_else(|| "cargo".into()),
         )
+    }
+}
+
+bitflags! {
+    pub struct CreateFlags: u32 {
+        const RECURSIVE = 0b_0000_0001;
+    }
+}
+
+bitflags! {
+    pub struct RemoveFlags: u32 {
+        const RECURSIVE = 0b_0000_0001;
     }
 }
 

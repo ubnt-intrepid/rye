@@ -1,20 +1,20 @@
-use crate::env::Env;
+use crate::shell::Shell;
 
-pub fn do_test(env: &Env) -> anyhow::Result<()> {
-    env.cargo().arg("test").run()?;
+pub fn do_test(sh: &Shell) -> anyhow::Result<()> {
+    sh.cargo().arg("test").run()?;
 
-    env.cargo()
+    sh.cargo()
         .arg("test")
         .arg("--package=smoke-harness")
         .run()?;
 
-    env.cargo()
+    sh.cargo()
         .arg("test")
         .arg("--package=smoke-frameworks")
         .run()?;
 
-    if probe_cargo_wasi(env).is_ok() {
-        env.cargo()
+    if probe_cargo_wasi(sh).is_ok() {
+        sh.cargo()
             .arg("wasi")
             .arg("test")
             .arg("--package=smoke-frameworks")
@@ -24,8 +24,8 @@ pub fn do_test(env: &Env) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn probe_cargo_wasi(env: &Env) -> anyhow::Result<()> {
-    env.subprocess("wasmtime").arg("--version").silent().run()?;
-    env.cargo().args(&["wasi", "--version"]).silent().run()?;
+fn probe_cargo_wasi(sh: &Shell) -> anyhow::Result<()> {
+    sh.subprocess("wasmtime").arg("--version").silent().run()?;
+    sh.cargo().args(&["wasi", "--version"]).silent().run()?;
     Ok(())
 }

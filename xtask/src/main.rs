@@ -1,16 +1,14 @@
 mod coverage;
 mod doc;
-mod env;
 mod hook;
 mod lint;
+mod shell;
 mod test;
 
-use crate::env::Env;
+use crate::shell::Shell;
 use pico_args::Arguments;
 
 fn main() -> anyhow::Result<()> {
-    let env = Env::init()?;
-
     let show_help = || {
         eprintln!(
             "\
@@ -42,13 +40,32 @@ Subcommands:
         show_help();
         err
     })?;
+
     match subcommand.as_deref() {
-        Some("test") => crate::test::do_test(&env),
-        Some("doc") => crate::doc::do_doc(&env),
-        Some("coverage") => crate::coverage::do_coverage(&env),
-        Some("lint") => lint::do_lint(&env),
-        Some("install-hooks") => crate::hook::install(&env),
-        Some("pre-commit") => crate::hook::pre_commit(&env),
+        Some("test") => {
+            let sh = Shell::new();
+            crate::test::do_test(&sh)
+        }
+        Some("doc") => {
+            let sh = Shell::new();
+            crate::doc::do_doc(&sh)
+        }
+        Some("coverage") => {
+            let sh = Shell::new();
+            crate::coverage::do_coverage(&sh)
+        }
+        Some("lint") => {
+            let sh = Shell::new();
+            lint::do_lint(&sh)
+        }
+        Some("install-hooks") => {
+            let sh = Shell::new();
+            crate::hook::install(&sh)
+        }
+        Some("pre-commit") => {
+            let sh = Shell::new();
+            crate::hook::pre_commit(&sh)
+        }
         Some(s) => {
             show_help();
             anyhow::bail!("invalid subcommand: {}", s);

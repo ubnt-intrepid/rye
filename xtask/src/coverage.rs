@@ -1,8 +1,7 @@
-use crate::env::Env;
-use std::fs;
+use crate::shell::{CreateFlags, RemoveFlags, Shell};
 
-pub fn do_coverage(env: &Env) -> anyhow::Result<()> {
-    let target_dir = env.target_dir();
+pub fn do_coverage(sh: &Shell) -> anyhow::Result<()> {
+    let target_dir = sh.target_dir();
 
     if let Some((_version, channel, date)) = version_check::triple() {
         if !channel.is_nightly() {
@@ -17,11 +16,11 @@ pub fn do_coverage(env: &Env) -> anyhow::Result<()> {
 
     let cov_dir = target_dir.join("cov");
     if cov_dir.exists() {
-        fs::remove_dir_all(&cov_dir)?;
+        sh.remove(&cov_dir, RemoveFlags::RECURSIVE)?;
     }
-    fs::create_dir_all(&cov_dir)?;
+    sh.create_dir(&cov_dir, CreateFlags::RECURSIVE)?;
 
-    env.cargo()
+    sh.cargo()
         .arg("test")
         .arg("--target-dir")
         .arg(&cov_dir)
@@ -38,15 +37,15 @@ pub fn do_coverage(env: &Env) -> anyhow::Result<()> {
         )
         .run()?;
 
-    if env
+    if sh
         .subprocess("grcov")
         .arg("--version")
         .silent()
         .run()
         .is_ok()
     {
-        env.subprocess("grcov")
-            .arg(env.project_root())
+        sh.subprocess("grcov")
+            .arg(sh.project_root())
             .arg("--branch")
             .arg("--ignore-not-existing")
             .arg("--llvm")
