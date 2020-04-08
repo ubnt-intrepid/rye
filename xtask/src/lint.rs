@@ -1,17 +1,17 @@
-use crate::env::Env;
+use crate::shell::Shell;
 
-pub fn do_lint(env: &Env) -> anyhow::Result<()> {
-    let has_rustfmt = env
+pub fn do_lint(sh: &Shell) -> anyhow::Result<()> {
+    let has_rustfmt = sh
         .cargo()
         .args(&["fmt", "--version"])
         .silent()
         .run()
         .is_ok();
     if has_rustfmt {
-        env.cargo().args(&["fmt", "--", "--check"]).run()?;
+        sh.cargo().args(&["fmt", "--", "--check"]).run()?;
     }
 
-    let has_clippy = env
+    let has_clippy = sh
         .cargo()
         .args(&["clippy", "--version"])
         .silent()
@@ -20,9 +20,9 @@ pub fn do_lint(env: &Env) -> anyhow::Result<()> {
 
     let cargo_lint = || {
         if has_clippy {
-            env.cargo().args(&["clippy", "--all-targets"])
+            sh.cargo().args(&["clippy", "--all-targets"])
         } else {
-            env.cargo().args(&["check", "--all-targets"])
+            sh.cargo().args(&["check", "--all-targets"])
         }
     };
 

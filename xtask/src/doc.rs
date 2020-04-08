@@ -1,14 +1,13 @@
-use crate::env::Env;
-use std::fs;
+use crate::shell::{RemoveFlags, Shell};
 
-pub fn do_doc(env: &Env) -> anyhow::Result<()> {
-    let doc_dir = env.target_dir().join("doc");
+pub fn do_doc(sh: &Shell) -> anyhow::Result<()> {
+    let doc_dir = sh.target_dir().join("doc");
     if doc_dir.exists() {
-        fs::remove_dir_all(&doc_dir)?;
+        sh.remove(&doc_dir, RemoveFlags::RECURSIVE)?;
     }
 
     let cargo_rustdoc = |package: &str| {
-        env.cargo()
+        sh.cargo()
             .arg("rustdoc")
             .arg("--package")
             .arg(package)
@@ -19,7 +18,7 @@ pub fn do_doc(env: &Env) -> anyhow::Result<()> {
     cargo_rustdoc("rye-runtime").run()?;
     cargo_rustdoc("rye-runtime-tokio").run()?;
 
-    fs::remove_file(doc_dir.join(".lock"))?;
+    sh.remove(doc_dir.join(".lock"), RemoveFlags::empty())?;
 
     Ok(())
 }
