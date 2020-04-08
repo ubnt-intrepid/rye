@@ -1,0 +1,12 @@
+[package]
+name = "rye-doctest"
+version = "0.0.0"
+edition = "2018"
+
+[lib]
+name = "rye_doctest"
+path = "doctest.rs"
+
+[dev-dependencies]
+rye = { path = "../crates/rye" }
+doc-comment = "0.3"

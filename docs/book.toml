@@ -1,0 +1,8 @@
+[book]
+title = "Rye Users Guide"
+authors = [
+  "Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>",
+]
+language = "en"
+multilingual = false
+src = "src"

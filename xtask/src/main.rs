@@ -47,8 +47,16 @@ Subcommands:
             crate::test::do_test(&sh)
         }
         Some("doc") => {
+            let serve_addr = if args.contains(["-s", "--serve"]) {
+                let addr = args //
+                    .opt_value_from_str(["-b", "--bind"])?
+                    .unwrap_or_else(|| ([0, 0, 0, 0], 8000).into());
+                Some(addr)
+            } else {
+                None
+            };
             let sh = Shell::new();
-            crate::doc::do_doc(&sh)
+            crate::doc::do_doc(&sh, serve_addr)
         }
         Some("coverage") => {
             let sh = Shell::new();

@@ -22,6 +22,20 @@ jobs:
         toolchain: nightly
         override: true
 
+    - name: Install mdbook
+      run: |
+        MDBOOK_VERSION=0.3.7
+        URL=https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz
+        mkdir -pv $HOME/.cargo/bin
+        curl -sSL $URL | tar xzvf - -C $HOME/.cargo/bin
+        echo ::add-path::$HOME/.cargo/bin
+
+    - name: Check tools installation
+      run: |
+        cargo --version
+        rustc --version
+        mdbook --version
+
     - name: Generate Cargo.lock
       run: cargo generate-lockfile
 
