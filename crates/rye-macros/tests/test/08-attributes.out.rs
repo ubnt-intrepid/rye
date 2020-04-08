@@ -1,4 +1,3 @@
-#[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
 const attributes: & path::to::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
@@ -33,7 +32,6 @@ const attributes: & path::to::rye::_test_reexports::TestCase = {
     }
 };
 
-#[cfg(any(test, trybuild))]
 path::to::rye::__test_case! {
     #[allow(non_upper_case_globals)]
     static __TEST_CASE_attributes: & path::to::rye::_test_reexports::TestCase = attributes;

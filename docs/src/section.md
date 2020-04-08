@@ -23,14 +23,14 @@ test case:
 ```rust
 # fn main() {}
 #[rye::test]
-fn has_multi_section() {
+fn has_multi_section(cx: &mut rye::Context<'_>) {
     println!("startup");
 
-    section!("section 1", {
+    section!(cx, "section 1", {
         println!("section 1");
     });
 
-    section!("section 2", {
+    section!(cx, "section 2", {
         println!("section 2");
     });
 

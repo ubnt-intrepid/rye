@@ -9,4 +9,5 @@ path = "doctest.rs"
 
 [dev-dependencies]
 rye = { path = "../crates/rye" }
+anyhow = "1"
 doc-comment = "0.3"

@@ -1,4 +1,3 @@
-#[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
 const case_sync_nested: & ::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
@@ -34,7 +33,6 @@ const case_sync_nested: & ::rye::_test_reexports::TestCase = {
     }
 };
 
-#[cfg(any(test, trybuild))]
 ::rye::__test_case! {
     #[allow(non_upper_case_globals)]
     static __TEST_CASE_case_sync_nested: & ::rye::_test_reexports::TestCase = case_sync_nested;

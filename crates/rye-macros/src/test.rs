@@ -367,7 +367,6 @@ impl ToTokens for Generated<'_> {
         let test_case_id = quote::format_ident!("__TEST_CASE_{}", ident);
 
         tokens.append_all(Some(quote! {
-            #[cfg(any(test, trybuild))]
             #[allow(non_upper_case_globals)]
             const #ident: & #crate_path::_test_reexports::TestCase = {
                 #[allow(unused_imports)]
@@ -387,7 +386,6 @@ impl ToTokens for Generated<'_> {
         }));
 
         tokens.append_all(Some(quote! {
-            #[cfg(any(test, trybuild))]
             #crate_path::__test_case! {
                 #[allow(non_upper_case_globals)]
                 static #test_case_id: & #crate_path::_test_reexports::TestCase = #ident;

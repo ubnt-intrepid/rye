@@ -1,4 +1,3 @@
-#[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
 const return_result: & ::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
@@ -23,7 +22,6 @@ const return_result: & ::rye::_test_reexports::TestCase = {
     }
 };
 
-#[cfg(any(test, trybuild))]
 ::rye::__test_case! {
     #[allow(non_upper_case_globals)]
     static __TEST_CASE_return_result: & ::rye::_test_reexports::TestCase = return_result;
