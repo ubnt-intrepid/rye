@@ -286,7 +286,7 @@ impl ConsoleReporter {
 }
 
 impl Reporter for ConsoleReporter {
-    fn test_run_starting(&self, tests: &[&dyn TestCase]) {
+    fn test_run_starting(&self, tests: &[&TestCase]) {
         let mut w = self.stream.lock();
         let _ = writeln!(w, "running {} tests", tests.len());
     }
@@ -306,12 +306,12 @@ impl Reporter for ConsoleReporter {
 
 pub struct SessionInner<'a> {
     parser: Parser,
-    test_cases: &'a [&'a dyn TestCase],
+    test_cases: &'a [&'static TestCase],
 }
 
 impl<'a> SessionInner<'a> {
     #[inline]
-    pub(crate) fn new(test_cases: &'a [&'a dyn TestCase]) -> Self {
+    pub(crate) fn new(test_cases: &'a [&'static TestCase]) -> Self {
         Self {
             parser: Parser::new(std::env::args()),
             test_cases,
@@ -330,7 +330,7 @@ impl<'a> SessionInner<'a> {
 
 pub struct Session<'sess> {
     parser: &'sess mut Parser,
-    test_cases: &'sess [&'sess dyn TestCase],
+    test_cases: &'sess [&'static TestCase],
     spawner: &'sess mut dyn Spawner,
 }
 
@@ -347,7 +347,7 @@ impl Session<'_> {
         let mut filtered_out_tests = vec![];
         let mut unique_test_names = HashSet::new();
         for test in self.test_cases {
-            let desc = test.desc();
+            let desc = &test.desc;
             let filtered_out = args.is_filtered_out(desc.name());
 
             anyhow::ensure!(
@@ -364,13 +364,13 @@ impl Session<'_> {
         }
 
         // sort test cases by name.
-        registered_tests.sort_by(|t1, t2| t1.desc().name().cmp(t2.desc().name()));
+        registered_tests.sort_by(|t1, t2| t1.desc.name().cmp(t2.desc.name()));
 
         if args.list_tests {
             let mut num_tests = 0;
             for test in &registered_tests {
                 num_tests += 1;
-                println!("{}: test", test.desc().name());
+                println!("{}: test", test.desc.name());
             }
 
             fn plural_suffix(n: usize) -> &'static str {

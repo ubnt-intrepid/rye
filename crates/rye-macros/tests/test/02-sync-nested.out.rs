@@ -1,6 +1,6 @@
 #[cfg(any(test, trybuild))]
 #[allow(non_upper_case_globals)]
-const case_sync_nested: &dyn ::rye::_test_reexports::TestCase = {
+const case_sync_nested: & ::rye::_test_reexports::TestCase = {
     #[allow(unused_imports)]
     use ::rye::_test_reexports as __rye;
 
@@ -22,32 +22,20 @@ const case_sync_nested: &dyn ::rye::_test_reexports::TestCase = {
         });
     }
 
-    struct __TestCase;
-
-    impl __rye::TestCase for __TestCase {
-        fn desc(&self) -> &'static __rye::TestDesc {
-            &__rye::TestDesc {
-                name: __rye::test_name!(case_sync_nested),
-                location: __rye::location!(),
-            }
-        }
-
-        fn test_fn(&self) -> __rye::TestFn {
-            __rye::test_fn!(@blocking case_sync_nested)
-        }
-
-        fn test_plans(&self) -> &'static [__rye::TestPlan] {
-            &[
-                __rye::TestPlan { target: Some(1u64), ancestors: &[ 0u64 ], },
-            ]
-        }
+    &__rye::TestCase {
+        desc: __rye::TestDesc {
+            name: __rye::test_name!(case_sync_nested),
+            location: __rye::location!(),
+        },
+        testfn: __rye::test_fn!(@blocking case_sync_nested),
+        plans: &[
+            __rye::TestPlan { target: Some(1u64), ancestors: &[ 0u64 ], },
+        ],
     }
-
-    &__TestCase
 };
 
 #[cfg(any(test, trybuild))]
 ::rye::__test_case! {
     #[allow(non_upper_case_globals)]
-    static __TEST_CASE_case_sync_nested: &dyn ::rye::_test_reexports::TestCase = case_sync_nested;
+    static __TEST_CASE_case_sync_nested: & ::rye::_test_reexports::TestCase = case_sync_nested;
 }

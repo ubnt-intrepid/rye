@@ -5,7 +5,7 @@ use maybe_unwind::capture_panic_info;
 use std::panic;
 use std::sync::Once;
 
-pub type TestCases<'a> = &'a [&'a dyn TestCase];
+pub type TestCases<'a> = &'a [&'static TestCase];
 
 extern "Rust" {
     #[link_name = "__rye_test_main"]

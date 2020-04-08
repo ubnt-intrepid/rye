@@ -59,7 +59,7 @@ impl Summary {
 }
 
 pub trait Reporter {
-    fn test_run_starting(&self, tests: &[&dyn TestCase]);
+    fn test_run_starting(&self, tests: &[&TestCase]);
     fn test_run_ended(&self, summary: &Summary);
 
     fn test_case_starting(&self, desc: &TestDesc);
@@ -68,7 +68,7 @@ pub trait Reporter {
 
 macro_rules! impl_reporter_body {
     () => {
-        fn test_run_starting(&self, tests: &[&dyn TestCase]) {
+        fn test_run_starting(&self, tests: &[&TestCase]) {
             (**self).test_run_starting(tests)
         }
 
