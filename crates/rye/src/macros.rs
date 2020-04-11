@@ -28,7 +28,7 @@ macro_rules! skip {
 #[macro_export]
 macro_rules! fail {
     ($ctx:ident) => {
-        $crate::fail!($ctx:ident, "explicitly failed");
+        $crate::fail!($ctx, "explicitly failed");
     };
     ($ctx:ident, $($arg:tt)+) => {{
         use $crate::_test_reexports as __rye;
