@@ -161,3 +161,37 @@ fn expensive_test_fallible(ctx: &mut rye::Context<'_>) -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[rye::test]
+#[allow(unreachable_code)]
+fn smoke_macros(ctx: &mut rye::Context<'_>) {
+    if false {
+        rye::skip!(ctx);
+        rye::skip!(ctx, "skipped");
+        rye::skip!(ctx, "skipped, message: {}", "<message>");
+    }
+
+    if false {
+        rye::fail!(ctx);
+        rye::fail!(ctx, "skipped");
+        rye::fail!(ctx, "skipped, message: {}", "<message>");
+    }
+}
+
+#[rye::test]
+#[allow(unreachable_code)]
+fn smoke_macros_fallible(ctx: &mut rye::Context<'_>) -> anyhow::Result<()> {
+    if false {
+        rye::skip!(ctx);
+        rye::skip!(ctx, "skipped");
+        rye::skip!(ctx, "skipped, message: {}", "<message>");
+    }
+
+    if false {
+        rye::fail!(ctx);
+        rye::fail!(ctx, "skipped");
+        rye::fail!(ctx, "skipped, message: {}", "<message>");
+    }
+
+    Ok(())
+}
