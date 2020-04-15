@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["default_runtime","Create an instance of `Runtime` used by the default test harness."]],"trait":[["Runtime","The runtime for driving the test application."],["Spawner","The value for spawning test cases."]]});
