@@ -1,5 +1,5 @@
 #[cfg(test)]
-rye::test_harness!();
+rye_harness::test_harness!();
 
 #[cfg(test)]
 mod tests {

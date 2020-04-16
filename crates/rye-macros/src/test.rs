@@ -386,7 +386,7 @@ impl ToTokens for Generated<'_> {
         }));
 
         tokens.append_all(Some(quote! {
-            #crate_path::__test_case! {
+            ::rye_harness::test_case! {
                 #[allow(non_upper_case_globals)]
                 static #test_case_id: & #crate_path::_test_reexports::TestCase = #ident;
             }

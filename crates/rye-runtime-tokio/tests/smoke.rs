@@ -1,7 +1,7 @@
 use std::time::Duration;
 use tokio::{task, time::delay_for};
 
-rye::test_harness!();
+rye_harness::test_harness!();
 
 #[rye::test_main]
 #[rye(runtime = rye_runtime_tokio::runtime)]

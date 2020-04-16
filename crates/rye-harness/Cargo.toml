@@ -1,0 +1,15 @@
+[package]
+name = "rye-harness"
+version = "0.1.0-dev"
+authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+rye = { version = "0.1.0-dev", path = "../rye" }
+linkme = "0.2"
+
+[[test]]
+name = "test_harness"
+path = "tests/test_harness.rs"
+harness = false
+required-features = [ "harness" ]

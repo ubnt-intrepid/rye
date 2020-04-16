@@ -11,7 +11,6 @@ a C++ unit testing framework library.
 
 #[macro_use]
 mod macros;
-mod harness;
 mod report;
 mod runner;
 mod session;
@@ -27,7 +26,7 @@ pub use rye_macros::test;
 pub use rye_macros::test_main;
 
 #[doc(hidden)]
-pub use runner::test_runner;
+pub use crate::{runner::test_runner, test::TestCase};
 
 hidden_item! {
     /// Re-exported items for #[test]
@@ -52,15 +51,6 @@ hidden_item! {
         pub use rye_runtime::{default_runtime, Runtime};
         pub use crate::{
             runner::{TestCases, test_main_inner},
-        };
-    }
-
-    /// Re-exported items for test_harness!() and __test_case_harness!()
-    #[cfg(feature = "harness")]
-    pub mod _test_harness_reexports {
-        pub use {
-            crate::harness::{TEST_CASES, main},
-            linkme::{self, distributed_slice},
         };
     }
 }

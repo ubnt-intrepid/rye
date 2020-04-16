@@ -5,14 +5,7 @@ use std::{
 };
 
 fn main() {
-    if cfg!(feature = "harness") {
-        println!("cargo:rustc-cfg=harness");
-    }
-
-    if cfg!(feature = "frameworks")
-        && !cfg!(feature = "harness")
-        && probe_custom_test_frameworks().map_or(false, |st| st.success())
-    {
+    if probe_custom_test_frameworks().map_or(false, |st| st.success()) {
         println!("cargo:rustc-cfg=frameworks");
     }
 }

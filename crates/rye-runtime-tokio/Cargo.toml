@@ -13,6 +13,7 @@ tokio = { version = "0.2", features = [ "blocking", "rt-threaded", "rt-util" ] }
 
 [dev-dependencies]
 rye = { version = "0.1.0-dev", path = "../rye" }
+rye-harness = { version = "0.1.0-dev", path = "../rye-harness" }
 tokio = { version = "0.2", features = [ "full" ] }
 
 [[test]]

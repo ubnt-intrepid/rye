@@ -1,0 +1,12 @@
+[package]
+name = "rye-frameworks"
+version = "0.1.0"
+authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+edition = "2018"
+build = "build.rs"
+
+[lib]
+name = "rye_harness"
+
+[dependencies]
+rye = { version = "0.1.0-dev", path = "../rye" }

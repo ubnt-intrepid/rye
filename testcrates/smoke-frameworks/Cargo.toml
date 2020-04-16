@@ -6,7 +6,8 @@ edition = "2018"
 build = "build.rs"
 
 [dev-dependencies]
-rye = { path = "../../crates/rye", default-features = false, features = [ "frameworks" ] }
+rye = { path = "../../crates/rye" }
+rye-frameworks = { path = "../../crates/rye-frameworks" }
 anyhow = "1"
 
 [[test]]

@@ -9,17 +9,10 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ubnt-intrepid/rye.git"
 readme = "README.md"
-build = "build.rs"
 
 [package.metadata.docs.rs]
-all-features = true
 rustdoc-args = [ "--cfg", "docs" ]
 targets = [ "x86_64-unknown-linux-gnu" ]
-
-[features]
-default = [ "harness" ]
-harness = [ "linkme" ]
-frameworks = []
 
 [dependencies]
 rye-macros = { version = "=0.1.0-dev", path = "../rye-macros" }
@@ -35,17 +28,10 @@ maybe-unwind = "0.3"
 pin-project = "0.4"
 termcolor = "1"
 
-linkme = { version = "0.2", optional = true }
-
 [dev-dependencies]
+dummy = { path = "dummy" }
 futures = "0.3"
 futures-test = "0.3"
 rustversion = "1"
 scoped-tls-async = { git = "https://github.com/ubnt-intrepid/scoped-tls-async.git" }
 trybuild = "1"
-
-[[test]]
-name = "test_harness"
-path = "tests/test_harness.rs"
-harness = false
-required-features = [ "harness" ]

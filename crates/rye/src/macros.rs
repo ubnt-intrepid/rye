@@ -111,31 +111,3 @@ macro_rules! __section {
         }
     };
 }
-
-#[doc(hidden)] // private API
-#[cfg(harness)]
-#[macro_export]
-macro_rules! __test_case {
-    ( $item:item ) => {
-        $crate::__test_case_harness!($item);
-    };
-}
-
-#[doc(hidden)] // private API
-#[cfg(frameworks)]
-#[macro_export]
-macro_rules! __test_case {
-    ( $item:item ) => {
-        #[test_case]
-        $item
-    };
-}
-
-#[doc(hidden)] // private API
-#[cfg(all(not(harness), not(frameworks)))]
-#[macro_export]
-macro_rules! __test_case {
-    ( $item:item ) => {
-        /* stub */
-    };
-}

@@ -5,7 +5,8 @@ publish = false
 edition = "2018"
 
 [dev-dependencies]
-rye = { path = "../../crates/rye", default-features = false, features = [ "harness" ] }
+rye = { path = "../../crates/rye" }
+rye-harness = { path = "../../crates/rye-harness" }
 anyhow = "1"
 
 [lib]
